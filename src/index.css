@@ -956,3 +956,62 @@ body {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.15);
 }
+/* ============================================= */
+/* TOAST DE NOTIFICAÇÃO (substitui os alerts)    */
+/* ============================================= */
+.toast-notification {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(92vw, 420px);
+  padding: 0.8rem 1.25rem;
+  border-radius: 999px;
+  background-color: #F2ECDD; /* Bege do design */
+  color: #15110E;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--accent-gold);
+  animation: toast-slide-up 0.25s ease-out;
+  pointer-events: none;
+}
+
+.toast-notification.error {
+  border-color: #ef4444;
+}
+
+.toast-notification .toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  color: #15110E;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.toast-notification.error .toast-icon {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+@keyframes toast-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

@@ -1,5 +1,6 @@
 export interface Participant {
-  id: string;
+  id: string; // username (ex: 'pedro') — usado nos caminhos de imagem e no ranking
+  uid?: string; // uuid do Supabase Auth
   name: string;
   avatarUrl: string; // Ex: '/imagens/pedro.png'
 }
@@ -20,7 +21,8 @@ export interface Match {
   homeScore: number | null; // null se não jogou
   awayScore: number | null; // null se não jogou
   status: MatchStatus;
-  local_date?: string; // Data original para cálculos
+  kickoff: string; // Início do jogo em UTC (ISO 8601) — fonte da verdade p/ lockout
+  isoDate: string; // Data do jogo no horário de Brasília (YYYY-MM-DD)
 }
 
 export interface Bet {

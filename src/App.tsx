@@ -1,359 +1,302 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Trophy, Calendar, CheckSquare, PencilLine } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding } from './types';
-import { initialParticipants } from './data/initialData';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { StandingsTable } from './components/StandingsTable';
+import { supabase } from './lib/supabase';
+import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
+
+// Fuso horário de exibição: todos os horários dos jogos são convertidos para Brasília
+const TZ = 'America/Sao_Paulo';
+
+const brDateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit' });
+const brTimeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+const isoDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 
 // Função para verificar se o jogo está no futuro (antes do horário de início)
-const isGameInFuture = (localDateStr: string): boolean => {
-  if (!localDateStr) return false;
-  const parts = localDateStr.split(' ');
-  if (parts.length < 2) return false;
-  const dateParts = parts[0].split('/'); // [MM, DD, YYYY]
-  const timeParts = parts[1].split(':'); // [HH, mm]
-  if (dateParts.length < 3 || timeParts.length < 2) return false;
-  
-  const month = parseInt(dateParts[0], 10) - 1;
-  const day = parseInt(dateParts[1], 10);
-  const year = parseInt(dateParts[2], 10);
-  const hour = parseInt(timeParts[0], 10);
-  const minute = parseInt(timeParts[1], 10);
-  
-  const gameTime = new Date(year, month, day, hour, minute);
-  const currentTime = new Date();
-  
-  // Pode apostar até 1 minuto antes (se gameTime for 16:00, currentTime deve ser < 16:00)
-  return currentTime.getTime() < gameTime.getTime();
+// O kickoff vem em UTC (ISO 8601) direto do banco — sem ambiguidade de fuso.
+const isGameInFuture = (kickoff: string): boolean => {
+  if (!kickoff) return false;
+  return Date.now() < Date.parse(kickoff);
 };
 
-// Obter a data de hoje no formato DD/MM
-const getTodayDateStr = (): string => {
-  const d = new Date();
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  return `${day}/${month}`;
-};
+// Data de hoje no horário de Brasília (YYYY-MM-DD)
+const getTodayIso = (): string => isoDateFmt.format(new Date());
 
-// Dicionário de tradução dos nomes dos países de Inglês para Português
-const teamNamesMap: { [key: string]: string } = {
-  "Algeria": "Argélia",
-  "Argentina": "Argentina",
-  "Australia": "Austrália",
-  "Austria": "Áustria",
-  "Belgium": "Bélgica",
-  "Bosnia and Herzegovina": "Bósnia",
-  "Brazil": "Brasil",
-  "Canada": "Canadá",
-  "Cape Verde": "Cabo Verde",
-  "Colombia": "Colômbia",
-  "Croatia": "Croácia",
-  "Curaçao": "Curaçao",
-  "Czech Republic": "República Tcheca",
-  "Democratic Republic of the Congo": "RD Congo",
-  "Ecuador": "Equador",
-  "Egypt": "Egito",
-  "England": "Inglaterra",
-  "France": "França",
-  "Germany": "Alemanha",
-  "Ghana": "Gana",
-  "Haiti": "Haiti",
-  "Iran": "Irã",
-  "Iraq": "Iraque",
-  "Ivory Coast": "Costa do Marfim",
-  "Japan": "Japão",
-  "Jordan": "Jordânia",
-  "Mexico": "México",
-  "Morocco": "Marrocos",
-  "Netherlands": "Holanda",
-  "New Zealand": "Nova Zelândia",
-  "Norway": "Noruega",
-  "Panama": "Panamá",
-  "Paraguay": "Paraguai",
-  "Portugal": "Portugal",
-  "Qatar": "Catar",
-  "Saudi Arabia": "Arábia Saudita",
-  "Scotland": "Escócia",
-  "Senegal": "Senegal",
-  "South Africa": "África do Sul",
-  "South Korea": "Coreia do Sul",
-  "Spain": "Espanha",
-  "Sweden": "Suécia",
-  "Switzerland": "Suíça",
-  "Tunisia": "Tunísia",
-  "Turkey": "Turquia",
-  "United States": "EUA",
-  "Uruguay": "Uruguai",
-  "Uzbekistan": "Uzbequistão"
-};
+// Linha crua da tabela `bets` do Supabase
+interface BetRow {
+  user_id: string;
+  match_id: number;
+  home_score: number;
+  away_score: number;
+}
 
-const translateTeam = (name: string) => {
-  return teamNamesMap[name] || name;
-};
+// Linha crua da tabela `matches` do Supabase
+interface MatchDbRow {
+  id: number;
+  utc_date: string;
+  status: string;
+  stage: string | null;
+  group_name: string | null;
+  home_team: string;
+  away_team: string;
+  home_tla: string;
+  away_tla: string;
+  home_crest: string;
+  away_crest: string;
+  home_score: number | null;
+  away_score: number | null;
+}
 
-// Função para mapear o código de time para o padrão do protótipo (ex: RSA -> AFRI, CZE -> TCH)
-const mapFifaCode = (teamNameEn: string, originalCode: string): string => {
-  const codeMap: { [key: string]: string } = {
-    "South Africa": "AFRI",
-    "Czech Republic": "TCH",
-    "United States": "EUA",
-    "Germany": "ALE",
-    "Saudi Arabia": "ARA",
-    "England": "ING",
-    "Curaçao": "CUR",
-    "Cape Verde": "CAB",
-    "Netherlands": "HOL",
-    "Jordan": "JOR",
-    "Uzbekistan": "UZB",
-    "Tunisia": "TUN",
-    "Morocco": "MAR",
-    "Senegal": "SEN",
-    "Algeria": "ALG",
-    "Egypt": "EGI",
-    "Ghana": "GAN",
-    "Norway": "NOR",
-    "Sweden": "SUE",
-    "Switzerland": "SUI",
-    "Croatia": "CRO",
-    "Belgium": "BEL",
-    "Austria": "AUT",
-    "Bosnia and Herzegovina": "BOS",
-    "Iraq": "IRA",
-    "Iran": "IRÃ",
-    "Japan": "JAP",
-    "South Korea": "KOR",
-    "Australia": "AUS",
-    "New Zealand": "NZL",
-    "Haiti": "HAI",
-    "Panama": "PAN",
-    "Ecuador": "EQU",
-    "Uruguay": "URU",
-    "Colombia": "COL"
+// Converte uma linha da tabela `matches` do Supabase para o formato do app
+const mapRowToMatch = (r: MatchDbRow): Match => {
+  const d = new Date(r.utc_date);
+  return {
+    id: String(r.id),
+    homeTeam: translateTeam(r.home_team),
+    awayTeam: translateTeam(r.away_team),
+    homeCode: mapFifaCode(r.home_team, r.home_tla),
+    awayCode: mapFifaCode(r.away_team, r.away_tla),
+    homeFlag: flagOf(r.home_team, r.home_crest),
+    awayFlag: flagOf(r.away_team, r.away_crest),
+    date: brDateFmt.format(d),
+    time: brTimeFmt.format(d),
+    group: groupLabel(r.stage, r.group_name),
+    homeScore: r.home_score ?? null,
+    awayScore: r.away_score ?? null,
+    status: r.status === 'FINISHED' ? 'finished' : 'scheduled',
+    kickoff: r.utc_date,
+    isoDate: isoDateFmt.format(d),
   };
-  return codeMap[teamNameEn] || originalCode || (teamNameEn || '').slice(0, 3).toUpperCase();
 };
 
-// Gerador determinístico de palpites para popular os pontos do ranking de forma realista
-const generateDeterministicBet = (matchId: string, participantId: string): { homeScore: number, awayScore: number } => {
-  const seed = `${matchId}-${participantId}`;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+const readCachedUser = (): Participant | null => {
+  const saved = localStorage.getItem('bolao_current_user');
+  if (!saved) return null;
+  try {
+    const parsed = JSON.parse(saved);
+    return parsed?.uid ? parsed : null; // formato antigo (sem uid) é descartado
+  } catch {
+    return null;
   }
-  const homeScore = Math.abs(hash) % 4;
-  const awayScore = Math.abs(hash >> 3) % 4;
-  return { homeScore, awayScore };
 };
 
 function App() {
   // 1. Estados de Autenticação e Telas
-  const [currentUser, setCurrentUser] = useState<Participant | null>(() => {
-    const saved = localStorage.getItem('bolao_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'splash' | 'app'>(() => {
-    const saved = localStorage.getItem('bolao_current_user');
-    return saved ? 'app' : 'login';
-  });
+  const [currentUser, setCurrentUser] = useState<Participant | null>(() => readCachedUser());
+
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'splash' | 'app'>(() =>
+    readCachedUser() ? 'app' : 'login'
+  );
 
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
 
   // 2. Estados Principais do Bolão
-  const [participants, setParticipants] = useState<Participant[]>(() => {
-    const saved = localStorage.getItem('bolao_participants');
-    return saved ? JSON.parse(saved) : initialParticipants;
-  });
-
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [bets, setBets] = useState<Bet[]>(() => {
-    const saved = localStorage.getItem('bolao_bets');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [betRows, setBetRows] = useState<BetRow[]>([]);
+  const [submittedDates, setSubmittedDates] = useState<Set<string>>(new Set());
 
   // Estado para os rascunhos de palpites editados inline
   const [draftBets, setDraftBets] = useState<{ [matchId: string]: { homeScore: string, awayScore: string } }>({});
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
   const [activeTab, setActiveTab] = useState<'jogos' | 'ranking'>('jogos');
-  
-  // Estado da data de partidas selecionada
-  const [selectedDate, setSelectedDate] = useState<string>('');
 
-  // 3. Salvar participantes ao alterar
+  // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
+  const [selectedDateState, setSelectedDateState] = useState<string>('');
+
+  // Toast de notificação (substitui os alert() nativos)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const toastTimerRef = useRef<number | undefined>(undefined);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'error') => {
+    window.clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3500);
+  };
+
+  const toastEl = toast && (
+    <div className={`toast-notification ${toast.type}`} role="status">
+      <span className="toast-icon">{toast.type === 'success' ? '✓' : '!'}</span>
+      <span>{toast.message}</span>
+    </div>
+  );
+
+  // 3. Validar a sessão do Supabase ao abrir o app
   useEffect(() => {
-    localStorage.setItem('bolao_participants', JSON.stringify(participants));
-  }, [participants]);
-
-  // 4. Carregamento de dados da API Real
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [gamesRes, teamsRes] = await Promise.all([
-          fetch('https://worldcup26.ir/get/games'),
-          fetch('https://worldcup26.ir/get/teams')
-        ]);
-        
-        if (!gamesRes.ok || !teamsRes.ok) {
-          throw new Error('Erro ao carregar dados da API real.');
-        }
-        
-        const gamesData = await gamesRes.json();
-        const teamsData = await teamsRes.json();
-        
-        const teamsList = teamsData.teams || [];
-        const gamesList = gamesData.games || [];
-        
-        const teamMap: { [key: string]: any } = {};
-        teamsList.forEach((t: any) => {
-          teamMap[t.id] = t;
-        });
-        
-        const parsedMatches: Match[] = gamesList.map((g: any) => {
-          const homeTeamObj = teamMap[g.home_team_id];
-          const awayTeamObj = teamMap[g.away_team_id];
-          
-          const homeName = g.home_team_name_en || (homeTeamObj ? homeTeamObj.name_en : '');
-          const awayName = g.away_team_name_en || (awayTeamObj ? awayTeamObj.name_en : '');
-          
-          let formattedDate = '11/06';
-          let formattedTime = '13:00';
-          if (g.local_date) {
-            const parts = g.local_date.split(' ');
-            if (parts.length >= 2) {
-              formattedTime = parts[1];
-              const dateParts = parts[0].split('/');
-              if (dateParts.length >= 2) {
-                formattedDate = `${dateParts[1]}/${dateParts[0]}`; // MM/DD/YYYY -> DD/MM
-              }
-            }
-          }
-          
-          return {
-            id: String(g.id),
-            homeTeam: translateTeam(homeName),
-            awayTeam: translateTeam(awayName),
-            homeCode: mapFifaCode(homeName, homeTeamObj ? homeTeamObj.fifa_code : ''),
-            awayCode: mapFifaCode(awayName, awayTeamObj ? awayTeamObj.fifa_code : ''),
-            homeFlag: homeTeamObj ? homeTeamObj.iso2.toLowerCase() : 'un',
-            awayFlag: awayTeamObj ? awayTeamObj.iso2.toLowerCase() : 'un',
-            date: formattedDate,
-            time: formattedTime,
-            group: g.group ? `Grupo ${g.group}` : 'Grupo A',
-            homeScore: g.finished === 'TRUE' ? parseInt(g.home_score) : null,
-            awayScore: g.finished === 'TRUE' ? parseInt(g.away_score) : null,
-            status: g.finished === 'TRUE' ? 'finished' : 'scheduled',
-            local_date: g.local_date // Manter original para checagem de horário
-          };
-        });
-        
-        // Ordenar partidas por data e hora
-        parsedMatches.sort((a, b) => {
-          const [dayA, monthA] = a.date.split('/').map(Number);
-          const [dayB, monthB] = b.date.split('/').map(Number);
-          if (monthA !== monthB) return monthA - monthB;
-          if (dayA !== dayB) return dayA - dayB;
-          return a.time.localeCompare(b.time);
-        });
-
-        setMatches(parsedMatches);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || 'Erro desconhecido');
-      } finally {
-        setLoading(false);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) {
+        localStorage.removeItem('bolao_current_user');
+        setCurrentUser(null);
+        setCurrentScreen('login');
+        return;
       }
-    };
-
-    fetchData();
+      const { data: prof } = await supabase
+        .from('participants')
+        .select('id, username, name, avatar_url')
+        .eq('id', session.user.id)
+        .single();
+      if (prof) {
+        const participant: Participant = {
+          id: prof.username,
+          uid: prof.id,
+          name: prof.name,
+          avatarUrl: prof.avatar_url,
+        };
+        localStorage.setItem('bolao_current_user', JSON.stringify(participant));
+        setCurrentUser(participant);
+        setCurrentScreen((prev) => (prev === 'login' ? 'app' : prev));
+      }
+    });
   }, []);
 
-  // 5. Configurar data inicial baseada em Hoje (se houver partidas) ou na primeira data disponível
+  // 4. Carregamento de dados do Supabase
+  const loadAll = async (uid: string, withSpinner: boolean) => {
+    if (withSpinner) setLoading(true);
+    try {
+      const [partsRes, matchesRes, betsRes, subsRes] = await Promise.all([
+        supabase.from('participants').select('id, username, name, avatar_url').order('username'),
+        supabase.from('matches').select('*').order('utc_date'),
+        supabase.from('bets').select('user_id, match_id, home_score, away_score'),
+        supabase.from('submissions').select('bet_date').eq('user_id', uid),
+      ]);
+
+      const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
+      if (firstError) throw new Error(firstError.message);
+
+      setParticipants(
+        (partsRes.data ?? []).map((p) => ({
+          id: p.username,
+          uid: p.id,
+          name: p.name,
+          avatarUrl: p.avatar_url,
+        }))
+      );
+      setMatches(((matchesRes.data ?? []) as MatchDbRow[]).map(mapRowToMatch));
+      setBetRows((betsRes.data ?? []) as BetRow[]);
+      setSubmittedDates(new Set((subsRes.data ?? []).map((s) => s.bet_date)));
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+    } finally {
+      if (withSpinner) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const uid = currentUser?.uid;
+    if (!uid) return;
+
+    const initialLoad = async () => {
+      // Pede para a Netlify Function atualizar os jogos (ignora se estiver
+      // rodando local sem `netlify dev` — o cron do Netlify cobre o resto)
+      try {
+        await fetch('/.netlify/functions/sync-matches');
+      } catch {
+        /* sem functions no ambiente local */
+      }
+      await loadAll(uid, true);
+    };
+
+    initialLoad();
+
+    // Atualizações ao vivo via Supabase Realtime: qualquer mudança em
+    // jogos/apostas/lançamentos recarrega os dados. O debounce agrupa as
+    // rajadas de eventos (a sincronização atualiza ~104 jogos de uma vez).
+    let reloadTimer: number | undefined;
+    const scheduleReload = () => {
+      window.clearTimeout(reloadTimer);
+      reloadTimer = window.setTimeout(() => loadAll(uid, false), 800);
+    };
+
+    const channel = supabase
+      .channel('bolao-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
+      .subscribe();
+
+    // Fallback caso o Realtime caia (e para revelar palpites após o kickoff)
+    const interval = setInterval(() => loadAll(uid, false), 300000);
+
+    return () => {
+      window.clearTimeout(reloadTimer);
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [currentUser?.uid]);
+
+  // 5. Mapear apostas cruas (uuid) para o formato do app (username)
+  const usernameByUid = useMemo(() => {
+    const map: { [uid: string]: string } = {};
+    participants.forEach((p) => {
+      if (p.uid) map[p.uid] = p.id;
+    });
+    return map;
+  }, [participants]);
+
+  const bets = useMemo<Bet[]>(
+    () =>
+      betRows.map((r) => ({
+        matchId: String(r.match_id),
+        participantId: usernameByUid[r.user_id] || r.user_id,
+        homeScore: r.home_score,
+        awayScore: r.away_score,
+      })),
+    [betRows, usernameByUid]
+  );
+
+  // 6. Datas disponíveis (chave ISO + rótulo DD/MM)
   const dates = useMemo(() => {
-    const allDates = matches.map((m) => m.date);
-    return Array.from(new Set(allDates));
+    const seen = new Map<string, string>();
+    matches.forEach((m) => {
+      if (!seen.has(m.isoDate)) seen.set(m.isoDate, m.date);
+    });
+    return Array.from(seen, ([iso, label]) => ({ iso, label }));
   }, [matches]);
 
-  useEffect(() => {
-    if (dates.length > 0 && !selectedDate) {
-      const todayStr = getTodayDateStr(); // Ex: "12/06"
-      if (dates.includes(todayStr)) {
-        setSelectedDate(todayStr);
-      } else {
-        setSelectedDate(dates[0]);
-      }
-    }
-  }, [dates, selectedDate]);
+  // Data efetivamente selecionada: a escolhida pelo usuário ou, por padrão,
+  // hoje (se tiver jogos) > próxima data com jogos > última data
+  const selectedDate = useMemo(() => {
+    if (selectedDateState) return selectedDateState;
+    if (dates.length === 0) return '';
+    const todayIso = getTodayIso();
+    const found =
+      dates.find((d) => d.iso === todayIso) ||
+      dates.find((d) => d.iso > todayIso) ||
+      dates[dates.length - 1];
+    return found.iso;
+  }, [selectedDateState, dates]);
 
-  // 6. Preencher palpites rascunho (draft) e palpites simulados determinísticos para mock users
-  useEffect(() => {
-    if (matches.length === 0 || !currentUser) return;
-
-    // Buscar palpites do localStorage
-    const savedBets = localStorage.getItem('bolao_bets');
-    let currentBetsList: Bet[] = savedBets ? JSON.parse(savedBets) : [];
-
-    const allParticipantIds = ['pedro', 'alex', 'rodrigo', 'neto'];
-    // Garantir que o participante atual também esteja na lista
-    if (!allParticipantIds.includes(currentUser.id)) {
-      allParticipantIds.push(currentUser.id);
-    }
-
-    const updatedBets = [...currentBetsList];
-    let changed = false;
-
+  // 7. Palpites a exibir: aposta já salva no banco tem prioridade;
+  //    senão, o rascunho que o usuário está digitando
+  const displayDrafts = useMemo(() => {
+    const map: { [matchId: string]: { homeScore: string, awayScore: string } } = {};
     matches.forEach((match) => {
-      allParticipantIds.forEach((pId) => {
-        const hasBet = updatedBets.some((b) => b.matchId === match.id && b.participantId === pId);
-        if (!hasBet) {
-          const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.local_date || '');
-          const isMockUser = pId !== currentUser.id;
-
-          // Se for mock user, ou se for o usuário logado e o jogo já tiver começado/passado:
-          if (isMockUser || hasGameStarted) {
-            const mockBet = generateDeterministicBet(match.id, pId);
-            updatedBets.push({
-              matchId: match.id,
-              participantId: pId,
-              homeScore: mockBet.homeScore,
-              awayScore: mockBet.awayScore,
-            });
-            changed = true;
-          }
-        }
-      });
+      const own = currentUser
+        ? bets.find((b) => b.matchId === match.id && b.participantId === currentUser.id)
+        : undefined;
+      map[match.id] = own
+        ? { homeScore: String(own.homeScore), awayScore: String(own.awayScore) }
+        : (draftBets[match.id] ?? { homeScore: '', awayScore: '' });
     });
-
-    if (changed || currentBetsList.length === 0) {
-      setBets(updatedBets);
-      localStorage.setItem('bolao_bets', JSON.stringify(updatedBets));
-    }
-
-    // Inicializar rascunho (draftBets) para as partidas editáveis do usuário logado
-    const newDrafts: { [matchId: string]: { homeScore: string, awayScore: string } } = {};
-    matches.forEach((match) => {
-      const existingBet = updatedBets.find((b) => b.matchId === match.id && b.participantId === currentUser.id);
-      newDrafts[match.id] = {
-        homeScore: existingBet ? String(existingBet.homeScore) : '',
-        awayScore: existingBet ? String(existingBet.awayScore) : '',
-      };
-    });
-    setDraftBets(newDrafts);
-  }, [matches, currentUser]);
+    return map;
+  }, [matches, bets, draftBets, currentUser]);
 
   // Agrupar partidas por data para renderização eficiente
   const groupedMatches = useMemo(() => {
     const groups: { [key: string]: Match[] } = {};
     matches.forEach((m) => {
-      if (!groups[m.date]) {
-        groups[m.date] = [];
+      if (!groups[m.isoDate]) {
+        groups[m.isoDate] = [];
       }
-      groups[m.date].push(m);
+      groups[m.isoDate].push(m);
     });
     return groups;
   }, [matches]);
@@ -365,50 +308,68 @@ function App() {
 
   // Partidas jogáveis de hoje que ainda não começaram
   const playableMatches = useMemo(() => {
-    const todayStr = getTodayDateStr();
-    if (selectedDate !== todayStr) return [];
-    return activeDateMatches.filter((m) => m.status === 'scheduled' && isGameInFuture(m.local_date || ''));
+    if (selectedDate !== getTodayIso()) return [];
+    return activeDateMatches.filter((m) => m.status === 'scheduled' && isGameInFuture(m.kickoff));
   }, [activeDateMatches, selectedDate]);
 
   // Verifica se todos os palpites das partidas jogáveis de hoje foram preenchidos
   const areAllPredictionsFilled = useMemo(() => {
     if (playableMatches.length === 0) return false;
     return playableMatches.every((m) => {
-      const draft = draftBets[m.id];
+      const draft = displayDrafts[m.id];
       return draft && draft.homeScore.trim() !== '' && draft.awayScore.trim() !== '';
     });
-  }, [playableMatches, draftBets]);
+  }, [playableMatches, displayDrafts]);
 
   // Verifica se a aposta já foi lançada para o dia selecionado
   const isSubmittedForSelectedDate = useMemo(() => {
     if (!currentUser || !selectedDate) return false;
-    return localStorage.getItem(`submitted_${currentUser.id}_${selectedDate}`) === 'true';
-  }, [currentUser, selectedDate, bets]);
+    return submittedDates.has(selectedDate);
+  }, [currentUser, selectedDate, submittedDates]);
 
-  // Handler de Login
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // Handler de Login (Supabase Auth: nome -> nome@bolao.app)
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!usernameInput.trim()) {
-      alert('Por favor, digite seu nome!');
+    const username = usernameInput.trim().toLowerCase();
+    if (!username) {
+      showToast('Por favor, digite seu nome!');
+      return;
+    }
+    if (!passwordInput) {
+      showToast('Por favor, digite sua senha!');
       return;
     }
 
-    const id = usernameInput.trim().toLowerCase();
-    
-    // Verifica se já existe o participante na lista, se não, adiciona
-    let matchedParticipant = participants.find((p) => p.id === id);
-    if (!matchedParticipant) {
-      matchedParticipant = {
-        id,
-        name: usernameInput.trim(),
-        avatarUrl: `/imagens/pedro.png` // Fallback padrão
-      };
-      setParticipants((prev) => [...prev, matchedParticipant!]);
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: `${username}@bolao.app`,
+      password: passwordInput,
+    });
+
+    if (authError || !data.user) {
+      showToast('Nome ou senha incorretos!');
+      return;
     }
 
-    // Grava usuário logado no estado e localStorage
-    localStorage.setItem('bolao_current_user', JSON.stringify(matchedParticipant));
-    setCurrentUser(matchedParticipant);
+    const { data: prof } = await supabase
+      .from('participants')
+      .select('id, username, name, avatar_url')
+      .eq('id', data.user.id)
+      .single();
+
+    if (!prof) {
+      showToast('Participante não encontrado. Avise o administrador do bolão!');
+      return;
+    }
+
+    const participant: Participant = {
+      id: prof.username,
+      uid: prof.id,
+      name: prof.name,
+      avatarUrl: prof.avatar_url,
+    };
+
+    localStorage.setItem('bolao_current_user', JSON.stringify(participant));
+    setCurrentUser(participant);
 
     // Iniciar fluxo da intro splash
     setCurrentScreen('splash');
@@ -418,42 +379,48 @@ function App() {
   };
 
   // Handler de Logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('bolao_current_user');
     setCurrentUser(null);
     setCurrentScreen('login');
     setUsernameInput('');
     setPasswordInput('');
     setActiveTab('jogos');
+    setBetRows([]);
+    setSubmittedDates(new Set());
+    setDraftBets({});
   };
 
-  // Handler de Lançamento de Apostas
-  const handleLaunchBets = () => {
-    if (!areAllPredictionsFilled) {
-      alert('Por favor, preencha todos os palpites do dia antes de lançar!');
+  // Handler de Lançamento de Apostas (validação final é feita no servidor)
+  const handleLaunchBets = async () => {
+    if (!areAllPredictionsFilled || !currentUser?.uid) {
+      showToast('Por favor, preencha todos os palpites do dia antes de lançar!');
       return;
     }
 
-    const updatedBets = [...bets];
-    playableMatches.forEach((m) => {
-      const draft = draftBets[m.id];
-      if (draft) {
-        const homeScore = parseInt(draft.homeScore, 10);
-        const awayScore = parseInt(draft.awayScore, 10);
-        
-        const idx = updatedBets.findIndex((b) => b.matchId === m.id && b.participantId === currentUser?.id);
-        if (idx !== -1) {
-          updatedBets[idx] = { matchId: m.id, participantId: currentUser!.id, homeScore, awayScore };
-        } else {
-          updatedBets.push({ matchId: m.id, participantId: currentUser!.id, homeScore, awayScore });
-        }
-      }
+    const payload = playableMatches.map((m) => {
+      const draft = displayDrafts[m.id];
+      return {
+        match_id: Number(m.id),
+        home_score: parseInt(draft.homeScore, 10),
+        away_score: parseInt(draft.awayScore, 10),
+      };
     });
 
-    setBets(updatedBets);
-    localStorage.setItem('bolao_bets', JSON.stringify(updatedBets));
-    localStorage.setItem(`submitted_${currentUser?.id}_${selectedDate}`, 'true');
-    alert('Apostas salvas com sucesso!');
+    const { error: rpcError } = await supabase.rpc('submit_bets', {
+      p_bets: payload,
+      p_bet_date: selectedDate,
+    });
+
+    if (rpcError) {
+      showToast(`Erro ao lançar apostas: ${rpcError.message}`);
+      return;
+    }
+
+    setSubmittedDates((prev) => new Set(prev).add(selectedDate));
+    await loadAll(currentUser.uid, false);
+    showToast('Apostas salvas com sucesso!', 'success');
   };
 
   // Calcular ranking/classificação dos participantes
@@ -491,7 +458,7 @@ function App() {
               className="login-field-input"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Digite sua senha (provisória)"
+              placeholder="Digite sua senha"
             />
           </div>
 
@@ -499,6 +466,8 @@ function App() {
             ENTRAR
           </button>
         </form>
+
+        {toastEl}
       </div>
     );
   }
@@ -537,21 +506,20 @@ function App() {
         {/* ABA: PARTIDAS & APOSTAS */}
         {activeTab === 'jogos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            
+
             {/* HORIZONTAL DATE SELECTOR BAR */}
             {dates.length > 0 && (
               <div className="date-selector-scroll-container">
-                {dates.map((dStr) => {
-                  const todayStr = getTodayDateStr();
-                  const isTodayLabel = dStr === todayStr;
-                  const labelText = isTodayLabel ? `Hoje ${dStr}` : dStr;
-                  const isSelected = selectedDate === dStr;
+                {dates.map((d) => {
+                  const isTodayLabel = d.iso === getTodayIso();
+                  const labelText = isTodayLabel ? `Hoje ${d.label}` : d.label;
+                  const isSelected = selectedDate === d.iso;
 
                   return (
                     <button
-                      key={dStr}
+                      key={d.iso}
                       className={`date-pill-btn-p16 ${isSelected ? 'active' : ''}`}
-                      onClick={() => setSelectedDate(dStr)}
+                      onClick={() => setSelectedDateState(d.iso)}
                     >
                       {labelText}
                     </button>
@@ -574,16 +542,15 @@ function App() {
                 <div className="games-grid-layout">
                   {activeDateMatches.map((match) => {
                     // Determinar se o jogo já começou ou terminou
-                    const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.local_date || '');
-                    
+                    const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff);
+
                     // Checar se a aposta pode ser editada (só se for hoje, jogo no futuro e aposta não lançada)
-                    const todayStr = getTodayDateStr();
-                    const isTodayTab = selectedDate === todayStr;
+                    const isTodayTab = selectedDate === getTodayIso();
                     const canEditBet = isTodayTab && !hasGameStarted && !isSubmittedForSelectedDate;
 
                     return (
                       <div key={match.id} className="game-card-item-p16">
-                        
+
                         {/* Cabeçalho do Jogo (Grupo e Horário) */}
                         <div className="game-card-header-p16">
                           {match.group} - {match.time}
@@ -595,7 +562,7 @@ function App() {
                           <div className="team-row-p16">
                             <div className="team-flag-badge-p16">
                               <img
-                                src={`https://flagcdn.com/w80/${match.homeFlag.toLowerCase()}.png`}
+                                src={flagSrc(match.homeFlag, 80)}
                                 alt={match.homeTeam}
                                 className="team-flag-img-p16"
                                 onError={(e) => {
@@ -606,14 +573,14 @@ function App() {
                             <div className="team-code-badge-p16">
                               {match.homeTeam}
                             </div>
-                            
+
                             {/* Caixa de Score */}
                             {canEditBet ? (
                               <input
                                 type="number"
                                 min="0"
                                 className="score-input-field-p16"
-                                value={draftBets[match.id]?.homeScore || ''}
+                                value={displayDrafts[match.id]?.homeScore || ''}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val === '' || parseInt(val) >= 0) {
@@ -626,7 +593,7 @@ function App() {
                               />
                             ) : (
                               <div className="score-display-box-p16">
-                                {hasGameStarted ? (match.homeScore !== null ? match.homeScore : '-') : (draftBets[match.id]?.homeScore || '-')}
+                                {hasGameStarted ? (match.homeScore !== null ? match.homeScore : '-') : (displayDrafts[match.id]?.homeScore || '-')}
                               </div>
                             )}
                           </div>
@@ -635,7 +602,7 @@ function App() {
                           <div className="team-row-p16">
                             <div className="team-flag-badge-p16">
                               <img
-                                src={`https://flagcdn.com/w80/${match.awayFlag.toLowerCase()}.png`}
+                                src={flagSrc(match.awayFlag, 80)}
                                 alt={match.awayTeam}
                                 className="team-flag-img-p16"
                                 onError={(e) => {
@@ -646,14 +613,14 @@ function App() {
                             <div className="team-code-badge-p16">
                               {match.awayTeam}
                             </div>
-                            
+
                             {/* Caixa de Score */}
                             {canEditBet ? (
                               <input
                                 type="number"
                                 min="0"
                                 className="score-input-field-p16"
-                                value={draftBets[match.id]?.awayScore || ''}
+                                value={displayDrafts[match.id]?.awayScore || ''}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val === '' || parseInt(val) >= 0) {
@@ -666,7 +633,7 @@ function App() {
                               />
                             ) : (
                               <div className="score-display-box-p16">
-                                {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (draftBets[match.id]?.awayScore || '-')}
+                                {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (displayDrafts[match.id]?.awayScore || '-')}
                               </div>
                             )}
                           </div>
@@ -678,7 +645,7 @@ function App() {
                             {participants.map((p) => {
                               const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
                               const analysis = analyzeBet(bet, match);
-                              
+
                               // Lógica do Badge de Pontos
                               let pointsBadgeClass = 'wrong';
                               let pointsText = '0 pts';
@@ -730,7 +697,7 @@ function App() {
                                         </span>
                                         {predictedWinnerFlag && (
                                           <img
-                                            src={`https://flagcdn.com/w40/${predictedWinnerFlag.toLowerCase()}.png`}
+                                            src={flagSrc(predictedWinnerFlag, 40)}
                                             alt="Palpite Vencedor"
                                             className="inline-guess-winner-flag-p16"
                                           />
@@ -760,12 +727,12 @@ function App() {
               )}
 
               {/* ACTION BAR DE LANÇAMENTO (Só exibe se estivermos na aba de Hoje e houver partidas jogáveis) */}
-              {selectedDate === getTodayDateStr() && playableMatches.length > 0 && (
+              {selectedDate === getTodayIso() && playableMatches.length > 0 && (
                 <div className="launch-action-bar-p16">
                   <div className="launch-edit-icon-circle-p16">
                     {isSubmittedForSelectedDate ? <CheckSquare size={18} color="#ffffff" /> : <PencilLine size={18} color="#ffffff" />}
                   </div>
-                  
+
                   {isSubmittedForSelectedDate ? (
                     <button className="launch-bet-btn-p16 submitted" disabled>
                       APOSTA LANÇADA
@@ -782,10 +749,10 @@ function App() {
                 </div>
               )}
             </div>
-            
+
             {/* Opção para Logout (Sign Out) rápida no fim da aba de partidas para desenvolvimento */}
             <div style={{ padding: '0 1rem', display: 'flex', justifyContent: 'center' }}>
-              <button 
+              <button
                 onClick={handleLogout}
                 style={{
                   background: 'none',
@@ -806,10 +773,10 @@ function App() {
         {activeTab === 'ranking' && (
           <div>
             <StandingsTable standings={standings} />
-            
+
             {/* Logout em baixo do Ranking */}
             <div style={{ padding: '2rem 1rem 0 1rem', display: 'flex', justifyContent: 'center' }}>
-              <button 
+              <button
                 onClick={handleLogout}
                 style={{
                   background: 'none',
@@ -844,6 +811,8 @@ function App() {
           <span>Ranking</span>
         </button>
       </nav>
+
+      {toastEl}
     </div>
   );
 }
