@@ -660,8 +660,29 @@ function App() {
 
                     // Determinar vencedor para destaque visual
                     const isFinished = match.status === 'finished';
-                    const homeWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore;
-                    const awayWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
+                    const homeFinalWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore;
+                    const awayFinalWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
+
+                    // Vencedor parcial em tempo real (jogo acontecendo)
+                    const isLiveGame = hasGameStarted && !isFinished;
+                    const homeLiveWinner = isLiveGame && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore;
+                    const awayLiveWinner = isLiveGame && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
+
+                    const homeClasses = [
+                      'team-row-p16',
+                      homeFinalWinner ? 'winner-highlight' : '',
+                      awayFinalWinner ? 'loser-fade' : '',
+                      homeLiveWinner ? 'live-winner' : '',
+                      awayLiveWinner ? 'live-loser-fade' : ''
+                    ].filter(Boolean).join(' ');
+
+                    const awayClasses = [
+                      'team-row-p16',
+                      awayFinalWinner ? 'winner-highlight' : '',
+                      homeFinalWinner ? 'loser-fade' : '',
+                      awayLiveWinner ? 'live-winner' : '',
+                      homeLiveWinner ? 'live-loser-fade' : ''
+                    ].filter(Boolean).join(' ');
 
                     return (
                       <div key={match.id} className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}>
@@ -680,7 +701,7 @@ function App() {
                         {/* Corpo do Confronto */}
                         <div className="game-card-body-p16">
                           {/* Time 1 (Mandante) */}
-                          <div className={`team-row-p16 ${homeWinner ? 'winner-highlight' : ''} ${awayWinner ? 'loser-fade' : ''}`}>
+                          <div className={homeClasses}>
                             <div className="team-flag-badge-p16">
                               <img
                                 src={flagSrc(match.homeFlag, 80)}
@@ -720,7 +741,7 @@ function App() {
                           </div>
 
                           {/* Time 2 (Visitante) */}
-                          <div className={`team-row-p16 ${awayWinner ? 'winner-highlight' : ''} ${homeWinner ? 'loser-fade' : ''}`}>
+                          <div className={awayClasses}>
                             <div className="team-flag-badge-p16">
                               <img
                                 src={flagSrc(match.awayFlag, 80)}
