@@ -66,10 +66,10 @@ $$;
 drop function public.bolao_create_user(text, text);
 
 -- Ajusta nomes de exibição e avatares (os arquivos já existem em /public/imagens)
-update public.participants set name = 'Pedro',   avatar_url = '/imagens/pedro.png'   where username = 'pedro';
-update public.participants set name = 'Alex',    avatar_url = '/imagens/alex.png'    where username = 'alex';
-update public.participants set name = 'Rodrigo', avatar_url = '/imagens/rodrigo.png' where username = 'rodrigo';
-update public.participants set name = 'Neto',    avatar_url = '/imagens/neto.png'    where username = 'neto';
+update public.participants set name = 'Pedro',   avatar_url = '/imagens/pedro.webp'   where username = 'pedro';
+update public.participants set name = 'Alex',    avatar_url = '/imagens/alex.webp'    where username = 'alex';
+update public.participants set name = 'Rodrigo', avatar_url = '/imagens/rodrigo.webp' where username = 'rodrigo';
+update public.participants set name = 'Neto',    avatar_url = '/imagens/neto.webp'    where username = 'neto';
 
 -- Confere o resultado
 select username, name, avatar_url from public.participants order by username;

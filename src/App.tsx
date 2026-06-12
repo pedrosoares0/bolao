@@ -419,7 +419,7 @@ function App() {
     setCurrentScreen('splash');
     setTimeout(() => {
       setCurrentScreen('app');
-    }, 3500); // 3.5 segundos de intro.gif
+    }, 3500); // 3.5 segundos de intro.webp
   };
 
   // Handler de Logout
@@ -524,7 +524,7 @@ function App() {
     return (
       <div className="splash-screen" onClick={() => setCurrentScreen('app')}>
         <img
-          src="/imagens/intro.gif"
+          src="/imagens/intro.webp"
           alt="Carregando..."
           className="splash-gif"
         />
@@ -723,7 +723,7 @@ function App() {
                                   <div className="inline-guess-user-info-p16">
                                     <div className="inline-guess-avatar-border-p16">
                                       <img
-                                        src={`/imagens/ranking ${p.id}.png`}
+                                        src={`/imagens/ranking ${p.id}.webp`}
                                         alt={p.name}
                                         className="inline-guess-avatar-img-p16"
                                         onError={(e) => {

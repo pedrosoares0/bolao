@@ -40,7 +40,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings }) => 
 
   // Helper para obter a imagem de ranking específica do participante
   const getRankingAvatar = (participantId: string) => {
-    return `/imagens/ranking ${participantId}.png`;
+    return `/imagens/ranking ${participantId}.webp`;
   };
 
   // Helper para separar parte inteira e decimal de um valor monetário

@@ -13,7 +13,7 @@ create table public.participants (
   id         uuid primary key references auth.users (id) on delete cascade,
   username   text unique not null,
   name       text not null,
-  avatar_url text not null default '/imagens/logo.png',
+  avatar_url text not null default '/imagens/logo.webp',
   created_at timestamptz not null default now()
 );
 
@@ -38,7 +38,7 @@ begin
     new.id,
     split_part(new.email, '@', 1),
     initcap(split_part(new.email, '@', 1)),
-    '/imagens/' || split_part(new.email, '@', 1) || '.png'
+    '/imagens/' || split_part(new.email, '@', 1) || '.webp'
   )
   on conflict (id) do nothing;
   return new;
