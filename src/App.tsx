@@ -662,6 +662,7 @@ function App() {
                     const isFinished = match.status === 'finished';
                     const homeFinalWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore;
                     const awayFinalWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
+                    const isFinalDraw = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore === match.awayScore;
 
                     // Vencedor parcial em tempo real (jogo acontecendo)
                     const isLiveGame = hasGameStarted && !isFinished;
@@ -672,6 +673,7 @@ function App() {
                       'team-row-p16',
                       homeFinalWinner ? 'winner-highlight' : '',
                       awayFinalWinner ? 'loser-fade' : '',
+                      isFinalDraw ? 'draw-highlight' : '',
                       homeLiveWinner ? 'live-winner' : '',
                       awayLiveWinner ? 'live-loser-fade' : ''
                     ].filter(Boolean).join(' ');
@@ -680,6 +682,7 @@ function App() {
                       'team-row-p16',
                       awayFinalWinner ? 'winner-highlight' : '',
                       homeFinalWinner ? 'loser-fade' : '',
+                      isFinalDraw ? 'draw-highlight' : '',
                       awayLiveWinner ? 'live-winner' : '',
                       homeLiveWinner ? 'live-loser-fade' : ''
                     ].filter(Boolean).join(' ');

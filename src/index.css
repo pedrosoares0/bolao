@@ -1602,3 +1602,16 @@ body {
   filter: grayscale(20%);
   transition: all 0.3s ease;
 }
+
+/* Destaque para empate nos jogos finalizados (borda prata) */
+.team-row-p16.draw-highlight .score-display-box-p16 {
+  border-color: #94a3b8 !important; /* Prata / Cinza suave */
+  background-color: rgba(148, 163, 184, 0.08) !important;
+  font-weight: 800;
+  box-shadow: 0 0 6px rgba(148, 163, 184, 0.2);
+}
+
+.team-row-p16.draw-highlight .team-code-badge-p16 {
+  border-color: #94a3b8 !important;
+  background-image: linear-gradient(90deg, #15110E 85%, rgba(148, 163, 184, 0.1) 100%) !important;
+}
