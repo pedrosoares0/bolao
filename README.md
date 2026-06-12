@@ -64,6 +64,7 @@ npm test          # testes das regras de pontuação (src/utils/rules.test.ts)
 - **Lançamento**: o botão habilita quando todos os jogos do dia estão preenchidos; depois de lançar, trava (`submissions`).
 - **Privacidade**: o palpite dos outros só fica visível depois que o jogo começa (regra no banco, não no front).
 - **Pontuação** (`src/utils/rules.ts`): placar exato **3 pts** · empate certo **2 pts** · vencedor certo **1 pt** · errou **0 pt**.
+- **Palpites especiais** (aba Palpites): campeão da Copa e até onde o Brasil vai — **5 pts cada**, confirmados pelos resultados reais da API. Editáveis até 28/06 (início do mata-mata) e **não pagam taxa**.
 - **Desempate no ranking**: pontos > placares exatos > empates certos > vencedores certos > nome.
 - **Prêmio**: R$ 2,50 por pessoa por dia com jogos finalizados; o card do Ranking soma tudo.
 

@@ -23,6 +23,27 @@ export interface Match {
   status: MatchStatus;
   kickoff: string; // Início do jogo em UTC (ISO 8601) — fonte da verdade p/ lockout
   isoDate: string; // Data do jogo no horário de Brasília (YYYY-MM-DD)
+  homeTeamEn: string; // Nome original em inglês (igual ao banco/API)
+  awayTeamEn: string;
+  stage: string; // GROUP_STAGE | LAST_32 | LAST_16 | QUARTER_FINALS | SEMI_FINALS | THIRD_PLACE | FINAL
+  winner?: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // decide pênaltis no mata-mata
+}
+
+// Estágios possíveis para o palpite "até onde o Brasil vai"
+export type BrazilStage =
+  | 'GROUP_STAGE'
+  | 'LAST_32'
+  | 'LAST_16'
+  | 'QUARTER_FINALS'
+  | 'SEMI_FINALS'
+  | 'FINAL'
+  | 'CHAMPION';
+
+// Palpite especial: campeão da Copa + até onde o Brasil vai (5 pts cada)
+export interface SpecialPrediction {
+  participantId: string; // username
+  championTeam: string; // nome em inglês (igual à tabela matches)
+  brazilStage: BrazilStage;
 }
 
 export interface Bet {

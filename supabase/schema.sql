@@ -66,6 +66,7 @@ create table public.matches (
   away_crest text not null default '',
   home_score int,
   away_score int,
+  winner     text,                           -- HOME_TEAM | AWAY_TEAM | DRAW (decide pênaltis no mata-mata)
   updated_at timestamptz not null default now()
 );
 
@@ -128,6 +129,43 @@ create policy "submissions_select_authenticated"
   on public.submissions for select
   to authenticated
   using (true);
+
+-- ------------------------------------------------------------
+-- 4b. PALPITES ESPECIAIS (campeão da Copa + até onde o Brasil vai)
+--     Valem 5 pontos cada ao serem confirmados. Não pagam taxa.
+--     Editáveis até o início do mata-mata (28/06/2026).
+-- ------------------------------------------------------------
+create table public.special_predictions (
+  user_id       uuid primary key references public.participants (id) on delete cascade,
+  champion_team text not null,               -- nome em inglês, igual à tabela matches
+  brazil_stage  text not null check (brazil_stage in
+    ('GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL','CHAMPION')),
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.special_predictions enable row level security;
+
+create policy "special_predictions_select"
+  on public.special_predictions for select
+  to authenticated
+  using (true);
+
+create policy "special_predictions_insert_own_until_knockout"
+  on public.special_predictions for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and now() < timestamptz '2026-06-28 00:00:00+00'
+  );
+
+create policy "special_predictions_update_own_until_knockout"
+  on public.special_predictions for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (
+    user_id = auth.uid()
+    and now() < timestamptz '2026-06-28 00:00:00+00'
+  );
 
 -- ------------------------------------------------------------
 -- 5. ESTADO DA SINCRONIZAÇÃO (throttle da Netlify Function)

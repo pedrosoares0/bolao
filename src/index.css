@@ -1134,3 +1134,216 @@ body {
   background: linear-gradient(135deg, #16a34a 0%, #4ade80 100%);
   color: #ffffff;
 }
+
+/* ============================================= */
+/* ABA PALPITES (especiais + histórico pessoal)  */
+/* ============================================= */
+.pix-payment-card.stretch {
+  align-items: stretch;
+}
+
+.pix-payment-card.stretch .pix-card-title {
+  text-align: center;
+}
+
+.palpites-hint {
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  line-height: 1.45;
+}
+
+.palpites-label {
+  font-family: var(--font-family);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--accent-gold);
+  margin-top: 0.35rem;
+}
+
+.palpites-select {
+  width: 100%;
+  appearance: none;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(245, 179, 0, 0.3);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #F2ECDD;
+  cursor: pointer;
+}
+
+.palpites-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.palpites-select option {
+  background: #171310;
+  color: #F2ECDD;
+}
+
+.palpites-save-btn {
+  margin-top: 0.4rem;
+  padding: 0.75rem 1rem;
+}
+
+.palpites-save-btn.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.palpites-others-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.8rem;
+}
+
+.palpites-other-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.palpites-other-name {
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #F2ECDD;
+  flex-shrink: 0;
+}
+
+.palpites-other-picks {
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  text-align: right;
+}
+
+.palpites-other-picks.none {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 0.65rem 0.85rem;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.history-date {
+  font-family: var(--font-family);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+}
+
+.history-teams {
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #F2ECDD;
+}
+
+.history-bet {
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+}
+
+/* ============================================= */
+/* MODAL PIX PÓS-LANÇAMENTO                      */
+/* ============================================= */
+.pix-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: toast-slide-up 0.2s ease-out;
+}
+
+.pix-modal-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid rgba(245, 179, 0, 0.35);
+  border-radius: var(--border-radius-lg);
+  background-color: #0d0a08;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(245, 179, 0, 0.14) 0%, transparent 60%),
+    linear-gradient(135deg, #171310 0%, #0b0807 100%);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+  padding: 1.5rem 1.25rem;
+}
+
+.pix-modal-emoji {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.pix-modal-text {
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.pix-modal-text b {
+  color: var(--accent-gold);
+}
+
+.pix-modal-close-btn {
+  width: 100%;
+  margin-top: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  background: transparent;
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #F2ECDD;
+  cursor: pointer;
+}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { analyzeBet, calculateStandings } from './rules';
+import { computeChampion, computeBrazilStage } from './specials';
 import type { Match, Bet, Participant } from '../types';
 
 // ---------- Fábricas de dados ----------
@@ -20,6 +21,10 @@ const baseMatch: Match = {
   status: 'scheduled',
   kickoff: '2026-06-12T19:00:00Z',
   isoDate: '2026-06-12',
+  homeTeamEn: 'Brazil',
+  awayTeamEn: 'Argentina',
+  stage: 'GROUP_STAGE',
+  winner: null,
 };
 
 const finishedMatch = (home: number, away: number, over: Partial<Match> = {}): Match => ({
@@ -174,5 +179,98 @@ describe('calculateStandings', () => {
     const standings = calculateStandings([pedro, alex], [], []);
     expect(standings[0].name).toBe('Alex');
     expect(standings[1].name).toBe('Pedro');
+  });
+
+  it('soma 5 pontos para o palpite certo de campeão', () => {
+    const final = finishedMatch(2, 0, {
+      id: 'f1',
+      stage: 'FINAL',
+      homeTeamEn: 'Brazil',
+      awayTeamEn: 'France',
+    });
+    const standings = calculateStandings([pedro, alex], [final], [], [
+      { participantId: 'pedro', championTeam: 'Brazil', brazilStage: 'LAST_16' },
+      { participantId: 'alex', championTeam: 'France', brazilStage: 'LAST_16' },
+    ]);
+    const pedroRow = standings.find((s) => s.participantId === 'pedro')!;
+    const alexRow = standings.find((s) => s.participantId === 'alex')!;
+    // pedro acertou campeão (+5) e Brasil campeão difere de LAST_16 (0)
+    expect(pedroRow.points - alexRow.points).toBe(5);
+  });
+});
+
+// ---------- computeChampion / computeBrazilStage ----------
+
+describe('computeChampion', () => {
+  it('retorna null sem final ou com final não terminada', () => {
+    expect(computeChampion([baseMatch])).toBeNull();
+    expect(computeChampion([{ ...baseMatch, stage: 'FINAL' }])).toBeNull();
+  });
+
+  it('retorna o vencedor da final pelo placar', () => {
+    const final = finishedMatch(3, 1, { stage: 'FINAL', homeTeamEn: 'Spain', awayTeamEn: 'France' });
+    expect(computeChampion([final])).toBe('Spain');
+  });
+
+  it('usa a coluna winner quando a final empata (pênaltis)', () => {
+    const final = finishedMatch(1, 1, {
+      stage: 'FINAL',
+      homeTeamEn: 'Spain',
+      awayTeamEn: 'France',
+      winner: 'AWAY_TEAM',
+    });
+    expect(computeChampion([final])).toBe('France');
+  });
+});
+
+describe('computeBrazilStage', () => {
+  const brazilGroup = (over: Partial<Match> = {}) =>
+    finishedMatch(1, 0, { id: 'g1', stage: 'GROUP_STAGE', homeTeamEn: 'Brazil', awayTeamEn: 'Morocco', ...over });
+
+  it('indefinido enquanto o Brasil segue vivo', () => {
+    expect(computeBrazilStage([brazilGroup()])).toBeNull();
+  });
+
+  it('Brasil eliminado nas oitavas (derrota nos pênaltis)', () => {
+    const oitavas = finishedMatch(1, 1, {
+      id: 'o1',
+      stage: 'LAST_16',
+      homeTeamEn: 'Brazil',
+      awayTeamEn: 'France',
+      winner: 'AWAY_TEAM',
+    });
+    expect(computeBrazilStage([brazilGroup(), oitavas])).toBe('LAST_16');
+  });
+
+  it('Brasil campeão ao vencer a final', () => {
+    const final = finishedMatch(2, 0, {
+      id: 'f1',
+      stage: 'FINAL',
+      homeTeamEn: 'Brazil',
+      awayTeamEn: 'France',
+      winner: 'HOME_TEAM',
+    });
+    expect(computeBrazilStage([brazilGroup(), final])).toBe('CHAMPION');
+  });
+
+  it('cai na fase de grupos quando os 16 avos estão definidos sem o Brasil', () => {
+    const last32 = finishedMatch(1, 0, {
+      id: 'l1',
+      stage: 'LAST_32',
+      homeTeamEn: 'France',
+      awayTeamEn: 'Morocco',
+    });
+    expect(computeBrazilStage([brazilGroup(), last32])).toBe('GROUP_STAGE');
+  });
+
+  it('indefinido enquanto os 16 avos têm times a definir', () => {
+    const last32 = {
+      ...baseMatch,
+      id: 'l1',
+      stage: 'LAST_32',
+      homeTeamEn: 'A definir',
+      awayTeamEn: 'A definir',
+    };
+    expect(computeBrazilStage([brazilGroup(), last32])).toBeNull();
   });
 });

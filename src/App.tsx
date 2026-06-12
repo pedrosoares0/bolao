@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Trophy, Calendar, CheckSquare, PencilLine, Wallet } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding } from './types';
+import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks } from 'lucide-react';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 import { StandingsTable } from './components/StandingsTable';
 import { PixTab } from './components/PixTab';
+import { PalpitesTab } from './components/PalpitesTab';
+import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
@@ -55,6 +57,7 @@ interface MatchDbRow {
   away_crest: string;
   home_score: number | null;
   away_score: number | null;
+  winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
 }
 
 // Converte uma linha da tabela `matches` do Supabase para o formato do app
@@ -76,6 +79,10 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     status: r.status === 'FINISHED' ? 'finished' : 'scheduled',
     kickoff: r.utc_date,
     isoDate: isoDateFmt.format(d),
+    homeTeamEn: r.home_team,
+    awayTeamEn: r.away_team,
+    stage: r.stage ?? 'GROUP_STAGE',
+    winner: r.winner ?? null,
   };
 };
 
@@ -106,6 +113,12 @@ function App() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [betRows, setBetRows] = useState<BetRow[]>([]);
   const [submittedDates, setSubmittedDates] = useState<Set<string>>(new Set());
+  const [specialRows, setSpecialRows] = useState<
+    { user_id: string; champion_team: string; brazil_stage: BrazilStage }[]
+  >([]);
+
+  // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
+  const [showPixModal, setShowPixModal] = useState(false);
 
   // Estado para os rascunhos de palpites editados inline
   const [draftBets, setDraftBets] = useState<{ [matchId: string]: { homeScore: string, awayScore: string } }>({});
@@ -114,7 +127,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
-  const [activeTab, setActiveTab] = useState<'jogos' | 'ranking' | 'pix'>('jogos');
+  const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix'>('jogos');
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
@@ -176,11 +189,12 @@ function App() {
   const loadAll = async (uid: string, withSpinner: boolean) => {
     if (withSpinner) setLoading(true);
     try {
-      const [partsRes, matchesRes, betsRes, subsRes] = await Promise.all([
+      const [partsRes, matchesRes, betsRes, subsRes, specialsRes] = await Promise.all([
         supabase.from('participants').select('id, username, name, avatar_url').order('username'),
         supabase.from('matches').select('*').order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score'),
         supabase.from('submissions').select('bet_date').eq('user_id', uid),
+        supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
@@ -197,6 +211,8 @@ function App() {
       setMatches(((matchesRes.data ?? []) as MatchDbRow[]).map(mapRowToMatch));
       setBetRows((betsRes.data ?? []) as BetRow[]);
       setSubmittedDates(new Set((subsRes.data ?? []).map((s) => s.bet_date)));
+      // specials pode falhar se a migration 003 ainda não rodou — não derruba o app
+      setSpecialRows((specialsRes.data ?? []) as typeof specialRows);
       setError(null);
     } catch (err) {
       console.error(err);
@@ -267,6 +283,16 @@ function App() {
         awayScore: r.away_score,
       })),
     [betRows, usernameByUid]
+  );
+
+  const specials = useMemo<SpecialPrediction[]>(
+    () =>
+      specialRows.map((r) => ({
+        participantId: usernameByUid[r.user_id] || r.user_id,
+        championTeam: r.champion_team,
+        brazilStage: r.brazil_stage,
+      })),
+    [specialRows, usernameByUid]
   );
 
   // 6. Datas disponíveis (chave ISO + rótulo DD/MM)
@@ -467,13 +493,30 @@ function App() {
     setSubmittedDates((prev) => new Set(prev).add(selectedDate));
     setDraftBets({}); // as apostas salvas passam a alimentar os campos
     await loadAll(currentUser.uid, false);
-    showToast('Apostas salvas com sucesso!', 'success');
+    setShowPixModal(true); // lembra do PIX que valida a aposta do dia
   };
 
-  // Calcular ranking/classificação dos participantes
+  // Handler de salvar os palpites especiais (campeão + até onde o Brasil vai)
+  const handleSaveSpecial = async (championTeam: string, brazilStage: BrazilStage) => {
+    if (!currentUser?.uid) return;
+    const { error: spError } = await supabase.from('special_predictions').upsert({
+      user_id: currentUser.uid,
+      champion_team: championTeam,
+      brazil_stage: brazilStage,
+      updated_at: new Date().toISOString(),
+    });
+    if (spError) {
+      showToast(`Erro ao salvar palpites: ${spError.message}`);
+      return;
+    }
+    await loadAll(currentUser.uid, false);
+    showToast('Palpites da Copa salvos!', 'success');
+  };
+
+  // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
   const standings = useMemo<ParticipantStanding[]>(() => {
-    return calculateStandings(participants, matches, bets);
-  }, [participants, matches, bets]);
+    return calculateStandings(participants, matches, bets, specials);
+  }, [participants, matches, bets, specials]);
 
   // Prêmio acumulado: R$ 10 por dia desde 12/06 até o fim da Copa (19/07)
   const accumulatedPot = useMemo(() => calcAccumulatedPot(getTodayIso()), [nowTs]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -819,6 +862,19 @@ function App() {
           </div>
         )}
 
+        {/* ABA: PALPITES (especiais + histórico pessoal) */}
+        {activeTab === 'palpites' && currentUser && (
+          <PalpitesTab
+            matches={matches}
+            bets={bets}
+            participants={participants}
+            specials={specials}
+            currentUser={currentUser}
+            nowTs={nowTs}
+            onSave={handleSaveSpecial}
+          />
+        )}
+
         {/* ABA: PAGAMENTO (PIX) */}
         {activeTab === 'pix' && (
           <PixTab accumulated={accumulatedPot} />
@@ -859,6 +915,13 @@ function App() {
           <span>Partidas</span>
         </button>
         <button
+          className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}
+          onClick={() => setActiveTab('palpites')}
+        >
+          <ListChecks size={20} />
+          <span>Palpites</span>
+        </button>
+        <button
           className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
           onClick={() => setActiveTab('ranking')}
         >
@@ -873,6 +936,28 @@ function App() {
           <span>Pagamento</span>
         </button>
       </nav>
+
+      {/* MODAL PIX PÓS-LANÇAMENTO (validação da aposta do dia) */}
+      {showPixModal && (
+        <div className="pix-modal-overlay" onClick={() => setShowPixModal(false)}>
+          <div className="pix-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="pix-modal-emoji">🎉</div>
+            <div className="pix-card-title">APOSTA LANÇADA!</div>
+            <div className="pix-modal-text">
+              Para <b>validar</b> sua aposta do dia, faça o PIX de <b>R$ 2,50</b> para:
+            </div>
+            <div className="pix-card-recipient">{PIX_RECIPIENT} · {PIX_BANK}</div>
+            <PixKeyRow />
+            <button
+              type="button"
+              className="pix-modal-close-btn"
+              onClick={() => setShowPixModal(false)}
+            >
+              FECHAR
+            </button>
+          </div>
+        </div>
+      )}
 
       {toastEl}
     </div>

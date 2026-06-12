@@ -1,10 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { POT_PER_DAY, POT_PER_PERSON_DAY } from '../utils/pot';
-
-// Dados do PIX para o pagamento da taxa diária do bolão
-const PIX_KEY = '7992a920-21c1-4a5c-8316-30cf039c5c43';
-const PIX_RECIPIENT = 'Rodrigo Weber';
-const PIX_BANK = 'Banco Inter';
+import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './PixKeyCopy';
 
 // Helper para separar parte inteira e decimal de um valor monetário
 const formatMoneyParts = (value: number) => {
@@ -14,26 +10,6 @@ const formatMoneyParts = (value: number) => {
 };
 
 const PixPaymentCard: React.FC = () => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(PIX_KEY);
-    } catch {
-      // Fallback para navegadores sem clipboard API (http/webviews antigos)
-      const el = document.createElement('textarea');
-      el.value = PIX_KEY;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
   return (
     <div className="pix-payment-card">
       <div className="pix-card-title">💸 PAGAMENTO DA APOSTA DIÁRIA</div>
@@ -49,16 +25,7 @@ const PixPaymentCard: React.FC = () => {
         {PIX_RECIPIENT} · {PIX_BANK}
       </div>
 
-      <div className="pix-card-key-row">
-        <span className="pix-card-key" title={PIX_KEY}>{PIX_KEY}</span>
-        <button
-          type="button"
-          className={`pix-copy-btn ${copied ? 'copied' : ''}`}
-          onClick={handleCopy}
-        >
-          {copied ? '✓ COPIADO!' : 'COPIAR'}
-        </button>
-      </div>
+      <PixKeyRow />
     </div>
   );
 };

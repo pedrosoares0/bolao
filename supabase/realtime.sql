@@ -10,3 +10,4 @@
 alter publication supabase_realtime add table public.matches;
 alter publication supabase_realtime add table public.bets;
 alter publication supabase_realtime add table public.submissions;
+alter publication supabase_realtime add table public.special_predictions;

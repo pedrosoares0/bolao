@@ -1,4 +1,5 @@
-import type { Match, Bet, Participant, ParticipantStanding } from '../types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction } from '../types';
+import { computeChampion, computeBrazilStage, SPECIAL_POINTS } from './specials';
 
 export type BetResultType = 'exact' | 'draw' | 'winner' | 'wrong' | 'pending';
 
@@ -37,12 +38,17 @@ export function analyzeBet(bet: Bet | undefined, match: Match): BetAnalysis {
   return { points: 0, type: 'wrong' };
 }
 
-// Gera a tabela de classificação/ranking ordenada e calcula os pagamentos
+// Gera a tabela de classificação/ranking ordenada e calcula os pagamentos.
+// Os palpites especiais (campeão + até onde o Brasil vai) somam 5 pontos
+// cada quando confirmados pelos resultados reais.
 export function calculateStandings(
   participants: Participant[],
   matches: Match[],
-  bets: Bet[]
+  bets: Bet[],
+  specials: SpecialPrediction[] = []
 ): ParticipantStanding[] {
+  const champion = computeChampion(matches);
+  const brazilStage = computeBrazilStage(matches);
   // Encontra todas as datas únicas de jogos que já foram finalizados (finished)
   const finishedDates = Array.from(new Set(
     matches.filter(m => m.status === 'finished').map((m) => m.date)
@@ -78,6 +84,13 @@ export function calculateStandings(
         else if (analysis.type === 'wrong') wrongCount++;
       }
     });
+
+    // Bônus dos palpites especiais (5 pts cada, quando o resultado é conhecido)
+    const special = specials.find((s) => s.participantId === p.id);
+    if (special) {
+      if (champion && special.championTeam === champion) points += SPECIAL_POINTS;
+      if (brazilStage && special.brazilStage === brazilStage) points += SPECIAL_POINTS;
+    }
 
     return {
       participantId: p.id,

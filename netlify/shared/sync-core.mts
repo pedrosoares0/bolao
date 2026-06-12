@@ -43,6 +43,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     away_crest: m.awayTeam?.crest ?? '',
     home_score: m.score?.fullTime?.home ?? null,
     away_score: m.score?.fullTime?.away ?? null,
+    winner: m.score?.winner ?? null,
     updated_at: new Date().toISOString(),
   }));
 
