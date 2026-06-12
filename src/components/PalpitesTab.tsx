@@ -74,12 +74,25 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
     stageValue !== '' &&
     (championValue !== myPrediction?.championTeam || stageValue !== myPrediction?.brazilStage);
 
-  // Histórico pessoal: jogos que já começaram/terminaram, do mais recente ao mais antigo
-  const historyMatches = useMemo(() => {
-    return matches
+  // Histórico pessoal agrupado por dia, do mais recente ao mais antigo
+  const historyDays = useMemo(() => {
+    const started = matches
       .filter((m) => m.status === 'finished' || Date.parse(m.kickoff) <= nowTs)
       .sort((a, b) => Date.parse(b.kickoff) - Date.parse(a.kickoff));
-  }, [matches, nowTs]);
+
+    const days: { iso: string; label: string; matches: Match[]; points: number }[] = [];
+    started.forEach((m) => {
+      let day = days.find((d) => d.iso === m.isoDate);
+      if (!day) {
+        day = { iso: m.isoDate, label: m.date, matches: [], points: 0 };
+        days.push(day);
+      }
+      day.matches.push(m);
+      const bet = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
+      day.points += analyzeBet(bet, m).points;
+    });
+    return days;
+  }, [matches, bets, currentUser.id, nowTs]);
 
   return (
     <div className="standings-container-modern">
@@ -158,38 +171,47 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
       <div className="pix-payment-card stretch">
         <div className="pix-card-title">📜 MEU HISTÓRICO ({currentUser.name})</div>
 
-        {historyMatches.length === 0 ? (
+        {historyDays.length === 0 ? (
           <div className="palpites-hint">Nenhum jogo disputado ainda.</div>
         ) : (
           <div className="history-list">
-            {historyMatches.map((m) => {
-              const bet = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
-              const analysis = analyzeBet(bet, m);
-
-              let badgeClass = 'wrong';
-              let badgeText = '0 pts';
-              if (analysis.type === 'exact') { badgeClass = 'exact'; badgeText = '+3 pts'; }
-              else if (analysis.type === 'draw') { badgeClass = 'draw'; badgeText = '+2 pts'; }
-              else if (analysis.type === 'winner') { badgeClass = 'winner'; badgeText = '+1 pt'; }
-              else if (analysis.type === 'pending') { badgeClass = 'pending'; badgeText = 'Pendente'; }
-
-              const realScore = `${m.homeScore ?? '-'} x ${m.awayScore ?? '-'}`;
-
-              return (
-                <div key={m.id} className="history-row">
-                  <div className="history-info">
-                    <span className="history-date">{m.date} · {m.group}</span>
-                    <span className="history-teams">{m.homeTeam} {realScore} {m.awayTeam}</span>
-                    <span className="history-bet">
-                      Seu palpite: {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
-                    </span>
-                  </div>
-                  <div className={`inline-guess-badge-p16 ${badgeClass}`}>
-                    {badgeText}
-                  </div>
+            {historyDays.map((day) => (
+              <div key={day.iso} className="history-day-group">
+                <div className="history-day-header">
+                  <span className="history-day-label">📅 {day.label}</span>
+                  <span className="history-day-points">{day.points} pts no dia</span>
                 </div>
-              );
-            })}
+
+                {day.matches.map((m) => {
+                  const bet = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
+                  const analysis = analyzeBet(bet, m);
+
+                  let badgeClass = 'wrong';
+                  let badgeText = '0 pts';
+                  if (analysis.type === 'exact') { badgeClass = 'exact'; badgeText = '+3 pts'; }
+                  else if (analysis.type === 'draw') { badgeClass = 'draw'; badgeText = '+2 pts'; }
+                  else if (analysis.type === 'winner') { badgeClass = 'winner'; badgeText = '+1 pt'; }
+                  else if (analysis.type === 'pending') { badgeClass = 'pending'; badgeText = 'Pendente'; }
+
+                  const realScore = `${m.homeScore ?? '-'} x ${m.awayScore ?? '-'}`;
+
+                  return (
+                    <div key={m.id} className="history-row">
+                      <div className="history-info">
+                        <span className="history-date">{m.group} · {m.time}</span>
+                        <span className="history-teams">{m.homeTeam} {realScore} {m.awayTeam}</span>
+                        <span className="history-bet">
+                          Seu palpite: {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
+                        </span>
+                      </div>
+                      <div className={`inline-guess-badge-p16 ${badgeClass}`}>
+                        {badgeText}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
       </div>

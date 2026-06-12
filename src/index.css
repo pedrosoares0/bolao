@@ -1434,3 +1434,40 @@ body {
     transform: scale(1.1);
   }
 }
+
+/* Agrupamento do histórico por dia */
+.history-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.history-day-group + .history-day-group {
+  margin-top: 0.5rem;
+}
+
+.history-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.15rem 0.2rem;
+  border-bottom: 1px solid rgba(245, 179, 0, 0.25);
+  padding-bottom: 0.4rem;
+}
+
+.history-day-label {
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #F2ECDD;
+}
+
+.history-day-points {
+  font-family: var(--font-family);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--accent-gold);
+}
