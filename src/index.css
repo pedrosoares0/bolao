@@ -1496,6 +1496,22 @@ body {
   box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
 }
 
+.finished-badge-p16 {
+  display: inline-flex;
+  align-items: center;
+  background-color: #5c534c; /* Marrom acinzentado/muted do tema */
+  color: #F2ECDD; /* Bege claro */
+  font-family: var(--font-family);
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  text-transform: uppercase;
+}
+
+
 .live-dot-p16 {
   width: 6px;
   height: 6px;

@@ -693,12 +693,16 @@ function App() {
                         {/* Cabeçalho do Jogo (Grupo e Horário) */}
                         <div className="game-card-header-p16" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span>{match.group} - {match.time}</span>
-                          {match.isLive && (
+                          {match.isLive ? (
                             <span className="live-badge-p16">
                               <span className="live-dot-p16"></span>
                               AO VIVO
                             </span>
-                          )}
+                          ) : isFinished ? (
+                            <span className="finished-badge-p16">
+                              ENCERRADO
+                            </span>
+                          ) : null}
                         </div>
 
                         {/* Corpo do Confronto */}
