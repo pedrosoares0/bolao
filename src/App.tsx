@@ -123,7 +123,8 @@ function App() {
   // Estado para os rascunhos de palpites editados inline
   const [draftBets, setDraftBets] = useState<{ [matchId: string]: { homeScore: string, awayScore: string } }>({});
 
-  const [loading, setLoading] = useState(false);
+  // Começa true: evita o flash de "Nenhum jogo agendado" antes da primeira carga
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
@@ -462,6 +463,7 @@ function App() {
     setBetRows([]);
     setSubmittedDates(new Set());
     setDraftBets({});
+    setLoading(true); // o próximo login recarrega tudo
   };
 
   // Handler de Lançamento de Apostas (validação final é feita no servidor)
@@ -624,8 +626,13 @@ function App() {
             {/* CARD CREME DAS PARTIDAS */}
             <div className="games-beige-card-container">
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#15110E', fontWeight: 700 }}>
-                  Carregando jogos da API...
+                <div className="copa-loading">
+                  <div className="copa-loading-ball">⚽</div>
+                  <div className="copa-loading-shadow"></div>
+                  <div className="copa-loading-text">CARREGANDO JOGOS DA COPA</div>
+                  <div className="copa-loading-dots">
+                    <span></span><span></span><span></span>
+                  </div>
                 </div>
               ) : error ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#ef4444', fontWeight: 700 }}>
