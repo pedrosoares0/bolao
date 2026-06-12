@@ -284,7 +284,11 @@ function App() {
         : undefined;
       map[match.id] = own
         ? { homeScore: String(own.homeScore), awayScore: String(own.awayScore) }
-        : (draftBets[match.id] ?? { homeScore: '', awayScore: '' });
+        : {
+            // o rascunho pode existir com só um dos campos preenchidos
+            homeScore: draftBets[match.id]?.homeScore ?? '',
+            awayScore: draftBets[match.id]?.awayScore ?? '',
+          };
     });
     return map;
   }, [matches, bets, draftBets, currentUser]);
