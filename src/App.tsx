@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks } from 'lucide-react';
+import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
@@ -83,6 +83,7 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     awayTeamEn: r.away_team,
     stage: r.stage ?? 'GROUP_STAGE',
     winner: r.winner ?? null,
+    isLive: ['IN_PLAY', 'PAUSED', 'LIVE', 'EXTRA_TIME', 'PENALTY_SHOOTOUT'].includes(r.status?.toUpperCase() || ''),
   };
 };
 
@@ -122,6 +123,16 @@ function App() {
 
   // Estado para os rascunhos de palpites editados inline
   const [draftBets, setDraftBets] = useState<{ [matchId: string]: { homeScore: string, awayScore: string } }>({});
+
+  // Estado para controlar quais palpites de jogos estão expandidos
+  const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({});
+
+  const toggleMatchExpanded = (matchId: string) => {
+    setExpandedMatches((prev) => ({
+      ...prev,
+      [matchId]: !prev[matchId],
+    }));
+  };
 
   // Começa true: evita o flash de "Nenhum jogo agendado" antes da primeira carga
   const [loading, setLoading] = useState(true);
@@ -648,11 +659,17 @@ function App() {
                     const canEditBet = isTodayTab && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
 
                     return (
-                      <div key={match.id} className="game-card-item-p16">
+                      <div key={match.id} className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}>
 
                         {/* Cabeçalho do Jogo (Grupo e Horário) */}
-                        <div className="game-card-header-p16">
-                          {match.group} - {match.time}
+                        <div className="game-card-header-p16" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span>{match.group} - {match.time}</span>
+                          {match.isLive && (
+                            <span className="live-badge-p16">
+                              <span className="live-dot-p16"></span>
+                              AO VIVO
+                            </span>
+                          )}
                         </div>
 
                         {/* Corpo do Confronto */}
@@ -738,9 +755,24 @@ function App() {
                           </div>
                         </div>
 
+                        {/* Botão para expandir/comprimir palpites */}
+                        <button
+                          type="button"
+                          className="toggle-guesses-btn-p16"
+                          onClick={() => toggleMatchExpanded(match.id)}
+                        >
+                          <span>Palpites</span>
+                          {expandedMatches[match.id] ? (
+                            <ChevronUp size={14} />
+                          ) : (
+                            <ChevronDown size={14} />
+                          )}
+                        </button>
+
                         {/* LISTA INLINE DE PALPITES DOS PARTICIPANTES */}
-                        <div className="inline-guesses-list-p16">
-                          {participants.map((p) => {
+                        {expandedMatches[match.id] && (
+                          <div className="inline-guesses-list-p16">
+                            {participants.map((p) => {
                             const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
                             const analysis = analyzeBet(bet, match);
 
@@ -813,6 +845,7 @@ function App() {
                             );
                           })}
                         </div>
+                        )}
                       </div>
                     );
                   })}

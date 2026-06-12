@@ -1471,3 +1471,88 @@ body {
   letter-spacing: 0.06em;
   color: var(--accent-gold);
 }
+
+/* Destaque para jogos acontecendo ao vivo */
+.game-card-item-p16.live-card-highlight {
+  border-left: 4px solid #ef4444;
+  padding-left: 0.75rem;
+  margin-left: -0.75rem;
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+.live-badge-p16 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: #ef4444; /* Vermelho vibrante */
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+  animation: pulse-live 2s infinite ease-in-out;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+}
+
+.live-dot-p16 {
+  width: 6px;
+  height: 6px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot-live 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-live {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.97);
+  }
+}
+
+@keyframes pulse-dot-live {
+  0%, 100% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+/* Botão colapsável de palpites do jogo */
+.toggle-guesses-btn-p16 {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid rgba(21, 17, 14, 0.12);
+  color: #8b8075;
+  font-family: var(--font-family);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  margin-top: 0.50rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.toggle-guesses-btn-p16:hover {
+  color: #15110E;
+  background-color: rgba(21, 17, 14, 0.04);
+  border-color: rgba(21, 17, 14, 0.25);
+}
+
+.toggle-guesses-btn-p16 svg {
+  color: inherit;
+  transition: transform 0.2s ease;
+}

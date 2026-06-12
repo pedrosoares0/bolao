@@ -27,6 +27,7 @@ export interface Match {
   awayTeamEn: string;
   stage: string; // GROUP_STAGE | LAST_32 | LAST_16 | QUARTER_FINALS | SEMI_FINALS | THIRD_PLACE | FINAL
   winner?: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // decide pênaltis no mata-mata
+  isLive?: boolean;
 }
 
 // Estágios possíveis para o palpite "até onde o Brasil vai"
