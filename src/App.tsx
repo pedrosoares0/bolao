@@ -13,11 +13,18 @@ const brDateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit
 const brTimeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 const isoDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 
-// Função para verificar se o jogo está no futuro (antes do horário de início)
 // O kickoff vem em UTC (ISO 8601) direto do banco — sem ambiguidade de fuso.
-const isGameInFuture = (kickoff: string): boolean => {
+// Jogo ainda não começou?
+const isGameInFuture = (kickoff: string, now: number): boolean => {
   if (!kickoff) return false;
-  return Date.now() < Date.parse(kickoff);
+  return now < Date.parse(kickoff);
+};
+
+// Pode apostar/editar até 1 minuto antes do início do jogo
+const BET_LOCKOUT_MS = 60 * 1000;
+const isBettable = (kickoff: string, now: number): boolean => {
+  if (!kickoff) return false;
+  return now < Date.parse(kickoff) - BET_LOCKOUT_MS;
 };
 
 // Data de hoje no horário de Brasília (YYYY-MM-DD)
@@ -109,6 +116,14 @@ function App() {
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
+
+  // Relógio interno (30s): trava os inputs no T-1min e revela os palpites
+  // no kickoff sem o usuário precisar recarregar a página
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = setInterval(() => setNowTs(Date.now()), 30000);
+    return () => clearInterval(tick);
+  }, []);
 
   // Toast de notificação (substitui os alert() nativos)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -274,21 +289,19 @@ function App() {
     return found.iso;
   }, [selectedDateState, dates]);
 
-  // 7. Palpites a exibir: aposta já salva no banco tem prioridade;
-  //    senão, o rascunho que o usuário está digitando
+  // 7. Palpites a exibir: o que o usuário está digitando tem prioridade;
+  //    senão, a aposta já salva no banco
   const displayDrafts = useMemo(() => {
     const map: { [matchId: string]: { homeScore: string, awayScore: string } } = {};
     matches.forEach((match) => {
       const own = currentUser
         ? bets.find((b) => b.matchId === match.id && b.participantId === currentUser.id)
         : undefined;
-      map[match.id] = own
-        ? { homeScore: String(own.homeScore), awayScore: String(own.awayScore) }
-        : {
-            // o rascunho pode existir com só um dos campos preenchidos
-            homeScore: draftBets[match.id]?.homeScore ?? '',
-            awayScore: draftBets[match.id]?.awayScore ?? '',
-          };
+      // campo a campo: o rascunho pode existir com só um dos lados digitado
+      map[match.id] = {
+        homeScore: draftBets[match.id]?.homeScore ?? (own ? String(own.homeScore) : ''),
+        awayScore: draftBets[match.id]?.awayScore ?? (own ? String(own.awayScore) : ''),
+      };
     });
     return map;
   }, [matches, bets, draftBets, currentUser]);
@@ -310,11 +323,11 @@ function App() {
     return groupedMatches[selectedDate] || [];
   }, [groupedMatches, selectedDate]);
 
-  // Partidas jogáveis de hoje que ainda não começaram
+  // Partidas jogáveis de hoje (editáveis até 1 minuto antes do kickoff)
   const playableMatches = useMemo(() => {
     if (selectedDate !== getTodayIso()) return [];
-    return activeDateMatches.filter((m) => m.status === 'scheduled' && isGameInFuture(m.kickoff));
-  }, [activeDateMatches, selectedDate]);
+    return activeDateMatches.filter((m) => m.status === 'scheduled' && isBettable(m.kickoff, nowTs));
+  }, [activeDateMatches, selectedDate, nowTs]);
 
   // Verifica se todos os palpites das partidas jogáveis de hoje foram preenchidos
   const areAllPredictionsFilled = useMemo(() => {
@@ -330,6 +343,33 @@ function App() {
     if (!currentUser || !selectedDate) return false;
     return submittedDates.has(selectedDate);
   }, [currentUser, selectedDate, submittedDates]);
+
+  // Há alguma edição ainda não lançada? (palpite digitado difere do salvo)
+  const hasChangesToLaunch = useMemo(() => {
+    if (!currentUser) return false;
+    return playableMatches.some((m) => {
+      const own = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
+      const draft = displayDrafts[m.id];
+      if (!draft) return false;
+      if (!own) return draft.homeScore.trim() !== '' || draft.awayScore.trim() !== '';
+      return draft.homeScore !== String(own.homeScore) || draft.awayScore !== String(own.awayScore);
+    });
+  }, [playableMatches, bets, displayDrafts, currentUser]);
+
+  // Ao cruzar um kickoff, recarrega os dados: o banco passa a liberar
+  // os palpites dos outros participantes para aquele jogo
+  useEffect(() => {
+    const uid = currentUser?.uid;
+    if (!uid) return;
+    const justStarted = matches.some((m) => {
+      const k = Date.parse(m.kickoff);
+      return k <= nowTs && k > nowTs - 35000;
+    });
+    if (!justStarted) return;
+    const t = window.setTimeout(() => loadAll(uid, false), 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowTs]);
 
   // Handler de Login (Supabase Auth: nome -> nome@bolao.app)
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -423,6 +463,7 @@ function App() {
     }
 
     setSubmittedDates((prev) => new Set(prev).add(selectedDate));
+    setDraftBets({}); // as apostas salvas passam a alimentar os campos
     await loadAll(currentUser.uid, false);
     showToast('Apostas salvas com sucesso!', 'success');
   };
@@ -546,11 +587,11 @@ function App() {
                 <div className="games-grid-layout">
                   {activeDateMatches.map((match) => {
                     // Determinar se o jogo já começou ou terminou
-                    const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff);
+                    const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff, nowTs);
 
-                    // Checar se a aposta pode ser editada (só se for hoje, jogo no futuro e aposta não lançada)
+                    // Aposta editável até 1 minuto antes do kickoff (mesmo depois de lançada)
                     const isTodayTab = selectedDate === getTodayIso();
-                    const canEditBet = isTodayTab && !hasGameStarted && !isSubmittedForSelectedDate;
+                    const canEditBet = isTodayTab && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
 
                     return (
                       <div key={match.id} className="game-card-item-p16">
@@ -734,10 +775,10 @@ function App() {
               {selectedDate === getTodayIso() && playableMatches.length > 0 && (
                 <div className="launch-action-bar-p16">
                   <div className="launch-edit-icon-circle-p16">
-                    {isSubmittedForSelectedDate ? <CheckSquare size={18} color="#ffffff" /> : <PencilLine size={18} color="#ffffff" />}
+                    {isSubmittedForSelectedDate && !hasChangesToLaunch ? <CheckSquare size={18} color="#ffffff" /> : <PencilLine size={18} color="#ffffff" />}
                   </div>
 
-                  {isSubmittedForSelectedDate ? (
+                  {isSubmittedForSelectedDate && !hasChangesToLaunch ? (
                     <button className="launch-bet-btn-p16 submitted" disabled>
                       APOSTA LANÇADA
                     </button>

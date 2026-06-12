@@ -144,8 +144,9 @@ alter table public.sync_state enable row level security;
 
 -- ------------------------------------------------------------
 -- 6. RPC DE LANÇAMENTO DE APOSTAS (validação no servidor)
---    - rejeita se o jogo já começou (anti-fraude de relógio)
---    - rejeita se o dia já foi lançado
+--    - aceita lançar e RELANÇAR (editar) quantas vezes quiser
+--    - trava cada jogo individualmente 1 MINUTO antes do kickoff
+--      (anti-fraude: usa a hora do servidor, não a do cliente)
 --    - grava todas as apostas + o lançamento numa transação só
 -- ------------------------------------------------------------
 create or replace function public.submit_bets(p_bets jsonb, p_bet_date date)
@@ -165,13 +166,6 @@ begin
     raise exception 'Nenhum palpite enviado.';
   end if;
 
-  if exists (
-    select 1 from public.submissions s
-    where s.user_id = auth.uid() and s.bet_date = p_bet_date
-  ) then
-    raise exception 'Aposta já lançada para este dia.';
-  end if;
-
   for b in
     select * from jsonb_to_recordset(p_bets)
       as x(match_id bigint, home_score int, away_score int)
@@ -181,11 +175,13 @@ begin
       raise exception 'Palpite inválido.';
     end if;
 
+    -- Pode apostar/editar até 1 minuto antes do início do jogo
     if not exists (
       select 1 from public.matches m
-      where m.id = b.match_id and m.utc_date > now()
+      where m.id = b.match_id
+        and m.utc_date - interval '1 minute' > now()
     ) then
-      raise exception 'Apostas encerradas: o jogo % já começou.', b.match_id;
+      raise exception 'Apostas encerradas para o jogo %.', b.match_id;
     end if;
 
     insert into public.bets (user_id, match_id, home_score, away_score)
@@ -197,7 +193,9 @@ begin
   end loop;
 
   insert into public.submissions (user_id, bet_date)
-  values (auth.uid(), p_bet_date);
+  values (auth.uid(), p_bet_date)
+  on conflict (user_id, bet_date) do update
+    set submitted_at = now();
 end;
 $$;
 
