@@ -883,7 +883,7 @@ function App() {
         {/* ABA: RANKING */}
         {activeTab === 'ranking' && (
           <div>
-            <StandingsTable standings={standings} accumulated={accumulatedPot} />
+            <StandingsTable standings={standings} />
 
             {/* Logout em baixo do Ranking */}
             <div style={{ padding: '2rem 1rem 0 1rem', display: 'flex', justifyContent: 'center' }}>
