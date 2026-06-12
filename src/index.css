@@ -1015,3 +1015,122 @@ body {
     transform: translateX(-50%) translateY(0);
   }
 }
+
+/* ============================================= */
+/* CARD DE PAGAMENTO PIX (taxa diária do bolão)  */
+/* ============================================= */
+.pix-payment-card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--border-radius-lg);
+  background-color: #0d0a08;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(245, 179, 0, 0.1) 0%, transparent 60%),
+    linear-gradient(135deg, #171310 0%, #0b0807 100%);
+  box-shadow:
+    0 15px 35px rgba(0, 0, 0, 0.55),
+    inset 0 1px 1px rgba(255, 255, 255, 0.03),
+    0 0 25px rgba(245, 179, 0, 0.05);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  overflow: hidden;
+}
+
+.pix-card-title {
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+}
+
+.pix-card-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  color: var(--accent-gold);
+  font-family: var(--font-family-condensed);
+}
+
+.pix-card-currency {
+  font-size: 1rem;
+  font-weight: normal;
+}
+
+.pix-card-amount {
+  font-size: 2.4rem;
+  font-weight: normal;
+  line-height: 1;
+}
+
+.pix-card-cents {
+  font-size: 1.3rem;
+  font-weight: normal;
+}
+
+.pix-card-per-day {
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  margin-left: 0.4rem;
+}
+
+.pix-card-recipient {
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #F2ECDD;
+}
+
+.pix-card-key-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(245, 179, 0, 0.25);
+  border-radius: 999px;
+  padding: 0.4rem 0.4rem 0.4rem 0.9rem;
+}
+
+.pix-card-key {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-family);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pix-copy-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-family);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #15110E;
+  background: linear-gradient(135deg, #f5b300 0%, #ffd34d 100%);
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.pix-copy-btn:active {
+  transform: scale(0.96);
+}
+
+.pix-copy-btn.copied {
+  background: linear-gradient(135deg, #16a34a 0%, #4ade80 100%);
+  color: #ffffff;
+}
