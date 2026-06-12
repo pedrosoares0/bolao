@@ -3,62 +3,8 @@ import type { ParticipantStanding } from '../types';
 
 interface StandingsTableProps {
   standings: ParticipantStanding[];
+  accumulated: number;
 }
-
-// Dados do PIX para o pagamento da taxa diária do bolão
-const PIX_KEY = '7992a920-21c1-4a5c-8316-30cf039c5c43';
-const PIX_RECIPIENT = 'Rodrigo Weber';
-const PIX_BANK = 'Banco Inter';
-
-const PixPaymentCard: React.FC = () => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(PIX_KEY);
-    } catch {
-      // Fallback para navegadores sem clipboard API (http/webviews antigos)
-      const el = document.createElement('textarea');
-      el.value = PIX_KEY;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  return (
-    <div className="pix-payment-card">
-      <div className="pix-card-title">💸 PAGAMENTO DA APOSTA DIÁRIA</div>
-
-      <div className="pix-card-value-row">
-        <span className="pix-card-currency">R$</span>
-        <span className="pix-card-amount">2</span>
-        <span className="pix-card-cents">,50</span>
-        <span className="pix-card-per-day">por dia</span>
-      </div>
-
-      <div className="pix-card-recipient">
-        {PIX_RECIPIENT} · {PIX_BANK}
-      </div>
-
-      <div className="pix-card-key-row">
-        <span className="pix-card-key" title={PIX_KEY}>{PIX_KEY}</span>
-        <button
-          type="button"
-          className={`pix-copy-btn ${copied ? 'copied' : ''}`}
-          onClick={handleCopy}
-        >
-          {copied ? '✓ COPIADO!' : 'COPIAR'}
-        </button>
-      </div>
-    </div>
-  );
-};
 
 const Slideshow: React.FC = () => {
   const images = [
@@ -90,8 +36,8 @@ const Slideshow: React.FC = () => {
   );
 };
 
-export const StandingsTable: React.FC<StandingsTableProps> = ({ standings }) => {
-  const totalAccumulated = standings.reduce((sum, s) => sum + s.totalPaid, 0);
+export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, accumulated }) => {
+  const totalAccumulated = accumulated;
 
   // Helper para obter a imagem de ranking específica do participante
   const getRankingAvatar = (participantId: string) => {
@@ -175,9 +121,6 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings }) => 
           </div>
         </div>
       </div>
-
-      {/* CARD DE PAGAMENTO VIA PIX */}
-      <PixPaymentCard />
 
       {/* RANKING */}
       <div className="standings-list-pills">

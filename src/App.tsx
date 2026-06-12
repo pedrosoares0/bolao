@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Trophy, Calendar, CheckSquare, PencilLine } from 'lucide-react';
+import { Trophy, Calendar, CheckSquare, PencilLine, Wallet } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
+import { calcAccumulatedPot } from './utils/pot';
 import { StandingsTable } from './components/StandingsTable';
+import { PixTab } from './components/PixTab';
 import { supabase } from './lib/supabase';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
@@ -112,7 +114,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
-  const [activeTab, setActiveTab] = useState<'jogos' | 'ranking'>('jogos');
+  const [activeTab, setActiveTab] = useState<'jogos' | 'ranking' | 'pix'>('jogos');
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
@@ -473,6 +475,9 @@ function App() {
     return calculateStandings(participants, matches, bets);
   }, [participants, matches, bets]);
 
+  // Prêmio acumulado: R$ 10 por dia desde 12/06 até o fim da Copa (19/07)
+  const accumulatedPot = useMemo(() => calcAccumulatedPot(getTodayIso()), [nowTs]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ----------------------------------------------------
   // RENDERIZAÇÃO DA TELA DE LOGIN
   // ----------------------------------------------------
@@ -814,10 +819,15 @@ function App() {
           </div>
         )}
 
+        {/* ABA: PAGAMENTO (PIX) */}
+        {activeTab === 'pix' && (
+          <PixTab accumulated={accumulatedPot} />
+        )}
+
         {/* ABA: RANKING */}
         {activeTab === 'ranking' && (
           <div>
-            <StandingsTable standings={standings} />
+            <StandingsTable standings={standings} accumulated={accumulatedPot} />
 
             {/* Logout em baixo do Ranking */}
             <div style={{ padding: '2rem 1rem 0 1rem', display: 'flex', justifyContent: 'center' }}>
@@ -854,6 +864,13 @@ function App() {
         >
           <Trophy size={20} />
           <span>Ranking</span>
+        </button>
+        <button
+          className={`nav-item ${activeTab === 'pix' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pix')}
+        >
+          <Wallet size={20} />
+          <span>Pagamento</span>
         </button>
       </nav>
 
