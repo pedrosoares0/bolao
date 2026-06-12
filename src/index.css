@@ -1556,3 +1556,49 @@ body {
   color: inherit;
   transition: transform 0.2s ease;
 }
+
+/* Transição suave do slide-down para a lista de palpites */
+.inline-guesses-list-wrapper-p16 {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.inline-guesses-list-wrapper-p16.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.inline-guesses-list-inner-p16 {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.5rem;
+  background-color: rgba(21, 17, 14, 0.03);
+  border-radius: 1rem;
+  margin-top: 0.85rem;
+}
+
+/* Destaque para vencedor e derrotado nos jogos finalizados */
+.team-row-p16.winner-highlight .score-display-box-p16 {
+  border-color: #f5b300 !important; /* Dourado */
+  background-color: rgba(245, 179, 0, 0.1) !important;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(245, 179, 0, 0.25);
+  transform: scale(1.03);
+  transition: transform 0.2s ease;
+}
+
+.team-row-p16.winner-highlight .team-code-badge-p16 {
+  border-color: #f5b300 !important;
+  background-image: linear-gradient(90deg, #15110E 85%, rgba(245, 179, 0, 0.15) 100%) !important;
+}
+
+.team-row-p16.loser-fade {
+  opacity: 0.5;
+  filter: grayscale(20%);
+  transition: all 0.3s ease;
+}

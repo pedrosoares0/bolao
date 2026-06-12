@@ -658,6 +658,11 @@ function App() {
                     const isTodayTab = selectedDate === getTodayIso();
                     const canEditBet = isTodayTab && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
 
+                    // Determinar vencedor para destaque visual
+                    const isFinished = match.status === 'finished';
+                    const homeWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore;
+                    const awayWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
+
                     return (
                       <div key={match.id} className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}>
 
@@ -675,7 +680,7 @@ function App() {
                         {/* Corpo do Confronto */}
                         <div className="game-card-body-p16">
                           {/* Time 1 (Mandante) */}
-                          <div className="team-row-p16">
+                          <div className={`team-row-p16 ${homeWinner ? 'winner-highlight' : ''} ${awayWinner ? 'loser-fade' : ''}`}>
                             <div className="team-flag-badge-p16">
                               <img
                                 src={flagSrc(match.homeFlag, 80)}
@@ -715,7 +720,7 @@ function App() {
                           </div>
 
                           {/* Time 2 (Visitante) */}
-                          <div className="team-row-p16">
+                          <div className={`team-row-p16 ${awayWinner ? 'winner-highlight' : ''} ${homeWinner ? 'loser-fade' : ''}`}>
                             <div className="team-flag-badge-p16">
                               <img
                                 src={flagSrc(match.awayFlag, 80)}
@@ -770,8 +775,8 @@ function App() {
                         </button>
 
                         {/* LISTA INLINE DE PALPITES DOS PARTICIPANTES */}
-                        {expandedMatches[match.id] && (
-                          <div className="inline-guesses-list-p16">
+                        <div className={`inline-guesses-list-wrapper-p16 ${expandedMatches[match.id] ? 'expanded' : ''}`}>
+                          <div className="inline-guesses-list-inner-p16">
                             {participants.map((p) => {
                             const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
                             const analysis = analyzeBet(bet, match);
@@ -845,7 +850,7 @@ function App() {
                             );
                           })}
                         </div>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
