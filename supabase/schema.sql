@@ -98,19 +98,11 @@ create index bets_match_idx on public.bets (match_id);
 
 alter table public.bets enable row level security;
 
--- REGRA ANTI-ESPIÃO: você sempre vê suas apostas;
--- as dos outros só ficam visíveis depois do início do jogo.
-create policy "bets_select_own_or_started"
+-- Todos os participantes autenticados veem os palpites assim que são lançados.
+create policy "bets_select_authenticated"
   on public.bets for select
   to authenticated
-  using (
-    user_id = auth.uid()
-    or exists (
-      select 1 from public.matches m
-      where m.id = bets.match_id
-        and m.utc_date <= now()
-    )
-  );
+  using (true);
 -- Sem policy de insert/update: apostas só entram pela função submit_bets abaixo.
 
 -- ------------------------------------------------------------

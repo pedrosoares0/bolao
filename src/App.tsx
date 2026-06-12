@@ -133,7 +133,7 @@ function App() {
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
 
-  // Relógio interno (30s): trava os inputs no T-1min e revela os palpites
+  // Relógio interno (30s): trava os inputs no T-1min e atualiza o estado dos jogos
   // no kickoff sem o usuário precisar recarregar a página
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
@@ -256,7 +256,7 @@ function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
       .subscribe();
 
-    // Fallback caso o Realtime caia (e para revelar palpites após o kickoff)
+    // Fallback caso o Realtime caia
     const interval = setInterval(() => loadAll(uid, false), 300000);
 
     return () => {
@@ -385,8 +385,7 @@ function App() {
     });
   }, [playableMatches, bets, displayDrafts, currentUser]);
 
-  // Ao cruzar um kickoff, recarrega os dados: o banco passa a liberar
-  // os palpites dos outros participantes para aquele jogo
+  // Ao cruzar um kickoff, recarrega os dados para atualizar o estado do jogo.
   useEffect(() => {
     const uid = currentUser?.uid;
     if (!uid) return;
@@ -739,83 +738,81 @@ function App() {
                           </div>
                         </div>
 
-                        {/* LISTA INLINE DE PALPITES DOS PARTICIPANTES (Só exibe se o jogo começou/terminou) */}
-                        {hasGameStarted && (
-                          <div className="inline-guesses-list-p16">
-                            {participants.map((p) => {
-                              const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
-                              const analysis = analyzeBet(bet, match);
+                        {/* LISTA INLINE DE PALPITES DOS PARTICIPANTES */}
+                        <div className="inline-guesses-list-p16">
+                          {participants.map((p) => {
+                            const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
+                            const analysis = analyzeBet(bet, match);
 
-                              // Lógica do Badge de Pontos
-                              let pointsBadgeClass = 'wrong';
-                              let pointsText = '0 pts';
-                              if (analysis.type === 'exact') {
-                                pointsBadgeClass = 'exact';
-                                pointsText = '+3 pts (Placar)';
-                              } else if (analysis.type === 'draw') {
-                                pointsBadgeClass = 'draw';
-                                pointsText = '+2 pts (Empate)';
-                              } else if (analysis.type === 'winner') {
-                                pointsBadgeClass = 'winner';
-                                pointsText = '+1 pt (Vence)';
-                              } else if (analysis.type === 'pending') {
-                                pointsBadgeClass = 'pending';
-                                pointsText = 'Pendente';
+                            // Lógica do Badge de Pontos
+                            let pointsBadgeClass = 'wrong';
+                            let pointsText = '0 pts';
+                            if (analysis.type === 'exact') {
+                              pointsBadgeClass = 'exact';
+                              pointsText = '+3 pts (Placar)';
+                            } else if (analysis.type === 'draw') {
+                              pointsBadgeClass = 'draw';
+                              pointsText = '+2 pts (Empate)';
+                            } else if (analysis.type === 'winner') {
+                              pointsBadgeClass = 'winner';
+                              pointsText = '+1 pt (Vence)';
+                            } else if (analysis.type === 'pending') {
+                              pointsBadgeClass = 'pending';
+                              pointsText = 'Pendente';
+                            }
+
+                            // Lógica da bandeira de quem o participante achou que ia vencer
+                            let predictedWinnerFlag: string | null = null;
+                            if (bet) {
+                              if (bet.homeScore > bet.awayScore) {
+                                predictedWinnerFlag = match.homeFlag;
+                              } else if (bet.awayScore > bet.homeScore) {
+                                predictedWinnerFlag = match.awayFlag;
                               }
+                            }
 
-                              // Lógica da bandeira de quem o participante achou que ia vencer
-                              let predictedWinnerFlag: string | null = null;
-                              if (bet) {
-                                if (bet.homeScore > bet.awayScore) {
-                                  predictedWinnerFlag = match.homeFlag;
-                                } else if (bet.awayScore > bet.homeScore) {
-                                  predictedWinnerFlag = match.awayFlag;
-                                }
-                              }
-
-                              return (
-                                <div key={p.id} className="inline-guess-row-p16">
-                                  <div className="inline-guess-user-info-p16">
-                                    <div className="inline-guess-avatar-border-p16">
-                                      <img
-                                        src={`/imagens/ranking ${p.id}.webp`}
-                                        alt={p.name}
-                                        className="inline-guess-avatar-img-p16"
-                                        onError={(e) => {
-                                          e.currentTarget.src = p.avatarUrl;
-                                        }}
-                                      />
-                                    </div>
-                                    <span className="inline-guess-username-p16">{p.name}</span>
+                            return (
+                              <div key={p.id} className="inline-guess-row-p16">
+                                <div className="inline-guess-user-info-p16">
+                                  <div className="inline-guess-avatar-border-p16">
+                                    <img
+                                      src={`/imagens/ranking ${p.id}.webp`}
+                                      alt={p.name}
+                                      className="inline-guess-avatar-img-p16"
+                                      onError={(e) => {
+                                        e.currentTarget.src = p.avatarUrl;
+                                      }}
+                                    />
                                   </div>
+                                  <span className="inline-guess-username-p16">{p.name}</span>
+                                </div>
 
-                                  <div className="inline-guess-result-info-p16">
-                                    {bet ? (
-                                      <div className="inline-guess-scores-container-p16">
-                                        <span className="inline-guess-score-text-p16">
-                                          {bet.homeScore} x {bet.awayScore}
-                                        </span>
-                                        {predictedWinnerFlag && (
-                                          <img
-                                            src={flagSrc(predictedWinnerFlag, 40)}
-                                            alt="Palpite Vencedor"
-                                            className="inline-guess-winner-flag-p16"
-                                          />
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className="inline-guess-none-text-p16">Sem Palpite</span>
-                                    )}
-
-                                    <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
-                                      {pointsText}
+                                <div className="inline-guess-result-info-p16">
+                                  {bet ? (
+                                    <div className="inline-guess-scores-container-p16">
+                                      <span className="inline-guess-score-text-p16">
+                                        {bet.homeScore} x {bet.awayScore}
+                                      </span>
+                                      {predictedWinnerFlag && (
+                                        <img
+                                          src={flagSrc(predictedWinnerFlag, 40)}
+                                          alt="Palpite Vencedor"
+                                          className="inline-guess-winner-flag-p16"
+                                        />
+                                      )}
                                     </div>
+                                  ) : (
+                                    <span className="inline-guess-none-text-p16">Sem Palpite</span>
+                                  )}
+
+                                  <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
+                                    {pointsText}
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })}

@@ -16,7 +16,7 @@ Bolão entre amigos para a Copa 2026. Frontend React (design premium mobile-firs
 ```
 Netlify (site estático)
  ├── React app  ──────────────► Supabase (matches, bets, participants, submissions)
- │                                 ▲ RLS: palpite alheio só aparece após o kickoff
+ │                                 ▲ RLS: participantes autenticados veem os palpites lançados
  │                                 ▲ RPC submit_bets: rejeita aposta após o início do jogo
  └── Functions
       ├── sync-matches       (HTTP: chamada quando o app abre, com throttle de 3 min)
@@ -62,7 +62,7 @@ npm test          # testes das regras de pontuação (src/utils/rules.test.ts)
 - **Login**: nome (pedro/alex/rodrigo/neto) + senha. Internamente vira `nome@bolao.app` no Supabase Auth.
 - **Palpites**: só para os jogos de **hoje** que ainda não começaram. O servidor rejeita palpites após o kickoff (não adianta mexer no relógio 😄).
 - **Lançamento**: o botão habilita quando todos os jogos do dia estão preenchidos; depois de lançar, trava (`submissions`).
-- **Privacidade**: o palpite dos outros só fica visível depois que o jogo começa (regra no banco, não no front).
+- **Palpites compartilhados**: todos veem os palpites lançados imediatamente, com atualização via Supabase Realtime.
 - **Pontuação** (`src/utils/rules.ts`): placar exato **3 pts** · empate certo **2 pts** · vencedor certo **1 pt** · errou **0 pt**.
 - **Palpites especiais** (aba Palpites): campeão da Copa e até onde o Brasil vai — **5 pts cada**, confirmados pelos resultados reais da API. Editáveis até 28/06 (início do mata-mata) e **não pagam taxa**.
 - **Desempate no ranking**: pontos > placares exatos > empates certos > vencedores certos > nome.
