@@ -211,23 +211,32 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     .map(standing => ({ standing }));
 
   // MVP da Rodada: quem fez mais pontos no dia finalizado mais recente
-  // EM QUE ALGUÉM PONTUOU. Desempate por nº de placares exatos.
+  // EM QUE TODOS OS JOGOS DESSE DIA FORAM CONCLUÍDOS. Desempate por nº de placares exatos.
   const roundMvp = ((): { standing: ParticipantStanding; pts: number; dateLabel: string } | null => {
     if (!matches || !bets) return null;
-    const finished = matches.filter(
-      (m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null
-    );
-    if (finished.length === 0) return null;
+    
+    // Todas as datas que possuem algum jogo
+    const allDates = Array.from(new Set(matches.map((m) => m.isoDate)));
+    
+    // Filtrar apenas datas em que TODOS os jogos cadastrados já terminaram (status === 'finished')
+    const completedDates = allDates.filter((iso) => {
+      const dayMatches = matches.filter((m) => m.isoDate === iso);
+      return dayMatches.length > 0 && dayMatches.every(
+        (m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null
+      );
+    });
 
-    // Datas finalizadas, da mais recente para a mais antiga (pelo kickoff)
-    const isoDates = Array.from(new Set(finished.map((m) => m.isoDate))).sort((a, b) => {
-      const ka = Math.max(...finished.filter((m) => m.isoDate === a).map((m) => Date.parse(m.kickoff)));
-      const kb = Math.max(...finished.filter((m) => m.isoDate === b).map((m) => Date.parse(m.kickoff)));
+    if (completedDates.length === 0) return null;
+
+    // Datas finalizadas, da mais recente para a mais antiga (pelo kickoff mais recente de cada data)
+    const sortedCompletedDates = completedDates.sort((a, b) => {
+      const ka = Math.max(...matches.filter((m) => m.isoDate === a).map((m) => Date.parse(m.kickoff)));
+      const kb = Math.max(...matches.filter((m) => m.isoDate === b).map((m) => Date.parse(m.kickoff)));
       return kb - ka;
     });
 
-    for (const iso of isoDates) {
-      const dayMatches = finished.filter((m) => m.isoDate === iso);
+    for (const iso of sortedCompletedDates) {
+      const dayMatches = matches.filter((m) => m.isoDate === iso);
       const scored = standings
         .map((s) => {
           let pts = 0;
@@ -309,27 +318,32 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     <div className="standings-container-modern">
       {/* MVP DA RODADA (quem mais pontuou no último dia finalizado) */}
       {roundMvp && (
-        <div className="round-mvp-card">
-          <div className="round-mvp-star">🌟</div>
-          <div className="round-mvp-avatar-wrap">
-            <img
-              src={getRankingAvatar(roundMvp.standing.participantId)}
-              alt={roundMvp.standing.name}
-              className="round-mvp-avatar"
-              onError={(e) => {
-                e.currentTarget.src = roundMvp.standing.avatarUrl;
-              }}
-            />
+        <>
+          <div className="round-mvp-card">
+            <div className="round-mvp-star">🌟</div>
+            <div className="round-mvp-avatar-wrap">
+              <img
+                src={getRankingAvatar(roundMvp.standing.participantId)}
+                alt={roundMvp.standing.name}
+                className="round-mvp-avatar"
+                onError={(e) => {
+                  e.currentTarget.src = roundMvp.standing.avatarUrl;
+                }}
+              />
+            </div>
+            <div className="round-mvp-content">
+              <span className="round-mvp-label">MVP DA RODADA · {roundMvp.dateLabel}</span>
+              <span className="round-mvp-name">{roundMvp.standing.name}</span>
+            </div>
+            <div className="round-mvp-pts">
+              <span className="round-mvp-pts-num">{roundMvp.pts}</span>
+              <span className="round-mvp-pts-lbl">pts</span>
+            </div>
           </div>
-          <div className="round-mvp-content">
-            <span className="round-mvp-label">MVP DA RODADA · {roundMvp.dateLabel}</span>
-            <span className="round-mvp-name">{roundMvp.standing.name}</span>
+          <div className="round-mvp-legend">
+            🌟 <strong>MVP da Rodada:</strong> Quem fez mais pontos nas partidas finalizadas desse dia (desempate por placares exatos). Só aparece ao término de todos os jogos da data.
           </div>
-          <div className="round-mvp-pts">
-            <span className="round-mvp-pts-num">{roundMvp.pts}</span>
-            <span className="round-mvp-pts-lbl">pts</span>
-          </div>
-        </div>
+        </>
       )}
 
       {/* RANKING CONTAINER COM LUZ DOURADA E FUNDO ESCURO */}

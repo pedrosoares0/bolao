@@ -2074,6 +2074,20 @@ body {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.6);
 }
+.round-mvp-legend {
+  font-family: var(--font-family);
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: -0.65rem;
+  margin-bottom: 1.2rem;
+  padding: 0.5rem 0.8rem;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  display: block;
+}
+
 
 .history-row {
   display: flex;
