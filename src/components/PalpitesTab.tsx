@@ -9,7 +9,7 @@ import {
   SPECIAL_LOCK_ISO,
   SPECIAL_POINTS,
 } from '../utils/specials';
-import { translateTeam } from '../lib/teamMaps';
+import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 
 interface PalpitesTabProps {
   matches: Match[];
@@ -99,9 +99,12 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
 
       {/* CARD DOS PALPITES ESPECIAIS */}
       <div className="pix-payment-card stretch">
-        <div className="pix-card-title">👑 PALPITES DA COPA</div>
+        <div className="pix-card-title">
+          <img src="/imagens/trofeu.webp" alt="Troféu" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
+          PALPITES DA COPA
+        </div>
         <div className="palpites-hint">
-          Valem <b>{SPECIAL_POINTS} pontos</b> cada ao serem confirmados. Não pagam taxa — só a aposta diária.
+          Valem <b>{SPECIAL_POINTS} pontos</b> cada ao serem confirmados.
           {!locked && ' Você pode editar até 28/06 (início do mata-mata).'}
           {locked && ' Palpites travados (mata-mata começou).'}
         </div>
@@ -154,9 +157,12 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                 <span className="palpites-other-name">{p.name}</span>
                 {sp ? (
                   <span className="palpites-other-picks">
-                    🏆 {translateTeam(sp.championTeam)}{hitChampion ? ' (+5)' : ''}
+                    <img src="/imagens/trofeu.webp" alt="Troféu" style={{ width: '16px', height: '16px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} />
+                    <img src={flagSrc(flagOf(sp.championTeam, ''), 40)} alt={sp.championTeam} style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', marginRight: '4px', verticalAlign: 'middle' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                    {translateTeam(sp.championTeam)}{hitChampion ? ' (+5)' : ''}
                     {' · '}
-                    🇧🇷 {BRAZIL_STAGE_LABELS[sp.brazilStage]}{hitBrazil ? ' (+5)' : ''}
+                    <img src={flagSrc('br', 40)} alt="Brasil" style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', marginRight: '4px', verticalAlign: 'middle' }} />
+                    {BRAZIL_STAGE_LABELS[sp.brazilStage]}{hitBrazil ? ' (+5)' : ''}
                   </span>
                 ) : (
                   <span className="palpites-other-picks none">Sem palpite</span>
@@ -169,7 +175,10 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
 
       {/* CARD DO HISTÓRICO PESSOAL */}
       <div className="pix-payment-card stretch">
-        <div className="pix-card-title">📜 MEU HISTÓRICO ({currentUser.name})</div>
+        <div className="pix-card-title">
+          <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-gqcPFadwUlUpL8ajC5Ap9ZN7a6JCTu.png&w=320&q=75" alt="Histórico" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
+          MEU HISTÓRICO ({currentUser.name})
+        </div>
 
         {historyDays.length === 0 ? (
           <div className="palpites-hint">Nenhum jogo disputado ainda.</div>
@@ -178,7 +187,10 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
             {historyDays.map((day) => (
               <div key={day.iso} className="history-day-group">
                 <div className="history-day-header">
-                  <span className="history-day-label">📅 {day.label}</span>
+                  <span className="history-day-label">
+                    <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-Sae9tyL6cjfCtWIsMdmFt0tn7Iu2tQ.png&w=320&q=75" alt="Data" style={{ width: '18px', height: '18px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} />
+                    {day.label}
+                  </span>
                   <span className="history-day-points">{day.points} pts no dia</span>
                 </div>
 
@@ -199,7 +211,11 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                     <div key={m.id} className="history-row">
                       <div className="history-info">
                         <span className="history-date">{m.group} · {m.time}</span>
-                        <span className="history-teams">{m.homeTeam} {realScore} {m.awayTeam}</span>
+                        <div className="history-teams" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <img src={flagSrc(m.homeFlag, 40)} alt={m.homeTeam} style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                          <span>{m.homeTeam} {realScore} {m.awayTeam}</span>
+                          <img src={flagSrc(m.awayFlag, 40)} alt={m.awayTeam} style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                        </div>
                         <span className="history-bet">
                           Seu palpite: {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
                         </span>

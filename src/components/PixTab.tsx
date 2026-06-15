@@ -12,7 +12,10 @@ const formatMoneyParts = (value: number) => {
 const PixPaymentCard: React.FC = () => {
   return (
     <div className="pix-payment-card">
-      <div className="pix-card-title">💸 PAGAMENTO DA APOSTA DIÁRIA</div>
+      <div className="pix-card-title">
+        <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-n9dmFV9wD0hKFc4BFPY2Mc7nByhtNY.png&w=320&q=75" alt="Pagamento" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} /> 
+        PAGAMENTO DA APOSTA DIÁRIA
+      </div>
 
       <div className="pix-card-value-row">
         <span className="pix-card-currency">R$</span>
@@ -220,7 +223,8 @@ export const PixTab: React.FC<PixTabProps> = ({
                                 className="debt-pendurar-action-btn"
                                 onClick={() => onRegisterDebt(p.uid!, todayIso)}
                               >
-                                📌 Pendurar
+                                <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-bo7jgF2brIAIRGLfOqfEWvsc6orR57.png&w=320&q=75" alt="Pendurar" style={{ width: '16px', height: '16px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} /> 
+                                Pendurar
                               </button>
                             )}
                           </>

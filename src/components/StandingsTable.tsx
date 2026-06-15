@@ -165,42 +165,8 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     return `/imagens/${participantId}-1ou2.webp`;
   };
 
-  // Encontra participantes que pontuaram nos últimos 5 jogos em que palpitaram
-  const getOnFireInfo = () => {
-    if (!matches || !bets) return [];
-
-    // 1. Filtrar jogos finalizados e ordenar cronologicamente por kickoff
-    const finishedMatches = [...matches]
-      .filter(m => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
-      .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff));
-
-    return standings
-      .map((standing) => {
-        const participantBets = bets.filter(b => b.participantId === standing.participantId);
-
-        // Filtrar apenas os jogos finalizados em que este participante de fato apostou
-        const finishedMatchesWithBets = finishedMatches.filter(match =>
-          participantBets.some(b => b.matchId === match.id)
-        );
-
-        // Precisamos de pelo menos 5 jogos apostados para ter streak
-        const lastFive = finishedMatchesWithBets.slice(-5);
-        if (lastFive.length < 5) return null;
-
-        // Verifica se pontuou em cada um desses 5 jogos (points > 0)
-        const scoredAll = lastFive.every(match => {
-          const bet = participantBets.find(b => b.matchId === match.id);
-          const analysis = analyzeBet(bet, match);
-          return analysis.points > 0;
-        });
-
-        if (!scoredAll) return null;
-        return { standing, lastFive };
-      })
-      .filter((x): x is { standing: ParticipantStanding; lastFive: Match[] } => x !== null);
-  };
-
-  const onFirePlayers = getOnFireInfo();
+  // A lista de onFirePlayers será definida logo após o cálculo de fireCounts, 
+  // pois a regra agora é que o card do ON FIRE seja uma conquista permanente (tipo Steam).
 
   // Conta quantos "onfires" (medalhas de fogo) cada participante já conquistou.
   // Regra: a cada 5 jogos consecutivos pontuando (dentre os jogos em que apostou),
@@ -240,6 +206,10 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
   const fireCounts = getFireCounts();
 
+  const onFirePlayers = standings
+    .filter(standing => (fireCounts[standing.participantId] || 0) > 0)
+    .map(standing => ({ standing }));
+
   // Renderiza as medalhas de fogo ao lado do nome no ranking.
   const renderFireMedals = (participantId: string) => {
     const count = fireCounts[participantId] || 0;
@@ -258,7 +228,13 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
   // Seta de evolução no ranking (subiu/caiu/manteve desde a última rodada)
   const renderRankChange = (participantId: string) => {
     const c = rankChanges?.[participantId];
-    if (c == null) return null;
+    if (c == null || c === 0) {
+      return (
+        <span className="rank-change neutral" title="Manteve a posição">
+          -
+        </span>
+      );
+    }
     if (c > 0)
       return (
         <span className="rank-change up" title={`Subiu ${c} posição(ões)`}>
@@ -271,7 +247,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
           ▼{Math.abs(c)}
         </span>
       );
-    return null; // manteve a posição — não exibe nada para não poluir
+    return null;
   };
 
   const handleShare = async () => {
@@ -290,13 +266,6 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
   return (
     <div className="standings-container-modern">
-      {/* BOTÃO DE COMPARTILHAR O RANKING */}
-      <div className="ranking-share-header">
-        <button type="button" className="ranking-share-btn" onClick={handleShare} disabled={sharing}>
-          {sharing ? '⏳ Gerando...' : '📲 Compartilhar ranking'}
-        </button>
-      </div>
-
       {/* RANKING CONTAINER COM LUZ DOURADA E FUNDO ESCURO */}
       <div className="ranking-podium-section">
 
@@ -317,13 +286,14 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     }}
                   />
                   <div className="podium-card-overlay"></div>
-                  <div className="podium-bg-number">2{renderRankChange(secondPlace.participantId)}</div>
+                  <div className="podium-bg-number">2</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-name-with-rank">
+                    <span className="podium-name-with-rank" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ transform: 'scale(0.8)' }}>{renderRankChange(secondPlace.participantId)}</div>
                       <span className="podium-player-name">{secondPlace.name}</span>
                       {renderFireMedals(secondPlace.participantId)}
                     </span>
@@ -335,7 +305,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 </>
               ) : (
                 <>
-                  <div className="podium-bg-number">2{renderRankChange(secondPlace.participantId)}</div>
+                  <div className="podium-bg-number">2</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -351,7 +321,8 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     />
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-name-with-rank">
+                    <span className="podium-name-with-rank" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ transform: 'scale(0.8)' }}>{renderRankChange(secondPlace.participantId)}</div>
                       <span className="podium-player-name">{secondPlace.name}</span>
                       {renderFireMedals(secondPlace.participantId)}
                     </span>
@@ -379,13 +350,14 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     }}
                   />
                   <div className="podium-card-overlay"></div>
-                  <div className="podium-bg-number">1{renderRankChange(firstPlace.participantId)}</div>
+                  <div className="podium-bg-number">1</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-name-with-rank">
+                    <span className="podium-name-with-rank" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ transform: 'scale(0.8)' }}>{renderRankChange(firstPlace.participantId)}</div>
                       <span className="podium-player-name">{firstPlace.name}</span>
                       {renderFireMedals(firstPlace.participantId)}
                     </span>
@@ -397,7 +369,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 </>
               ) : (
                 <>
-                  <div className="podium-bg-number">1{renderRankChange(firstPlace.participantId)}</div>
+                  <div className="podium-bg-number">1</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -413,7 +385,8 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     />
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-name-with-rank">
+                    <span className="podium-name-with-rank" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ transform: 'scale(0.8)' }}>{renderRankChange(firstPlace.participantId)}</div>
                       <span className="podium-player-name">{firstPlace.name}</span>
                       {renderFireMedals(firstPlace.participantId)}
                     </span>
@@ -472,6 +445,24 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
             })}
           </div>
         )}
+      </div>
+
+      {/* BOTÃO DE COMPARTILHAR O RANKING */}
+      <div className="ranking-share-header" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+        <button type="button" className="ranking-share-btn" onClick={handleShare} disabled={sharing} style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+          {sharing ? (
+            '⏳ Gerando...'
+          ) : (
+            <>
+              <img 
+                src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-zKoxdD3l5QDuQDFQGP45fqO0EuaKqP.png&w=320&q=75" 
+                alt="Compartilhar" 
+                style={{ width: '20px', height: '20px', objectFit: 'contain' }} 
+              />
+              Compartilhar
+            </>
+          )}
+        </button>
       </div>
 
       {/* CARD "ON FIRE" */}

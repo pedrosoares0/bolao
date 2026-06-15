@@ -677,17 +677,15 @@ function App() {
   // Evolução no ranking: compara a posição atual com a posição ANTES da última
   // rodada finalizada. Valor positivo = subiu; negativo = caiu; 0 = manteve.
   const rankChanges = useMemo<Record<string, number>>(() => {
-    const finishedIso = Array.from(
-      new Set(
-        matches
-          .filter((m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
-          .map((m) => m.isoDate)
-      )
-    ).sort();
-    if (finishedIso.length < 2) return {};
+    const finishedMatches = matches
+      .filter((m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
+      .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
 
-    const latestIso = finishedIso[finishedIso.length - 1];
-    const prevMatches = matches.filter((m) => !(m.status === 'finished' && m.isoDate === latestIso));
+    if (finishedMatches.length === 0) return {};
+
+    // Remove apenas o ÚLTIMO jogo finalizado para saber como estava o ranking exatamente antes dele
+    const lastMatch = finishedMatches[finishedMatches.length - 1];
+    const prevMatches = matches.filter((m) => m.id !== lastMatch.id);
     const prev = calculateStandings(participants, prevMatches, bets, specials);
 
     const prevRank: Record<string, number> = {};
@@ -900,6 +898,8 @@ function App() {
                             {canEditBet ? (
                               <input
                                 type="number"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 min="0"
                                 className="score-input-field-p16"
                                 value={displayDrafts[match.id]?.homeScore || ''}
@@ -940,6 +940,8 @@ function App() {
                             {canEditBet ? (
                               <input
                                 type="number"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 min="0"
                                 className="score-input-field-p16"
                                 value={displayDrafts[match.id]?.awayScore || ''}

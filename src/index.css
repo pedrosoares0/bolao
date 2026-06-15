@@ -199,14 +199,30 @@ body {
 
 .app-header-card-gradient-border {
   border: 3px solid transparent;
-  background: linear-gradient(#15110E, #15110E) padding-box,
-              linear-gradient(90deg, #009c3b 0%, #ffdf00 50%, #002776 100%) border-box;
+  background: 
+    linear-gradient(#15110E, #15110E) padding-box,
+    linear-gradient(90deg, 
+      #009c3b 0%, 
+      #ffdf00 16.666%, 
+      #002776 33.333%, 
+      #009c3b 50%, 
+      #ffdf00 66.666%, 
+      #002776 83.333%, 
+      #009c3b 100%
+    ) border-box;
+  background-size: 100% 100%, 200% 100%;
+  animation: moveBorderGradient 4s linear infinite;
   border-radius: 1.75rem;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes moveBorderGradient {
+  0% { background-position: 0% 0%, 0% 50%; }
+  100% { background-position: 0% 0%, 100% 50%; }
 }
 
 .app-header-card-img {
@@ -1608,42 +1624,51 @@ body {
   width: calc(100% - 32px);
   max-width: 440px;
 
-  /* Dark Glassmorphism Premium */
-  background: rgba(21, 17, 14, 0.92);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  /* Liquid Glass Premium */
+  background: rgba(21, 17, 14, 0.55);
+  backdrop-filter: blur(24px) saturate(200%) contrast(110%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%) contrast(110%);
 
   border-radius: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   padding: 0.6rem 0.5rem;
   z-index: 100;
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  flex: 1; /* Distribui o espaço igualmente */
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.65rem;
   font-weight: 800;
   cursor: pointer;
-  gap: 0.15rem;
-  transition: var(--transition-smooth);
-  padding: 0.35rem 1.5rem;
+  gap: 0.2rem;
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* iOS-like springy transition */
+  padding: 0.45rem 0;
   border-radius: 1rem;
+  transform-origin: center;
+}
+
+.nav-item:active {
+  transform: scale(0.92);
 }
 
 .nav-item.active {
   color: var(--accent-gold); /* Destaque em ouro para a aba ativa */
   background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.05);
 }
 /* ============================================= */
 /* TOAST DE NOTIFICAÇÃO (substitui os alerts)    */
@@ -1730,11 +1755,14 @@ body {
 
 .pix-card-title {
   font-family: var(--font-family);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   color: rgba(255, 255, 255, 0.85);
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pix-card-value-row {
@@ -1897,10 +1925,11 @@ body {
 }
 
 .palpites-other-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  align-items: center;
   gap: 0.6rem;
+  padding: 0.3rem 0;
 }
 
 .palpites-other-name {
@@ -1908,15 +1937,16 @@ body {
   font-size: 0.8rem;
   font-weight: 800;
   color: #F2ECDD;
-  flex-shrink: 0;
 }
 
 .palpites-other-picks {
   font-family: var(--font-family);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.65);
-  text-align: right;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: left;
+  display: flex;
+  align-items: center;
 }
 
 .palpites-other-picks.none {
@@ -3110,6 +3140,7 @@ body {
 }
 .rank-change.up { color: #4ade80; text-shadow: 0 0 6px rgba(74, 222, 128, 0.5); }
 .rank-change.down { color: #f87171; text-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
+.rank-change.neutral { color: rgba(255, 255, 255, 0.5); text-shadow: none; font-weight: 900; }
 
 /* Nome com a medalha de fogo como EXPOENTE (número elevado: Rodrigo🔥²) */
 .standing-name-with-rank,
@@ -3159,9 +3190,9 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: linear-gradient(135deg, #1e7e34 0%, #25d366 100%);
-  border: none;
-  color: #fff;
+  background: linear-gradient(135deg, rgba(245, 179, 0, 0.15) 0%, rgba(245, 179, 0, 0.05) 100%);
+  border: 1px solid rgba(245, 179, 0, 0.4);
+  color: #f5b300;
   font-family: var(--font-family);
   font-size: 0.78rem;
   font-weight: 800;
@@ -3169,7 +3200,7 @@ body {
   padding: 0.55rem 1.3rem;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 3px 12px rgba(37, 211, 102, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: all 0.18s ease;
 }
 .ranking-share-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
