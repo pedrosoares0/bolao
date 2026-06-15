@@ -37,6 +37,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
   const [champDraft, setChampDraft] = useState('');
   const [stageDraft, setStageDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
 
   const championValue = champDraft || myPrediction?.championTeam || '';
   const stageValue = stageDraft || myPrediction?.brazilStage || '';
@@ -93,6 +94,15 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
     });
     return days;
   }, [matches, bets, currentUser.id, nowTs]);
+
+  // Paginação do histórico: 3 dias por página, do mais recente ao mais antigo
+  const HISTORY_PAGE_SIZE = 3;
+  const totalHistoryPages = Math.max(1, Math.ceil(historyDays.length / HISTORY_PAGE_SIZE));
+  const currentHistoryPage = Math.min(historyPage, totalHistoryPages - 1);
+  const pagedHistoryDays = historyDays.slice(
+    currentHistoryPage * HISTORY_PAGE_SIZE,
+    currentHistoryPage * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
+  );
 
   return (
     <div className="standings-container-modern">
@@ -183,8 +193,9 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
         {historyDays.length === 0 ? (
           <div className="palpites-hint">Nenhum jogo disputado ainda.</div>
         ) : (
+          <>
           <div className="history-list">
-            {historyDays.map((day) => (
+            {pagedHistoryDays.map((day) => (
               <div key={day.iso} className="history-day-group">
                 <div className="history-day-header">
                   <span className="history-day-label">
@@ -229,6 +240,31 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
               </div>
             ))}
           </div>
+
+          {totalHistoryPages > 1 && (
+            <div className="history-pagination">
+              <button
+                type="button"
+                className="history-page-btn"
+                disabled={currentHistoryPage === 0}
+                onClick={() => setHistoryPage((p) => Math.max(0, p - 1))}
+              >
+                ← Mais recentes
+              </button>
+              <span className="history-page-info">
+                Página {currentHistoryPage + 1} de {totalHistoryPages}
+              </span>
+              <button
+                type="button"
+                className="history-page-btn"
+                disabled={currentHistoryPage >= totalHistoryPages - 1}
+                onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages - 1, p + 1))}
+              >
+                Dias anteriores →
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

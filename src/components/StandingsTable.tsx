@@ -210,6 +210,45 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     .filter(standing => (fireCounts[standing.participantId] || 0) > 0)
     .map(standing => ({ standing }));
 
+  // MVP da Rodada: quem fez mais pontos no dia finalizado mais recente
+  // EM QUE ALGUÉM PONTUOU. Desempate por nº de placares exatos.
+  const roundMvp = ((): { standing: ParticipantStanding; pts: number; dateLabel: string } | null => {
+    if (!matches || !bets) return null;
+    const finished = matches.filter(
+      (m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null
+    );
+    if (finished.length === 0) return null;
+
+    // Datas finalizadas, da mais recente para a mais antiga (pelo kickoff)
+    const isoDates = Array.from(new Set(finished.map((m) => m.isoDate))).sort((a, b) => {
+      const ka = Math.max(...finished.filter((m) => m.isoDate === a).map((m) => Date.parse(m.kickoff)));
+      const kb = Math.max(...finished.filter((m) => m.isoDate === b).map((m) => Date.parse(m.kickoff)));
+      return kb - ka;
+    });
+
+    for (const iso of isoDates) {
+      const dayMatches = finished.filter((m) => m.isoDate === iso);
+      let best: { standing: ParticipantStanding; pts: number; exacts: number } | null = null;
+      standings.forEach((s) => {
+        let pts = 0;
+        let exacts = 0;
+        dayMatches.forEach((m) => {
+          const bet = bets.find((b) => b.matchId === m.id && b.participantId === s.participantId);
+          const a = analyzeBet(bet, m);
+          pts += a.points;
+          if (a.type === 'exact') exacts++;
+        });
+        if (pts > 0 && (!best || pts > best.pts || (pts === best.pts && exacts > best.exacts))) {
+          best = { standing: s, pts, exacts };
+        }
+      });
+      if (best) {
+        return { standing: best.standing, pts: best.pts, dateLabel: dayMatches[0]?.date ?? '' };
+      }
+    }
+    return null;
+  })();
+
   // Renderiza as medalhas de fogo ao lado do nome no ranking.
   const renderFireMedals = (participantId: string) => {
     const count = fireCounts[participantId] || 0;
@@ -266,6 +305,31 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
   return (
     <div className="standings-container-modern">
+      {/* MVP DA RODADA (quem mais pontuou no último dia finalizado) */}
+      {roundMvp && (
+        <div className="round-mvp-card">
+          <div className="round-mvp-star">🌟</div>
+          <div className="round-mvp-avatar-wrap">
+            <img
+              src={getRankingAvatar(roundMvp.standing.participantId)}
+              alt={roundMvp.standing.name}
+              className="round-mvp-avatar"
+              onError={(e) => {
+                e.currentTarget.src = roundMvp.standing.avatarUrl;
+              }}
+            />
+          </div>
+          <div className="round-mvp-content">
+            <span className="round-mvp-label">MVP DA RODADA · {roundMvp.dateLabel}</span>
+            <span className="round-mvp-name">{roundMvp.standing.name}</span>
+          </div>
+          <div className="round-mvp-pts">
+            <span className="round-mvp-pts-num">{roundMvp.pts}</span>
+            <span className="round-mvp-pts-lbl">pts</span>
+          </div>
+        </div>
+      )}
+
       {/* RANKING CONTAINER COM LUZ DOURADA E FUNDO ESCURO */}
       <div className="ranking-podium-section">
 
