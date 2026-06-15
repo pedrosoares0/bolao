@@ -65,10 +65,7 @@ export const PixTab: React.FC<PixTabProps> = ({
   const [confirmPayAll, setConfirmPayAll] = React.useState<
     { uid: string; count: number; total: number } | null
   >(null);
-  // Total pendurado (dinheiro que ainda não entrou no pote) desconta do acumulado
-  const totalPendurado = debts.reduce((sum, d) => sum + d.amount, 0);
-  const netAccumulated = Math.max(0, accumulated - totalPendurado);
-  const prizeParts = formatMoneyParts(netAccumulated);
+  const prizeParts = formatMoneyParts(accumulated);
   const dayValueParts = formatMoneyParts(POT_PER_DAY);
   const personValueParts = formatMoneyParts(POT_PER_PERSON_DAY);
 
@@ -98,12 +95,6 @@ export const PixTab: React.FC<PixTabProps> = ({
             <span className="vault-integer">{prizeParts.integerPart}</span>
             <span className="vault-decimals">,{prizeParts.decimalPart}</span>
           </div>
-
-          {totalPendurado > 0 && (
-            <div className="vault-pendurado-note">
-              📌 R$ {totalPendurado.toFixed(2).replace('.', ',')} pendurados (descontados)
-            </div>
-          )}
         </div>
 
         <div className="vault-details-bottom">

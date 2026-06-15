@@ -720,16 +720,6 @@ body {
   margin-top: 0.45rem;
 }
 
-.vault-pendurado-note {
-  margin-top: 0.4rem;
-  font-family: var(--font-family);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #ff8c42;
-  text-align: center;
-  letter-spacing: 0.02em;
-}
-
 .vault-details-bottom {
   display: flex;
   justify-content: space-between;
@@ -1175,7 +1165,7 @@ body {
   top: 5px;
   left: 10px;
   font-family: 'Granika', sans-serif;
-  font-size: 7rem;
+  font-size: 4.5rem;
   font-weight: 900;
   line-height: 0.8;
   pointer-events: none;
@@ -1183,14 +1173,10 @@ body {
   user-select: none;
 }
 
-.first-place-card .podium-bg-number {
-  color: rgba(245, 179, 0, 0.5); /* Golden tint — mais visível */
-  text-shadow: 0 0 12px rgba(245, 179, 0, 0.35);
-}
-
+.first-place-card .podium-bg-number,
 .second-place-card .podium-bg-number {
-  color: rgba(255, 255, 255, 0.32); /* Silver/white tint — mais visível */
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85); /* Letras brancas (igual à imagem) */
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.3);
 }
 
 /* Medal and Points Glow animations */
