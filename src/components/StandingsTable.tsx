@@ -199,6 +199,59 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
   const onFirePlayers = getOnFireInfo();
 
+  // Conta quantos "onfires" (medalhas de fogo) cada participante já conquistou.
+  // Regra: a cada 5 jogos consecutivos pontuando (dentre os jogos em que apostou),
+  // ganha +1 fogo PERMANENTE. Errar um jogo zera apenas a contagem rumo ao próximo
+  // grupo de 5 — os fogos já conquistados nunca são removidos.
+  const getFireCounts = (): Record<string, number> => {
+    const counts: Record<string, number> = {};
+    if (!matches || !bets) return counts;
+
+    const finishedMatches = [...matches]
+      .filter(m => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
+      .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff));
+
+    standings.forEach((standing) => {
+      const participantBets = bets.filter(b => b.participantId === standing.participantId);
+      let fires = 0;
+      let streak = 0;
+      finishedMatches.forEach((match) => {
+        const bet = participantBets.find(b => b.matchId === match.id);
+        if (!bet) return; // só conta jogos em que o participante apostou
+        const analysis = analyzeBet(bet, match);
+        if (analysis.points > 0) {
+          streak++;
+          if (streak === 5) {
+            fires++;
+            streak = 0;
+          }
+        } else {
+          streak = 0;
+        }
+      });
+      counts[standing.participantId] = fires;
+    });
+
+    return counts;
+  };
+
+  const fireCounts = getFireCounts();
+
+  // Renderiza as medalhas de fogo ao lado do nome no ranking.
+  const renderFireMedals = (participantId: string) => {
+    const count = fireCounts[participantId] || 0;
+    if (count <= 0) return null;
+    return (
+      <span
+        className="fire-medal-badge"
+        title={`${count} On Fire — ${count * 5} jogos pontuando em sequência`}
+      >
+        <span className="fire-medal-flame">🔥</span>
+        {count > 1 && <span className="fire-medal-count">{count}</span>}
+      </span>
+    );
+  };
+
   const firstPlace = standings[0];
   const secondPlace = standings[1];
   const remainingStandings = standings.slice(2);
@@ -232,6 +285,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   </div>
                   <div className="podium-player-info-row">
                     <span className="podium-player-name">{secondPlace.name}</span>
+                    {renderFireMedals(secondPlace.participantId)}
                     <div className="podium-player-pts glow-silver-text-anim">
                       <span className="pts-number">{secondPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -257,6 +311,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   </div>
                   <div className="podium-player-info-row">
                     <span className="podium-player-name">{secondPlace.name}</span>
+                    {renderFireMedals(secondPlace.participantId)}
                     <div className="podium-player-pts glow-silver-text-anim">
                       <span className="pts-number">{secondPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -288,6 +343,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   </div>
                   <div className="podium-player-info-row">
                     <span className="podium-player-name">{firstPlace.name}</span>
+                    {renderFireMedals(firstPlace.participantId)}
                     <div className="podium-player-pts glow-gold-text-anim">
                       <span className="pts-number">{firstPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -313,6 +369,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   </div>
                   <div className="podium-player-info-row">
                     <span className="podium-player-name">{firstPlace.name}</span>
+                    {renderFireMedals(firstPlace.participantId)}
                     <div className="podium-player-pts glow-gold-text-anim">
                       <span className="pts-number">{firstPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -353,6 +410,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                       />
                     </div>
                     <span className="standing-row-name">{standing.name}</span>
+                    {renderFireMedals(standing.participantId)}
                   </div>
 
                   <div className="standing-row-right">
@@ -463,6 +521,17 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   <p className="on-fire-desc">
                     São 5 jogos consecutivos pontuando. Ninguém consegue parar o homem.
                   </p>
+                  {(fireCounts[player.standing.participantId] || 0) > 0 && (
+                    <div className="on-fire-count-badge">
+                      <span className="on-fire-count-flame">🔥</span>
+                      <span className="on-fire-count-num">
+                        {fireCounts[player.standing.participantId]}
+                      </span>
+                      <span className="on-fire-count-label">
+                        {fireCounts[player.standing.participantId] === 1 ? 'ON FIRE' : 'ON FIRES'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

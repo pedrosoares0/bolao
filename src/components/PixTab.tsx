@@ -39,6 +39,7 @@ interface PixTabProps {
   debts: Debt[];
   onRegisterDebt: (userId: string, date: string) => Promise<void>;
   onRemoveDebt: (debtId: number) => Promise<void>;
+  onRemoveAllDebts: (userId: string) => Promise<void>;
 }
 
 const formatIsoDateToBr = (isoDate: string) => {
@@ -56,10 +57,18 @@ export const PixTab: React.FC<PixTabProps> = ({
   debts,
   onRegisterDebt,
   onRemoveDebt,
+  onRemoveAllDebts,
 }) => {
   const [trophyError, setTrophyError] = React.useState(false);
   const [isDebtsExpanded, setIsDebtsExpanded] = React.useState(false);
-  const prizeParts = formatMoneyParts(accumulated);
+  const [expandedDebtUsers, setExpandedDebtUsers] = React.useState<Record<string, boolean>>({});
+  const [confirmPayAll, setConfirmPayAll] = React.useState<
+    { uid: string; count: number; total: number } | null
+  >(null);
+  // Total pendurado (dinheiro que ainda não entrou no pote) desconta do acumulado
+  const totalPendurado = debts.reduce((sum, d) => sum + d.amount, 0);
+  const netAccumulated = Math.max(0, accumulated - totalPendurado);
+  const prizeParts = formatMoneyParts(netAccumulated);
   const dayValueParts = formatMoneyParts(POT_PER_DAY);
   const personValueParts = formatMoneyParts(POT_PER_PERSON_DAY);
 
@@ -89,6 +98,12 @@ export const PixTab: React.FC<PixTabProps> = ({
             <span className="vault-integer">{prizeParts.integerPart}</span>
             <span className="vault-decimals">,{prizeParts.decimalPart}</span>
           </div>
+
+          {totalPendurado > 0 && (
+            <div className="vault-pendurado-note">
+              📌 R$ {totalPendurado.toFixed(2).replace('.', ',')} pendurados (descontados)
+            </div>
+          )}
         </div>
 
         <div className="vault-details-bottom">
@@ -165,79 +180,147 @@ export const PixTab: React.FC<PixTabProps> = ({
                 }).format(new Date());
 
                 const hasPenduradoHoje = userDebts.some((d) => d.debtDate === todayIso);
+                const isUserExpanded = !!expandedDebtUsers[p.id];
 
                 return (
-                  <div key={p.id} className={`debt-participant-row ${isSelf ? 'is-self' : ''}`}>
-                    <div className="debt-user-profile">
-                      <div className="debt-avatar-container">
-                        <img
-                          src={`/imagens/ranking ${p.id}.webp`}
-                          alt={p.name}
-                          className="debt-avatar"
-                          onError={(e) => {
-                            e.currentTarget.src = p.avatarUrl;
-                          }}
-                        />
+                  <React.Fragment key={p.id}>
+                    <div className={`debt-participant-row ${isSelf ? 'is-self' : ''}`}>
+                      <div className="debt-user-profile">
+                        <div className="debt-avatar-container">
+                          <img
+                            src={`/imagens/ranking ${p.id}.webp`}
+                            alt={p.name}
+                            className="debt-avatar"
+                            onError={(e) => {
+                              e.currentTarget.src = p.avatarUrl;
+                            }}
+                          />
+                        </div>
+                        <div className="debt-user-details">
+                          <span className="debt-user-name">
+                            {p.name} {isSelf && <span className="self-tag">(Você)</span>}
+                          </span>
+                          {userDebts.length > 0 ? (
+                            <button
+                              type="button"
+                              className="debt-toggle-days-btn"
+                              onClick={() =>
+                                setExpandedDebtUsers((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
+                              }
+                            >
+                              {isUserExpanded
+                                ? '▲ Ocultar dias'
+                                : `▼ Ver dias pendurados (${userDebts.length})`}
+                            </button>
+                          ) : (
+                            <span className="debt-no-debts">Em dia</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="debt-user-details">
-                        <span className="debt-user-name">
-                          {p.name} {isSelf && <span className="self-tag">(Você)</span>}
-                        </span>
-                        {userDebts.length > 0 ? (
-                          <div className="debt-dates-list">
-                            {userDebts.map((d) => (
-                              <span key={d.id} className="debt-date-badge">
-                                {formatIsoDateToBr(d.debtDate)}
-                                {isSelf && (
-                                  <button
-                                    type="button"
-                                    className="debt-clear-btn"
-                                    onClick={() => onRemoveDebt(d.id)}
-                                    title="Dar baixa neste fiado"
-                                  >
-                                    ×
-                                  </button>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="debt-no-debts">Em dia</span>
+
+                      <div className="debt-actions-area">
+                        {isSelf && (
+                          <>
+                            {hasPenduradoHoje ? (
+                              <span className="debt-status-badge today">Pendurado Hoje</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="debt-pendurar-action-btn"
+                                onClick={() => onRegisterDebt(p.uid!, todayIso)}
+                              >
+                                📌 Pendurar
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
 
-                    <div className="debt-actions-area">
-                      {userDebts.length > 0 && (
-                        <div className="debt-total-display">
-                          <span className="debt-total-label">Total:</span>
-                          <span className="debt-total-val">R$ {totalUnpaid.toFixed(2).replace('.', ',')}</span>
+                    {userDebts.length > 0 && isUserExpanded && (
+                      <div className={`debt-days-expanded ${isSelf ? 'is-self' : ''}`}>
+                        <div className="debt-dates-list">
+                          {userDebts.map((d) => (
+                            <span key={d.id} className="debt-date-badge">
+                              {formatIsoDateToBr(d.debtDate)}
+                              {isSelf && (
+                                <button
+                                  type="button"
+                                  className="debt-clear-btn"
+                                  onClick={() => onRemoveDebt(d.id)}
+                                  title="Dar baixa neste fiado"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </span>
+                          ))}
                         </div>
-                      )}
+                        <div className="debt-total-display">
+                          <span className="debt-total-label">Total pendurado:</span>
+                          <span className="debt-total-val">
+                            R$ {totalUnpaid.toFixed(2).replace('.', ',')}
+                          </span>
+                        </div>
 
-                      {isSelf && (
-                        <>
-                          {hasPenduradoHoje ? (
-                            <span className="debt-status-badge today">Pendurado Hoje</span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="debt-pendurar-action-btn"
-                              onClick={() => onRegisterDebt(p.uid!, todayIso)}
-                            >
-                              📌 Pendurar
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
+                        {isSelf && (
+                          <button
+                            type="button"
+                            className="debt-pay-all-btn"
+                            onClick={() =>
+                              setConfirmPayAll({
+                                uid: p.uid!,
+                                count: userDebts.length,
+                                total: totalUnpaid,
+                              })
+                            }
+                          >
+                            ✅ Pagar tudo
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>
           </div>
         </div>
       </div>
+
+      {/* POPUP DE CONFIRMAÇÃO — Pagar tudo */}
+      {confirmPayAll && (
+        <div className="pix-modal-overlay" onClick={() => setConfirmPayAll(null)}>
+          <div className="pix-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="pix-modal-emoji">💸</div>
+            <div className="pix-card-title">QUITAR FIADOS</div>
+            <div className="pix-modal-text">
+              Dar baixa em <b>todos os {confirmPayAll.count} fiados</b> pendurados, no total de{' '}
+              <b>R$ {confirmPayAll.total.toFixed(2).replace('.', ',')}</b>?
+            </div>
+            <div className="confirm-modal-actions">
+              <button
+                type="button"
+                className="confirm-modal-cancel-btn"
+                onClick={() => setConfirmPayAll(null)}
+              >
+                CANCELAR
+              </button>
+              <button
+                type="button"
+                className="confirm-modal-confirm-btn"
+                onClick={() => {
+                  const uid = confirmPayAll.uid;
+                  setConfirmPayAll(null);
+                  onRemoveAllDebts(uid);
+                }}
+              >
+                ✅ PAGAR TUDO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

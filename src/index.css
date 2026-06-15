@@ -720,6 +720,16 @@ body {
   margin-top: 0.45rem;
 }
 
+.vault-pendurado-note {
+  margin-top: 0.4rem;
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ff8c42;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
 .vault-details-bottom {
   display: flex;
   justify-content: space-between;
@@ -978,16 +988,21 @@ body {
   padding: 1rem 1.25rem 1.25rem 1.25rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   z-index: 2;
 }
 
 .participant-card-name {
   font-family: 'Granika', var(--font-family-condensed);
-  font-size: 1.35rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: 0.01em;
+  width: 100%;
+  text-align: center;
+  border: none !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
 }
 
 .participant-card-badge {
@@ -1169,11 +1184,13 @@ body {
 }
 
 .first-place-card .podium-bg-number {
-  color: rgba(245, 179, 0, 0.15); /* Golden tint */
+  color: rgba(245, 179, 0, 0.5); /* Golden tint — mais visível */
+  text-shadow: 0 0 12px rgba(245, 179, 0, 0.35);
 }
 
 .second-place-card .podium-bg-number {
-  color: rgba(255, 255, 255, 0.08); /* Silver/white tint */
+  color: rgba(255, 255, 255, 0.32); /* Silver/white tint — mais visível */
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
 }
 
 /* Medal and Points Glow animations */
@@ -1520,6 +1537,49 @@ body {
   -webkit-text-stroke: 0 !important;
   border: none !important;
   text-shadow: none !important;
+}
+
+/* ===== MEDALHA DE FOGO (ON FIRE) AO LADO DO NOME NO RANKING ===== */
+.fire-medal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.fire-medal-flame {
+  font-size: 1.15em;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 90, 20, 0.9));
+  animation: fire-medal-flicker 1.4s ease-in-out infinite;
+}
+
+.fire-medal-count {
+  font-family: 'Granika', var(--font-family-condensed);
+  font-size: 0.78em;
+  font-weight: bold;
+  color: #ffae00;
+  text-shadow: 0 0 6px rgba(255, 90, 20, 0.7);
+  -webkit-text-stroke: 0 !important;
+  margin-left: -0.05rem;
+}
+
+@keyframes fire-medal-flicker {
+  0%, 100% {
+    transform: scale(1) rotate(-2deg);
+    filter: drop-shadow(0 0 6px rgba(255, 90, 20, 0.9));
+  }
+  50% {
+    transform: scale(1.12) rotate(2deg);
+    filter: drop-shadow(0 0 11px rgba(255, 140, 0, 1));
+  }
+}
+
+/* No pódio o nome tem max-width; garantimos que a chama não seja cortada */
+.podium-player-info-row .fire-medal-badge {
+  z-index: 3;
 }
 
 .standing-row-right {
@@ -1989,6 +2049,53 @@ body {
   letter-spacing: 0.1em;
   color: #F2ECDD;
   cursor: pointer;
+}
+
+/* Ações do popup de confirmação (Cancelar / Pagar tudo) */
+.confirm-modal-actions {
+  display: flex;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
+.confirm-modal-cancel-btn,
+.confirm-modal-confirm-btn {
+  flex: 1;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.confirm-modal-cancel-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: #F2ECDD;
+}
+
+.confirm-modal-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.confirm-modal-confirm-btn {
+  border: none;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.3);
+}
+
+.confirm-modal-confirm-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.confirm-modal-confirm-btn:active {
+  transform: translateY(1px) scale(0.98);
 }
 
 /* ============================================= */
@@ -2539,10 +2646,98 @@ body {
   border-radius: 6px;
 }
 
-.debt-participant-row.is-self .debt-date-badge {
+.debt-participant-row.is-self .debt-date-badge,
+.debt-days-expanded.is-self .debt-date-badge {
   background-color: var(--accent-gold);
   color: #15110E;
   border-color: var(--accent-gold);
+}
+
+/* Botão "Ver dias pendurados" */
+.debt-toggle-days-btn {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-family);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.debt-toggle-days-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.debt-participant-row.is-self .debt-toggle-days-btn {
+  background: rgba(245, 179, 0, 0.12);
+  border-color: rgba(245, 179, 0, 0.4);
+  color: var(--accent-gold);
+}
+
+/* Painel expandido com a lista de dias + total */
+.debt-days-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  margin: -0.4rem 0 0.1rem 0;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 1.25rem;
+  animation: debt-expand-in 0.2s ease;
+}
+
+.debt-days-expanded.is-self {
+  background-color: rgba(245, 179, 0, 0.04);
+  border-color: rgba(245, 179, 0, 0.22);
+}
+
+.debt-days-expanded .debt-total-display {
+  align-self: flex-end;
+}
+
+/* Botão "Pagar tudo" no fim do detalhamento do usuário */
+.debt-pay-all-btn {
+  align-self: stretch;
+  margin-top: 0.1rem;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  border: none;
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.25);
+  transition: all 0.18s ease;
+}
+
+.debt-pay-all-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.debt-pay-all-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.debt-days-expanded.is-self .debt-clear-btn {
+  color: #15110E;
+  opacity: 0.8;
+}
+
+@keyframes debt-expand-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .debt-clear-btn {
@@ -2794,6 +2989,46 @@ body {
   margin: 0;
   padding: 0;
   line-height: 1.35;
+}
+
+/* Contador de medalhas de fogo dentro do card "ON FIRE" */
+.on-fire-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin-top: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 69, 0, 0.28), rgba(255, 140, 0, 0.12));
+  border: 1px solid rgba(255, 140, 0, 0.45);
+  box-shadow: 0 0 10px rgba(255, 90, 20, 0.35);
+  width: fit-content;
+}
+
+.on-fire-count-flame {
+  font-size: 1rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 5px rgba(255, 90, 20, 0.9));
+  animation: fire-medal-flicker 1.4s ease-in-out infinite;
+}
+
+.on-fire-count-num {
+  font-family: 'Granika', var(--font-family-condensed);
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: #ffae00;
+  text-shadow: 0 0 6px rgba(255, 90, 20, 0.7);
+  -webkit-text-stroke: 0 !important;
+  line-height: 1;
+}
+
+.on-fire-count-label {
+  font-family: var(--font-family);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
 }
 
 .on-fire-portrait-container {

@@ -641,6 +641,34 @@ function App() {
     if (currentUser?.uid) await loadAll(currentUser.uid, false);
   };
 
+  // Handler para quitar TODOS os fiados de um usuário de uma vez
+  const handleRemoveAllDebts = async (userId: string) => {
+    // 1. Tenta deletar tudo no Supabase
+    const { error: dbError } = await supabase.from('debts').delete().eq('user_id', userId);
+
+    if (dbError) {
+      console.warn("Falha ao quitar fiados no Supabase. Atualizando localmente.");
+      // 2. Fallback para localStorage
+      const currentLocal = getLocalDebts();
+      const updated = currentLocal.filter((d: any) => d.user_id !== userId);
+      saveLocalDebts(updated);
+
+      // Atualiza o estado
+      setDebts(updated.map((d: any) => ({
+        id: d.id,
+        userId: d.user_id,
+        amount: Number(d.amount),
+        debtDate: d.debt_date,
+        createdAt: d.created_at
+      })));
+      showToast('Fiados quitados localmente!', 'success');
+      return;
+    }
+
+    showToast('Todos os fiados foram quitados!', 'success');
+    if (currentUser?.uid) await loadAll(currentUser.uid, false);
+  };
+
   // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
   const standings = useMemo<ParticipantStanding[]>(() => {
     return calculateStandings(participants, matches, bets, specials);
@@ -1070,6 +1098,7 @@ function App() {
             debts={debts}
             onRegisterDebt={handleRegisterDebt}
             onRemoveDebt={handleRemoveDebt}
+            onRemoveAllDebts={handleRemoveAllDebts}
           />
         )}
 
