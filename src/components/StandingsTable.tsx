@@ -3,6 +3,7 @@ import type { ParticipantStanding, Match, Bet } from '../types';
 import { analyzeBet } from '../utils/rules';
 import { shareRanking } from '../utils/shareRanking';
 import LightRays from './LightRays';
+import Aurora from './Aurora';
 
 interface StandingsTableProps {
   standings: ParticipantStanding[];
@@ -40,7 +41,7 @@ const Slideshow: React.FC = () => {
   const handleDragEnd = () => {
     if (!isDragging) return;
     setIsDragging(false);
-    
+
     const threshold = 60;
     if (dragX > threshold) {
       // Swiped right -> go to previous card
@@ -66,7 +67,7 @@ const Slideshow: React.FC = () => {
           {participantSlides.map((slide, index) => {
             const len = participantSlides.length;
             const diff = (index - activeIndex + len) % len;
-            
+
             // Styles based on stack depth (diff)
             let transform = '';
             let zIndex = 1;
@@ -121,10 +122,10 @@ const Slideshow: React.FC = () => {
                 onTouchEnd={handleDragEnd}
               >
                 <div className="participant-card-image-wrapper">
-                  <img 
-                    src={slide.img} 
-                    alt={slide.name} 
-                    className="participant-stacked-img" 
+                  <img
+                    src={slide.img}
+                    alt={slide.name}
+                    className="participant-stacked-img"
                     draggable="false"
                   />
                   <div className="participant-card-label-overlay">
@@ -154,6 +155,14 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
   const [imageErrors, setImageErrors] = React.useState<Record<string, boolean>>({});
   const [sharing, setSharing] = React.useState(false);
   const [onFireImageErrors, setOnFireImageErrors] = React.useState<Record<string, boolean>>({});
+
+  // Helper para obter a data de ontem formatada como DD/MM
+  const getYesterdayLabel = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
+    return fmt.format(d);
+  };
 
   // Helper para obter a imagem de ranking específica do participante
   const getRankingAvatar = (participantId: string) => {
@@ -214,10 +223,10 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
   // EM QUE TODOS OS JOGOS DESSE DIA FORAM CONCLUÍDOS. Desempate por nº de placares exatos.
   const roundMvp = ((): { standing: ParticipantStanding; pts: number; dateLabel: string } | null => {
     if (!matches || !bets) return null;
-    
+
     // Todas as datas que possuem algum jogo
     const allDates = Array.from(new Set(matches.map((m) => m.isoDate)));
-    
+
     // Filtrar apenas datas em que TODOS os jogos cadastrados já terminaram (status === 'finished')
     const completedDates = allDates.filter((iso) => {
       const dayMatches = matches.filter((m) => m.isoDate === iso);
@@ -320,13 +329,12 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
       {roundMvp && (
         <>
           <div className="round-mvp-card">
-            <div className="round-mvp-star-container">
-              <img
-                src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-xlrkDsOx81TbxXfY6dE9dU7ZqD80s1.png&w=320&q=75"
-                alt="MVP Icon"
-                className="round-mvp-star-img"
-              />
-            </div>
+            <Aurora
+              colorStops={["#ffe066", "#f5b300", "#c58c00"]}
+              blend={0.5}
+              amplitude={1.0}
+              speed={0.5}
+            />
             <div className="round-mvp-avatar-wrap">
               <img
                 src={getRankingAvatar(roundMvp.standing.participantId)}
@@ -337,26 +345,41 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 }}
               />
             </div>
+
             <div className="round-mvp-content">
               <div className="round-mvp-meta">
-                <span className="round-mvp-label">MVP DA RODADA</span>
+                <img
+                  src="/imagens/coroa-mvp.png"
+                  alt="Coroa MVP"
+                  className="round-mvp-crown-img"
+                />
+                <span className="round-mvp-label glow-gold-text-anim">MVP</span>
                 <span className="round-mvp-badge">{roundMvp.dateLabel}</span>
               </div>
               <span className="round-mvp-name">{roundMvp.standing.name}</span>
             </div>
+
             <div className="round-mvp-pts">
-              <span className="round-mvp-pts-num">{roundMvp.pts}</span>
-              <span className="round-mvp-pts-lbl">pts</span>
+              <span className="round-mvp-pts-num glow-gold-text-anim">{roundMvp.pts}</span>
+              <div className="round-mvp-pts-label-stack">
+                <span className="round-mvp-pts-lbl-main">pts.</span>
+                <span className="round-mvp-pts-lbl-sub">
+                  {roundMvp.dateLabel === getYesterdayLabel() ? 'ontem' : roundMvp.dateLabel}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="round-mvp-legend">
-            🌟 <strong>MVP da Rodada:</strong> Quem fez mais pontos nas partidas finalizadas desse dia (desempate por placares exatos). Só aparece ao término de todos os jogos da data.
           </div>
         </>
       )}
 
       {/* RANKING CONTAINER COM LUZ DOURADA E FUNDO ESCURO */}
       <div className="ranking-podium-section">
+        <Aurora
+          colorStops={["#ffe066", "#f5b300", "#c58c00"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.5}
+        />
 
         {/* PODIUM CARDS (1º e 2º lugares) */}
         <div className="podium-cards-container">
@@ -493,7 +516,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
         {/* RESTANTE DO RANKING (3º, 4º, etc.) */}
         {remainingStandings.length > 0 && (
-          <div className="standings-list-rows">
+          <div className="standings-list-rows" style={{ position: 'relative', zIndex: 2 }}>
             {remainingStandings.map((standing, index) => {
               const actualRank = index + 3; // O index começa em 0, mas representa o 3º colocado
               const isThird = actualRank === 3;
@@ -537,16 +560,16 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
       </div>
 
       {/* BOTÃO DE COMPARTILHAR O RANKING */}
-      <div className="ranking-share-header" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+      <div className="ranking-share-header" style={{ marginTop: '1rem', marginBottom: '1rem', position: 'relative', zIndex: 2 }}>
         <button type="button" className="ranking-share-btn" onClick={handleShare} disabled={sharing} style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
           {sharing ? (
             '⏳ Gerando...'
           ) : (
             <>
-              <img 
-                src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-zKoxdD3l5QDuQDFQGP45fqO0EuaKqP.png&w=320&q=75" 
-                alt="Compartilhar" 
-                style={{ width: '20px', height: '20px', objectFit: 'contain' }} 
+              <img
+                src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-zKoxdD3l5QDuQDFQGP45fqO0EuaKqP.png&w=320&q=75"
+                alt="Compartilhar"
+                style={{ width: '20px', height: '20px', objectFit: 'contain' }}
               />
               Compartilhar
             </>
