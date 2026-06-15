@@ -1,0 +1,1 @@
+- [Verificar com npm run build](verify-with-npm-build.md) — usar `tsc -b` (npm run build), não `tsc --noEmit`, p/ bater com o deploy do Netlify

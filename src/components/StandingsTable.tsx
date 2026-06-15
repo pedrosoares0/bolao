@@ -228,21 +228,23 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
     for (const iso of isoDates) {
       const dayMatches = finished.filter((m) => m.isoDate === iso);
-      let best: { standing: ParticipantStanding; pts: number; exacts: number } | null = null;
-      standings.forEach((s) => {
-        let pts = 0;
-        let exacts = 0;
-        dayMatches.forEach((m) => {
-          const bet = bets.find((b) => b.matchId === m.id && b.participantId === s.participantId);
-          const a = analyzeBet(bet, m);
-          pts += a.points;
-          if (a.type === 'exact') exacts++;
-        });
-        if (pts > 0 && (!best || pts > best.pts || (pts === best.pts && exacts > best.exacts))) {
-          best = { standing: s, pts, exacts };
-        }
-      });
-      if (best) {
+      const scored = standings
+        .map((s) => {
+          let pts = 0;
+          let exacts = 0;
+          dayMatches.forEach((m) => {
+            const bet = bets.find((b) => b.matchId === m.id && b.participantId === s.participantId);
+            const a = analyzeBet(bet, m);
+            pts += a.points;
+            if (a.type === 'exact') exacts++;
+          });
+          return { standing: s, pts, exacts };
+        })
+        .filter((x) => x.pts > 0)
+        .sort((a, b) => b.pts - a.pts || b.exacts - a.exacts);
+
+      if (scored.length > 0) {
+        const best = scored[0];
         return { standing: best.standing, pts: best.pts, dateLabel: dayMatches[0]?.date ?? '' };
       }
     }
