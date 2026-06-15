@@ -1,12 +1,14 @@
 import React from 'react';
 import type { ParticipantStanding, Match, Bet } from '../types';
 import { analyzeBet } from '../utils/rules';
+import { shareRanking } from '../utils/shareRanking';
 import LightRays from './LightRays';
 
 interface StandingsTableProps {
   standings: ParticipantStanding[];
   matches: Match[];
   bets: Bet[];
+  rankChanges?: Record<string, number>;
 }
 
 const Slideshow: React.FC = () => {
@@ -148,8 +150,9 @@ const Slideshow: React.FC = () => {
   );
 };
 
-export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, matches, bets }) => {
+export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, matches, bets, rankChanges }) => {
   const [imageErrors, setImageErrors] = React.useState<Record<string, boolean>>({});
+  const [sharing, setSharing] = React.useState(false);
   const [onFireImageErrors, setOnFireImageErrors] = React.useState<Record<string, boolean>>({});
 
   // Helper para obter a imagem de ranking específica do participante
@@ -252,12 +255,48 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     );
   };
 
+  // Seta de evolução no ranking (subiu/caiu/manteve desde a última rodada)
+  const renderRankChange = (participantId: string) => {
+    const c = rankChanges?.[participantId];
+    if (c == null) return null;
+    if (c > 0)
+      return (
+        <span className="rank-change up" title={`Subiu ${c} posição(ões)`}>
+          ▲{c}
+        </span>
+      );
+    if (c < 0)
+      return (
+        <span className="rank-change down" title={`Caiu ${Math.abs(c)} posição(ões)`}>
+          ▼{Math.abs(c)}
+        </span>
+      );
+    return null; // manteve a posição — não exibe nada para não poluir
+  };
+
+  const handleShare = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      await shareRanking(standings, fireCounts, rankChanges ?? {});
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const firstPlace = standings[0];
   const secondPlace = standings[1];
   const remainingStandings = standings.slice(2);
 
   return (
     <div className="standings-container-modern">
+      {/* BOTÃO DE COMPARTILHAR O RANKING */}
+      <div className="ranking-share-header">
+        <button type="button" className="ranking-share-btn" onClick={handleShare} disabled={sharing}>
+          {sharing ? '⏳ Gerando...' : '📲 Compartilhar ranking'}
+        </button>
+      </div>
+
       {/* RANKING CONTAINER COM LUZ DOURADA E FUNDO ESCURO */}
       <div className="ranking-podium-section">
 
@@ -278,14 +317,16 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     }}
                   />
                   <div className="podium-card-overlay"></div>
-                  <div className="podium-bg-number">2</div>
+                  <div className="podium-bg-number">2{renderRankChange(secondPlace.participantId)}</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-player-name">{secondPlace.name}</span>
-                    {renderFireMedals(secondPlace.participantId)}
+                    <span className="podium-name-with-rank">
+                      <span className="podium-player-name">{secondPlace.name}</span>
+                      {renderFireMedals(secondPlace.participantId)}
+                    </span>
                     <div className="podium-player-pts glow-silver-text-anim">
                       <span className="pts-number">{secondPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -294,7 +335,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 </>
               ) : (
                 <>
-                  <div className="podium-bg-number">2</div>
+                  <div className="podium-bg-number">2{renderRankChange(secondPlace.participantId)}</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -310,8 +351,10 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     />
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-player-name">{secondPlace.name}</span>
-                    {renderFireMedals(secondPlace.participantId)}
+                    <span className="podium-name-with-rank">
+                      <span className="podium-player-name">{secondPlace.name}</span>
+                      {renderFireMedals(secondPlace.participantId)}
+                    </span>
                     <div className="podium-player-pts glow-silver-text-anim">
                       <span className="pts-number">{secondPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -336,14 +379,16 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     }}
                   />
                   <div className="podium-card-overlay"></div>
-                  <div className="podium-bg-number">1</div>
+                  <div className="podium-bg-number">1{renderRankChange(firstPlace.participantId)}</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-player-name">{firstPlace.name}</span>
-                    {renderFireMedals(firstPlace.participantId)}
+                    <span className="podium-name-with-rank">
+                      <span className="podium-player-name">{firstPlace.name}</span>
+                      {renderFireMedals(firstPlace.participantId)}
+                    </span>
                     <div className="podium-player-pts glow-gold-text-anim">
                       <span className="pts-number">{firstPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -352,7 +397,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 </>
               ) : (
                 <>
-                  <div className="podium-bg-number">1</div>
+                  <div className="podium-bg-number">1{renderRankChange(firstPlace.participantId)}</div>
                   <div className="podium-medal-wrapper">
                     <img src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -368,8 +413,10 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     />
                   </div>
                   <div className="podium-player-info-row">
-                    <span className="podium-player-name">{firstPlace.name}</span>
-                    {renderFireMedals(firstPlace.participantId)}
+                    <span className="podium-name-with-rank">
+                      <span className="podium-player-name">{firstPlace.name}</span>
+                      {renderFireMedals(firstPlace.participantId)}
+                    </span>
                     <div className="podium-player-pts glow-gold-text-anim">
                       <span className="pts-number">{firstPlace.points}</span>
                       <span className="pts-label">Pts</span>
@@ -409,8 +456,11 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                         }}
                       />
                     </div>
-                    <span className="standing-row-name">{standing.name}</span>
-                    {renderFireMedals(standing.participantId)}
+                    <span className="standing-name-with-rank">
+                      <span className="standing-row-name">{standing.name}</span>
+                      {renderFireMedals(standing.participantId)}
+                    </span>
+                    {renderRankChange(standing.participantId)}
                   </div>
 
                   <div className="standing-row-right">

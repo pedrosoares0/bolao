@@ -3092,3 +3092,88 @@ body {
 .on-fire-particles .particle:nth-child(7) { left: 35%; width: 4px; height: 4px; animation-delay: 2.7s; animation-duration: 3.9s; --drift: 12px; }
 .on-fire-particles .particle:nth-child(8) { left: 68%; width: 3px; height: 3px; animation-delay: 0.9s; animation-duration: 4.1s; --drift: -20px; }
 
+/* ============================================= */
+/* EVOLUÇÃO NO RANKING (setas ↑↓)                 */
+/* ============================================= */
+/* Seta de evolução: fica À ESQUERDA do nome (indica mudança de POSIÇÃO,
+   não de pontos) */
+.rank-change {
+  font-family: var(--font-family);
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-right: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+  -webkit-text-stroke: 0 !important;
+}
+.rank-change.up { color: #4ade80; text-shadow: 0 0 6px rgba(74, 222, 128, 0.5); }
+.rank-change.down { color: #f87171; text-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
+
+/* Nome com a medalha de fogo como EXPOENTE (número elevado: Rodrigo🔥²) */
+.standing-name-with-rank,
+.podium-name-with-rank {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  margin-right: 1.5rem; /* reserva espaço para o expoente de fogo */
+}
+.podium-name-with-rank {
+  max-width: 70%;
+}
+.podium-name-with-rank .podium-player-name {
+  max-width: 100% !important;
+}
+
+/* Medalha de fogo posicionada como expoente no topo-direito do nome */
+.standing-name-with-rank .fire-medal-badge,
+.podium-name-with-rank .fire-medal-badge {
+  position: absolute;
+  left: 100%;
+  top: -0.35em;
+  margin-left: 2px;
+  font-size: 0.66rem;
+}
+
+/* No top 1 e 2, a seta de colocação fica ao lado do número grande (1/2) */
+.podium-bg-number .rank-change {
+  vertical-align: top;
+  position: relative;
+  top: 0.3em;
+  margin-left: 0.06em;
+  margin-right: 0;
+  font-size: 1.1rem;
+}
+
+/* ============================================= */
+/* BOTÃO COMPARTILHAR RANKING                     */
+/* ============================================= */
+.ranking-share-header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+}
+.ranking-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, #1e7e34 0%, #25d366 100%);
+  border: none;
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 1.3rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(37, 211, 102, 0.3);
+  transition: all 0.18s ease;
+}
+.ranking-share-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.ranking-share-btn:active { transform: translateY(1px) scale(0.98); }
+.ranking-share-btn:disabled { opacity: 0.65; cursor: default; transform: none; }
+
+

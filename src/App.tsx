@@ -674,6 +674,35 @@ function App() {
     return calculateStandings(participants, matches, bets, specials);
   }, [participants, matches, bets, specials]);
 
+  // Evolução no ranking: compara a posição atual com a posição ANTES da última
+  // rodada finalizada. Valor positivo = subiu; negativo = caiu; 0 = manteve.
+  const rankChanges = useMemo<Record<string, number>>(() => {
+    const finishedIso = Array.from(
+      new Set(
+        matches
+          .filter((m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
+          .map((m) => m.isoDate)
+      )
+    ).sort();
+    if (finishedIso.length < 2) return {};
+
+    const latestIso = finishedIso[finishedIso.length - 1];
+    const prevMatches = matches.filter((m) => !(m.status === 'finished' && m.isoDate === latestIso));
+    const prev = calculateStandings(participants, prevMatches, bets, specials);
+
+    const prevRank: Record<string, number> = {};
+    prev.forEach((s, i) => {
+      prevRank[s.participantId] = i;
+    });
+
+    const changes: Record<string, number> = {};
+    standings.forEach((s, i) => {
+      const pr = prevRank[s.participantId];
+      changes[s.participantId] = pr == null ? 0 : pr - i;
+    });
+    return changes;
+  }, [participants, matches, bets, specials, standings]);
+
   // Prêmio acumulado: R$ 10 por dia desde 12/06 até o fim da Copa (19/07)
   const accumulatedPot = useMemo(() => calcAccumulatedPot(getTodayIso()), [nowTs]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1105,7 +1134,7 @@ function App() {
         {/* ABA: RANKING */}
         {activeTab === 'ranking' && (
           <div>
-            <StandingsTable standings={standings} matches={matches} bets={bets} />
+            <StandingsTable standings={standings} matches={matches} bets={bets} rankChanges={rankChanges} />
 
             {/* Logout em baixo do Ranking */}
             <div style={{ padding: '2rem 1rem 0 1rem', display: 'flex', justifyContent: 'center' }}>
