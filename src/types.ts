@@ -66,3 +66,12 @@ export interface ParticipantStanding {
   totalBets: number;
   totalPaid: number; // Dias jogados * 2.5
 }
+
+export interface Debt {
+  id: number;
+  userId: string;
+  amount: number;
+  debtDate: string;
+  createdAt: string;
+}
+

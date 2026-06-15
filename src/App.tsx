@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage } from './types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 import { StandingsTable } from './components/StandingsTable';
@@ -98,6 +98,21 @@ const readCachedUser = (): Participant | null => {
   }
 };
 
+const getLocalDebts = (): any[] => {
+  const saved = localStorage.getItem('bolao_debts');
+  if (!saved) return [];
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalDebts = (list: any[]) => {
+  localStorage.setItem('bolao_debts', JSON.stringify(list));
+};
+
+
 function App() {
   // 1. Estados de Autenticação e Telas
   const [currentUser, setCurrentUser] = useState<Participant | null>(() => readCachedUser());
@@ -117,6 +132,7 @@ function App() {
   const [specialRows, setSpecialRows] = useState<
     { user_id: string; champion_team: string; brazil_stage: BrazilStage }[]
   >([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
 
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
   const [showPixModal, setShowPixModal] = useState(false);
@@ -201,12 +217,16 @@ function App() {
   const loadAll = async (uid: string, withSpinner: boolean) => {
     if (withSpinner) setLoading(true);
     try {
-      const [partsRes, matchesRes, betsRes, subsRes, specialsRes] = await Promise.all([
+      const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes] = await Promise.all([
         supabase.from('participants').select('id, username, name, avatar_url').order('username'),
         supabase.from('matches').select('*').order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score'),
         supabase.from('submissions').select('bet_date').eq('user_id', uid),
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
+        supabase.from('debts').select('id, user_id, amount, debt_date, created_at').then(
+          (r) => r,
+          (err) => ({ data: null, error: err })
+        ),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
@@ -225,6 +245,29 @@ function App() {
       setSubmittedDates(new Set((subsRes.data ?? []).map((s) => s.bet_date)));
       // specials pode falhar se a migration 003 ainda não rodou — não derruba o app
       setSpecialRows((specialsRes.data ?? []) as typeof specialRows);
+
+      if (debtsRes.error) {
+        setDebts(
+          getLocalDebts().map((d: any) => ({
+            id: d.id,
+            userId: d.user_id,
+            amount: Number(d.amount),
+            debtDate: d.debt_date,
+            createdAt: d.created_at,
+          }))
+        );
+      } else {
+        setDebts(
+          (debtsRes.data ?? []).map((d: any) => ({
+            id: d.id,
+            userId: d.user_id,
+            amount: Number(d.amount),
+            debtDate: d.debt_date,
+            createdAt: d.created_at,
+          }))
+        );
+      }
+
       setError(null);
     } catch (err) {
       console.error(err);
@@ -265,6 +308,7 @@ function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, scheduleReload)
       .subscribe();
 
     // Fallback caso o Realtime caia
@@ -523,6 +567,78 @@ function App() {
     }
     await loadAll(currentUser.uid, false);
     showToast('Palpites da Copa salvos!', 'success');
+  };
+
+  // Handler para pendurar aposta (R$ 2,50)
+  const handleRegisterDebt = async (userId: string, date: string) => {
+    // 1. Tenta salvar no Supabase
+    const { error: dbError } = await supabase.from('debts').insert({
+      user_id: userId,
+      debt_date: date,
+      amount: 2.50
+    });
+
+    if (dbError) {
+      console.warn("Falha ao salvar fiado no Supabase (provavelmente tabela inexistente). Salvando localmente.");
+      // 2. Fallback para localStorage
+      const currentLocal = getLocalDebts();
+      // Evita duplicados para o mesmo dia e usuário
+      if (currentLocal.some((d: any) => d.user_id === userId && d.debt_date === date)) {
+        showToast('Você já pendurou a aposta de hoje!');
+        return;
+      }
+      const newDebt = {
+        id: Date.now(), // id temporário único local
+        user_id: userId,
+        amount: 2.50,
+        debt_date: date,
+        created_at: new Date().toISOString()
+      };
+      const updated = [...currentLocal, newDebt];
+      saveLocalDebts(updated);
+      
+      // Atualiza o estado
+      setDebts(updated.map((d: any) => ({
+        id: d.id,
+        userId: d.user_id,
+        amount: Number(d.amount),
+        debtDate: d.debt_date,
+        createdAt: d.created_at
+      })));
+      showToast('Pendurado localmente!', 'success');
+      return;
+    }
+
+    showToast('Aposta pendurada com sucesso!', 'success');
+    if (currentUser?.uid) await loadAll(currentUser.uid, false);
+  };
+
+  // Handler para pagar/dar baixa no fiado
+  const handleRemoveDebt = async (debtId: number) => {
+    // 1. Tenta deletar no Supabase
+    const { error: dbError } = await supabase.from('debts').delete().eq('id', debtId);
+
+    if (dbError) {
+      console.warn("Falha ao deletar fiado no Supabase. Atualizando localmente.");
+      // 2. Fallback para localStorage
+      const currentLocal = getLocalDebts();
+      const updated = currentLocal.filter((d: any) => d.id !== debtId);
+      saveLocalDebts(updated);
+
+      // Atualiza o estado
+      setDebts(updated.map((d: any) => ({
+        id: d.id,
+        userId: d.user_id,
+        amount: Number(d.amount),
+        debtDate: d.debt_date,
+        createdAt: d.created_at
+      })));
+      showToast('Baixa realizada localmente!', 'success');
+      return;
+    }
+
+    showToast('Baixa no fiado realizada com sucesso!', 'success');
+    if (currentUser?.uid) await loadAll(currentUser.uid, false);
   };
 
   // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
@@ -947,13 +1063,20 @@ function App() {
 
         {/* ABA: PAGAMENTO (PIX) */}
         {activeTab === 'pix' && (
-          <PixTab accumulated={accumulatedPot} />
+          <PixTab
+            accumulated={accumulatedPot}
+            currentUser={currentUser}
+            participants={participants}
+            debts={debts}
+            onRegisterDebt={handleRegisterDebt}
+            onRemoveDebt={handleRemoveDebt}
+          />
         )}
 
         {/* ABA: RANKING */}
         {activeTab === 'ranking' && (
           <div>
-            <StandingsTable standings={standings} />
+            <StandingsTable standings={standings} matches={matches} bets={bets} />
 
             {/* Logout em baixo do Ranking */}
             <div style={{ padding: '2rem 1rem 0 1rem', display: 'flex', justifyContent: 'center' }}>
