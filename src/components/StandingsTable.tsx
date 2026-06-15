@@ -320,7 +320,13 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
       {roundMvp && (
         <>
           <div className="round-mvp-card">
-            <div className="round-mvp-star">🌟</div>
+            <div className="round-mvp-star-container">
+              <img
+                src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-xlrkDsOx81TbxXfY6dE9dU7ZqD80s1.png&w=320&q=75"
+                alt="MVP Icon"
+                className="round-mvp-star-img"
+              />
+            </div>
             <div className="round-mvp-avatar-wrap">
               <img
                 src={getRankingAvatar(roundMvp.standing.participantId)}
@@ -332,7 +338,10 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
               />
             </div>
             <div className="round-mvp-content">
-              <span className="round-mvp-label">MVP DA RODADA · {roundMvp.dateLabel}</span>
+              <div className="round-mvp-meta">
+                <span className="round-mvp-label">MVP DA RODADA</span>
+                <span className="round-mvp-badge">{roundMvp.dateLabel}</span>
+              </div>
               <span className="round-mvp-name">{roundMvp.standing.name}</span>
             </div>
             <div className="round-mvp-pts">
