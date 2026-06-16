@@ -182,6 +182,11 @@ function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
 
+  // Seletor de datas: rolar automaticamente para o dia selecionado (hoje, por
+  // padrão) ficar na frente, sem o usuário precisar arrastar a barra.
+  const dateScrollRef = useRef<HTMLDivElement>(null);
+  const activeDatePillRef = useRef<HTMLButtonElement>(null);
+
   const showToast = (message: string, type: 'success' | 'error' = 'error') => {
     window.clearTimeout(toastTimerRef.current);
     setToast({ message, type });
@@ -374,6 +379,20 @@ function App() {
       dates[dates.length - 1];
     return found.iso;
   }, [selectedDateState, dates]);
+
+  // Posiciona a barra de datas com o dia selecionado (hoje, por padrão) na
+  // frente. Mantém a ordem cronológica — dá pra rolar à esquerda p/ dias passados.
+  // Só reposiciona quando o conjunto de datas muda ou ao abrir a aba (não a cada
+  // reload do Realtime nem ao clicar num dia, p/ não "puxar" a barra do usuário).
+  const datesKey = dates.map((d) => d.iso).join(',');
+  useEffect(() => {
+    if (activeTab !== 'jogos') return;
+    const container = dateScrollRef.current;
+    const pill = activeDatePillRef.current;
+    if (!container || !pill) return;
+    const delta = pill.getBoundingClientRect().left - container.getBoundingClientRect().left;
+    container.scrollLeft += delta - 8; // 8px de respiro à esquerda
+  }, [datesKey, activeTab]);
 
   // 7. Palpites a exibir: o que o usuário está digitando tem prioridade;
   //    senão, a aposta já salva no banco
@@ -738,7 +757,7 @@ function App() {
 
             {/* HORIZONTAL DATE SELECTOR BAR */}
             {dates.length > 0 && (
-              <div className="date-selector-scroll-container">
+              <div className="date-selector-scroll-container" ref={dateScrollRef}>
                 {dates.map((d) => {
                   const isTodayLabel = d.iso === getTodayIso();
                   const labelText = isTodayLabel ? `Hoje ${d.label}` : d.label;
@@ -747,6 +766,7 @@ function App() {
                   return (
                     <button
                       key={d.iso}
+                      ref={isSelected ? activeDatePillRef : undefined}
                       className={`date-pill-btn-p16 ${isSelected ? 'active' : ''}`}
                       onClick={() => setSelectedDateState(d.iso)}
                     >
