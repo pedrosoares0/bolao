@@ -511,6 +511,42 @@ body {
   color: #15110E;
 }
 
+/* Coluna nome + mini-título (Profeta / Pé Frio) */
+.inline-guess-name-col-p16 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.inline-guess-title-p16 {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-family);
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.inline-guess-title-p16.profeta {
+  color: #6b21a8;
+  background: linear-gradient(135deg, #f3e8ff, #e9d5ff);
+  border: 1px solid #c084fc;
+}
+
+.inline-guess-title-p16.pe-frio {
+  color: #0c4a6e;
+  background: linear-gradient(135deg, #e0f2fe, #cffafe);
+  border: 1px solid #7dd3fc;
+}
+
 .inline-guess-result-info-p16 {
   display: flex;
   align-items: center;

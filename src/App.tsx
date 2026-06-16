@@ -832,6 +832,19 @@ function App() {
                       homeLiveWinner ? 'live-loser-fade' : ''
                     ].filter(Boolean).join(' ');
 
+                    // Mini-títulos nos palpites (só quando o jogo terminou):
+                    //  🔮 Profeta = acertou o placar exato
+                    //  🥶 Pé Frio = só UMA pessoa zerou o palpite e todo o resto pontuou
+                    const finishedTitles = isFinished && match.homeScore !== null && match.awayScore !== null;
+                    const bettorTypes = finishedTitles
+                      ? participants
+                          .map((p) => bets.find((b) => b.matchId === match.id && b.participantId === p.id))
+                          .filter((b): b is Bet => !!b)
+                          .map((b) => ({ id: b.participantId, type: analyzeBet(b, match).type }))
+                      : [];
+                    const wrongBettors = bettorTypes.filter((x) => x.type === 'wrong');
+                    const peFrioId = bettorTypes.length >= 2 && wrongBettors.length === 1 ? wrongBettors[0].id : null;
+
                     return (
                       <div key={match.id} className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}>
 
@@ -958,6 +971,10 @@ function App() {
                             const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
                             const analysis = analyzeBet(bet, match);
 
+                            // Mini-títulos do jogo
+                            const isProfeta = finishedTitles && analysis.type === 'exact';
+                            const isPeFrio = p.id === peFrioId;
+
                             // Lógica do Badge de Pontos
                             let pointsBadgeClass = 'wrong';
                             let pointsText = '0 pts';
@@ -998,7 +1015,15 @@ function App() {
                                       }}
                                     />
                                   </div>
-                                  <span className="inline-guess-username-p16">{p.name}</span>
+                                  <div className="inline-guess-name-col-p16">
+                                    {isProfeta && (
+                                      <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
+                                    )}
+                                    {isPeFrio && (
+                                      <span className="inline-guess-title-p16 pe-frio">🥶 Pé Frio</span>
+                                    )}
+                                    <span className="inline-guess-username-p16">{p.name}</span>
+                                  </div>
                                 </div>
 
                                 <div className="inline-guess-result-info-p16">
