@@ -13,9 +13,31 @@ import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/t
 // Fuso horário de exibição: todos os horários dos jogos são convertidos para Brasília
 const TZ = 'America/Sao_Paulo';
 
-const brDateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit' });
 const brTimeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 const isoDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+const brHourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' });
+
+// Jogos de madrugada (kickoff entre 00h e 08h de Brasília) pertencem à
+// RODADA DO DIA ANTERIOR: dá para apostar junto com os jogos da tarde/noite
+// (ex.: jogo 01h de 17/06 entra na mesma sessão de lançamento de 16/06).
+const MADRUGADA_ATE_HORA = 8;
+
+const isoMinusOneDay = (iso: string): string => {
+  const dt = new Date(`${iso}T12:00:00Z`);
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10);
+};
+
+// Dia da rodada (sessão de apostas) a que um jogo pertence (YYYY-MM-DD, Brasília)
+const bettingDayIso = (utcDate: string): string => {
+  const d = new Date(utcDate);
+  const calendarIso = isoDateFmt.format(d);
+  const hour = parseInt(brHourFmt.format(d), 10);
+  return hour < MADRUGADA_ATE_HORA ? isoMinusOneDay(calendarIso) : calendarIso;
+};
+
+// Início (ms) de um dia de Brasília — UTC-3 fixo (sem horário de verão desde 2019)
+const startOfBrDay = (iso: string): number => Date.parse(`${iso}T00:00:00-03:00`);
 
 // O kickoff vem em UTC (ISO 8601) direto do banco — sem ambiguidade de fuso.
 // Jogo ainda não começou?
@@ -63,6 +85,9 @@ interface MatchDbRow {
 // Converte uma linha da tabela `matches` do Supabase para o formato do app
 const mapRowToMatch = (r: MatchDbRow): Match => {
   const d = new Date(r.utc_date);
+  // Jogos de madrugada caem na rodada do dia anterior (ver bettingDayIso)
+  const bDay = bettingDayIso(r.utc_date);
+  const bDayLabel = `${bDay.slice(8, 10)}/${bDay.slice(5, 7)}`;
   return {
     id: String(r.id),
     homeTeam: translateTeam(r.home_team),
@@ -71,14 +96,14 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     awayCode: mapFifaCode(r.away_team, r.away_tla),
     homeFlag: flagOf(r.home_team, r.home_crest),
     awayFlag: flagOf(r.away_team, r.away_crest),
-    date: brDateFmt.format(d),
+    date: bDayLabel,
     time: brTimeFmt.format(d),
     group: groupLabel(r.stage, r.group_name),
     homeScore: r.home_score ?? null,
     awayScore: r.away_score ?? null,
     status: r.status === 'FINISHED' ? 'finished' : 'scheduled',
     kickoff: r.utc_date,
-    isoDate: isoDateFmt.format(d),
+    isoDate: bDay,
     homeTeamEn: r.home_team,
     awayTeamEn: r.away_team,
     stage: r.stage ?? 'GROUP_STAGE',
@@ -332,7 +357,9 @@ function App() {
     matches.forEach((m) => {
       if (!seen.has(m.isoDate)) seen.set(m.isoDate, m.date);
     });
-    return Array.from(seen, ([iso, label]) => ({ iso, label }));
+    return Array.from(seen, ([iso, label]) => ({ iso, label })).sort((a, b) =>
+      a.iso.localeCompare(b.iso)
+    );
   }, [matches]);
 
   // Data efetivamente selecionada: a escolhida pelo usuário ou, por padrão,
@@ -382,9 +409,11 @@ function App() {
     return groupedMatches[selectedDate] || [];
   }, [groupedMatches, selectedDate]);
 
-  // Partidas jogáveis de hoje (editáveis até 1 minuto antes do kickoff)
+  // Partidas jogáveis da rodada selecionada (editáveis até 1 min antes do kickoff).
+  // A sessão de apostas de um dia abre à meia-noite (Brasília) daquele dia; jogos
+  // de madrugada já entram na sessão do dia anterior (ver bettingDayIso).
   const playableMatches = useMemo(() => {
-    if (selectedDate !== getTodayIso()) return [];
+    if (nowTs < startOfBrDay(selectedDate)) return [];
     return activeDateMatches.filter((m) => m.status === 'scheduled' && isBettable(m.kickoff, nowTs));
   }, [activeDateMatches, selectedDate, nowTs]);
 
@@ -749,9 +778,10 @@ function App() {
                     // Determinar se o jogo já começou ou terminou
                     const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff, nowTs);
 
-                    // Aposta editável até 1 minuto antes do kickoff (mesmo depois de lançada)
-                    const isTodayTab = selectedDate === getTodayIso();
-                    const canEditBet = isTodayTab && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
+                    // Aposta editável até 1 minuto antes do kickoff (mesmo depois de lançada),
+                    // desde que a sessão da rodada já tenha aberto (meia-noite do dia da rodada).
+                    const sessionOpen = nowTs >= startOfBrDay(selectedDate);
+                    const canEditBet = sessionOpen && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
 
                     // Determinar vencedor para destaque visual
                     const isFinished = match.status === 'finished';
@@ -988,8 +1018,8 @@ function App() {
                 </div>
               )}
 
-              {/* ACTION BAR DE LANÇAMENTO (Só exibe se estivermos na aba de Hoje e houver partidas jogáveis) */}
-              {selectedDate === getTodayIso() && playableMatches.length > 0 && (
+              {/* ACTION BAR DE LANÇAMENTO (exibe quando a rodada está aberta e há partidas jogáveis) */}
+              {playableMatches.length > 0 && (
                 <div className="launch-action-bar-p16">
                   <div className="launch-edit-icon-circle-p16">
                     {isSubmittedForSelectedDate && !hasChangesToLaunch ? <CheckSquare size={18} color="#ffffff" /> : <PencilLine size={18} color="#ffffff" />}

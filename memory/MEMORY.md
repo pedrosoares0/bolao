@@ -1,1 +1,2 @@
 - [Verificar com npm run build](verify-with-npm-build.md) — usar `tsc -b` (npm run build), não `tsc --noEmit`, p/ bater com o deploy do Netlify
+- [Visão: plataforma multi-grupo](visao-plataforma-multi-grupo.md) — meta de virar plataforma p/ parceiros com prêmios no WhatsApp; plano em docs/ESCALABILIDADE.md

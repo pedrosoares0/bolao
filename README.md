@@ -85,16 +85,18 @@ npm test          # testes das regras de pontuação (src/utils/rules.test.ts)
 
 ## 📲 Notificações no WhatsApp
 
-A cada sincronização (cron de ~2 min), o backend compara o estado **anterior** dos jogos com o **novo** e dispara mensagens no grupo via Evolution API. Cada mensagem tem uma chave única em `sent_notifications`, então **nunca é enviada duas vezes** (ex.: "Gol 1x0" não repete). Toda mensagem termina com a assinatura `BANDIDO$ APO$TADO$🤑🏆`.
+A cada sincronização (cron de ~2 min), o backend compara o estado **anterior** dos jogos com o **novo** e dispara mensagens no grupo via Evolution API. Cada mensagem tem uma chave única em `sent_notifications`, então **nunca é enviada duas vezes** (ex.: "Gol 1x0" não repete).
 
 | Notificação | Quando dispara | Confiabilidade |
 |---|---|---|
-| ⏰ **Falta ~1h** pro palpite fechar (+ quem ainda não palpitou) | a partir de 60 min antes do kickoff | alta (baseada no horário) |
+| ⏰ **Falta ~1h** pro palpite fechar (lista quem ainda não palpitou) | a partir de 60 min antes do kickoff — **só se ainda houver alguém sem palpitar** | alta (baseada no horário) |
 | 🟢 **Jogo começou** | status `SCHEDULED/TIMED → IN_PLAY` | depende do "ao vivo" da API |
 | ⚽ **Gol** (de qual time) | o placar sobe durante `IN_PLAY` | depende do "ao vivo" |
-| 🟡 **Intervalo** | status `→ PAUSED` | depende do "ao vivo" |
 | 🔴 **Fim de jogo** + quem pontuou | status `→ FINISHED` | alta |
 | 🏁 **Pontuação final do dia** + ranking geral | quando o último jogo do dia termina | alta |
+| 📅 **Próxima rodada** (jogos do dia seguinte; inclui os de madrugada com 🌙) | **30 min após** a pontuação final do dia | alta |
+
+> As notificações de **fim de jogo**, **pontuação final do dia** e **próxima rodada** usam o **dia de calendário** (físico). Por isso um jogo de madrugada (ex.: 01h), que pode ser **apostado junto com a rodada do dia anterior**, aparece na mensagem de **próxima rodada** — afinal ele acontece no dia seguinte.
 
 > ⚠️ Gol mostra **o time** que marcou (detectado pela variação do placar), não o nome do artilheiro — o plano gratuito da football-data.org não fornece o autor do gol.
 >
@@ -111,3 +113,4 @@ A cada sincronização (cron de ~2 min), o backend compara o estado **anterior**
 - `netlify/shared/sync-core.mts` — busca jogos na football-data.org, faz upsert e aciona as notificações.
 - `netlify/shared/notify-core.mts` — monta e envia as mensagens do WhatsApp (Evolution API).
 - `supabase/` — SQL de schema, seed e migrations (`update-00X-*.sql`).
+- `docs/` — documentação de arquitetura. Ver [`docs/ESCALABILIDADE.md`](docs/ESCALABILIDADE.md) (plano para virar plataforma multi-grupo com parceiros, prêmios e infra por fases).

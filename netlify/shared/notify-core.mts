@@ -114,9 +114,15 @@ const isoFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo',
 const dmFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
 const timeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false });
 
+const hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' });
+
 const isoDateOf = (utc: string) => isoFmt.format(new Date(utc));
 const dmLabelOf = (utc: string) => dmFmt.format(new Date(utc));
 const timeOf = (utc: string) => timeFmt.format(new Date(utc));
+// Jogo de madrugada (kickoff entre 00h e 08h de Brasília)
+const isMadrugada = (utc: string) => parseInt(hourFmt.format(new Date(utc)), 10) < 8;
+// "2026-06-17" -> "17/06"
+const dmFromIso = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 // ============================================================
 // Pontuação (espelha src/utils/rules.ts)
@@ -148,11 +154,7 @@ const evolutionConfigured = (): boolean =>
   !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY &&
      process.env.EVOLUTION_INSTANCE_NAME && (process.env.id_grupo || process.env.ID_GRUPO));
 
-// Assinatura fixa no rodapé de toda notificação automática
-const FOOTER = '\n\nBANDIDO$ APO$TADO$🤑🏆';
-
-const sendText = async (rawText: string): Promise<boolean> => {
-  const text = rawText + FOOTER;
+const sendText = async (text: string): Promise<boolean> => {
   const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
   const key = process.env.EVOLUTION_API_KEY || '';
   const instance = process.env.EVOLUTION_INSTANCE_NAME || '';
@@ -207,19 +209,16 @@ const sendOnce = async (supabase: any, key: string, text: string): Promise<void>
 
 const url = () => process.env.url_bolao || process.env.URL_BOLAO || 'https://bandidosapostados.netlify.app/';
 
-const msgReminder = (m: MatchRow, missing: string[]): string => {
-  const linha = missing.length
-    ? `❌ Ainda não palpitaram: *${missing.join(', ')}*`
-    : '✅ Todos já palpitaram!';
-  return [
+// Só é enviado quando há gente sem palpitar (ver runNotifications)
+const msgReminder = (m: MatchRow, missing: string[]): string =>
+  [
     '⏰ *FALTA ~1 HORA!*',
     '',
     `O palpite de ${teamLabel(m.home_team)} x ${teamLabel(m.away_team)} fecha às *${timeOf(m.utc_date)}*.`,
     '',
-    linha,
+    `❌ Ainda não palpitaram: *${missing.join(', ')}*`,
     `👉 ${url()}`,
   ].join('\n');
-};
 
 const msgStarted = (m: MatchRow): string =>
   [
@@ -237,9 +236,6 @@ const msgGoal = (m: MatchRow, sideTeamEn: string): string =>
     '',
     scoreLine(m),
   ].join('\n');
-
-const msgHalf = (m: MatchRow): string =>
-  ['🟡 *INTERVALO*', '', scoreLine(m)].join('\n');
 
 const msgEnd = (m: MatchRow, scorers: { name: string; points: number; type: ResultType }[]): string => {
   const bloco = scorers.length
@@ -268,6 +264,23 @@ const msgDayFinal = (
   ].join('\n');
 };
 
+// Prévia dos jogos do dia seguinte (enviada 30 min após a pontuação final).
+// Jogos de madrugada (00h-08h) ganham 🌙 — apesar de poderem ser apostados
+// um dia antes, no resumo aparecem na próxima rodada (são do dia seguinte).
+const msgNextRound = (iso: string, matches: MatchRow[]): string => {
+  const linhas = matches.map(
+    (m) => `${isMadrugada(m.utc_date) ? '🌙 ' : ''}${teamLabel(m.home_team)} x ${teamLabel(m.away_team)} — *${timeOf(m.utc_date)}*`
+  );
+  return [
+    `📅 *PRÓXIMA RODADA — ${dmFromIso(iso)}*`,
+    '',
+    ...linhas,
+    '',
+    '⏰ Já deixe seus palpites prontos!',
+    `👉 ${url()}`,
+  ].join('\n');
+};
+
 // ============================================================
 // Motor de notificações
 // ============================================================
@@ -293,16 +306,18 @@ export async function runNotifications(
   const now = Date.now();
 
   // ---- 1. Lembrete de ~1h antes do fechamento do palpite ----
+  //   Só envia se AINDA HÁ gente sem palpitar. Se todos já apostaram, não manda.
   for (const m of rows) {
     if (!isPre(m.status)) continue;
     const mins = (Date.parse(m.utc_date) - now) / 60000;
     if (mins <= 0 || mins > 60) continue;
-    const key = `pre60:${m.id}`;
-    if (!(await reserve(supabase, key))) continue;
     // quem ainda não palpitou NESTE jogo
     const { data: betRows } = await supabase.from('bets').select('user_id').eq('match_id', m.id);
     const apostaram = new Set((betRows ?? []).map((b: any) => b.user_id));
     const missing = participants.filter((p) => !apostaram.has(p.id)).map((p) => p.name);
+    if (missing.length === 0) continue; // todos já palpitaram → não envia lembrete
+    const key = `pre60:${m.id}`;
+    if (!(await reserve(supabase, key))) continue;
     const ok = await sendText(msgReminder(m, missing));
     if (!ok) await release(supabase, key);
   }
@@ -329,11 +344,6 @@ export async function runNotifications(
       if (m.away_score > pa) {
         await sendOnce(supabase, `goal:${m.id}:A:${m.away_score}`, msgGoal(m, m.away_team));
       }
-    }
-
-    // intervalo
-    if (m.status === 'PAUSED' && prev.status !== 'PAUSED') {
-      await sendOnce(supabase, `half:${m.id}`, msgHalf(m));
     }
 
     // fim de jogo
@@ -380,6 +390,38 @@ export async function runNotifications(
       .sort((a, b) => b.points - a.points);
 
     const ok = await sendText(msgDayFinal(dmLabelOf(dayMatches[0].utc_date), dayScores, general));
+    if (!ok) await release(supabase, key);
+  }
+
+  // ---- 4. Prévia da PRÓXIMA RODADA (30 min após a pontuação final do dia) ----
+  //   Listamos os jogos do próximo dia de CALENDÁRIO com jogos — incluindo os de
+  //   madrugada (00h-08h), que fisicamente são do dia seguinte.
+  const THIRTY_MIN = 30 * 60 * 1000;
+  const SIX_HOURS = 6 * 60 * 60 * 1000; // janela p/ evitar backfill em deploy
+  const { data: dayFinals } = await supabase
+    .from('sent_notifications')
+    .select('dedup_key, sent_at')
+    .like('dedup_key', 'dayfinal:%');
+
+  for (const df of dayFinals ?? []) {
+    const sentMs = Date.parse(df.sent_at);
+    const elapsed = now - sentMs;
+    if (elapsed < THIRTY_MIN || elapsed > SIX_HOURS) continue; // cedo demais ou antigo demais
+
+    const dayIso = (df.dedup_key as string).slice('dayfinal:'.length);
+    const nextIso = rows
+      .map((r) => isoDateOf(r.utc_date))
+      .filter((iso) => iso > dayIso)
+      .sort()[0];
+    if (!nextIso) continue;
+
+    const key = `nextround:${dayIso}`;
+    if (!(await reserve(supabase, key))) continue;
+
+    const nextMatches = rows
+      .filter((r) => isoDateOf(r.utc_date) === nextIso)
+      .sort((a, b) => Date.parse(a.utc_date) - Date.parse(b.utc_date));
+    const ok = await sendText(msgNextRound(nextIso, nextMatches));
     if (!ok) await release(supabase, key);
   }
 }
