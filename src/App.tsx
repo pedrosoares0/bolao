@@ -98,21 +98,6 @@ const readCachedUser = (): Participant | null => {
   }
 };
 
-const getLocalDebts = (): any[] => {
-  const saved = localStorage.getItem('bolao_debts');
-  if (!saved) return [];
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return [];
-  }
-};
-
-const saveLocalDebts = (list: any[]) => {
-  localStorage.setItem('bolao_debts', JSON.stringify(list));
-};
-
-
 function App() {
   // 1. Estados de Autenticação e Telas
   const [currentUser, setCurrentUser] = useState<Participant | null>(() => readCachedUser());
@@ -223,10 +208,7 @@ function App() {
         supabase.from('bets').select('user_id, match_id, home_score, away_score'),
         supabase.from('submissions').select('bet_date').eq('user_id', uid),
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
-        supabase.from('debts').select('id, user_id, amount, debt_date, created_at').then(
-          (r) => r,
-          (err) => ({ data: null, error: err })
-        ),
+        supabase.from('debts').select('id, user_id, amount, debt_date, created_at'),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
@@ -247,18 +229,11 @@ function App() {
       setSpecialRows((specialsRes.data ?? []) as typeof specialRows);
 
       if (debtsRes.error) {
-        setDebts(
-          getLocalDebts().map((d: any) => ({
-            id: d.id,
-            userId: d.user_id,
-            amount: Number(d.amount),
-            debtDate: d.debt_date,
-            createdAt: d.created_at,
-          }))
-        );
+        console.error('Erro ao carregar fiados:', debtsRes.error.message);
+        setDebts([]);
       } else {
         setDebts(
-          (debtsRes.data ?? []).map((d: any) => ({
+          (debtsRes.data ?? []).map((d): Debt => ({
             id: d.id,
             userId: d.user_id,
             amount: Number(d.amount),
@@ -571,41 +546,20 @@ function App() {
 
   // Handler para pendurar aposta (R$ 2,50)
   const handleRegisterDebt = async (userId: string, date: string) => {
-    // 1. Tenta salvar no Supabase
+    // Evita duplicado para o mesmo dia e usuário
+    if (debts.some((d) => d.userId === userId && d.debtDate === date)) {
+      showToast('Você já pendurou a aposta de hoje!');
+      return;
+    }
+
     const { error: dbError } = await supabase.from('debts').insert({
       user_id: userId,
       debt_date: date,
-      amount: 2.50
+      amount: 2.50,
     });
 
     if (dbError) {
-      console.warn("Falha ao salvar fiado no Supabase (provavelmente tabela inexistente). Salvando localmente.");
-      // 2. Fallback para localStorage
-      const currentLocal = getLocalDebts();
-      // Evita duplicados para o mesmo dia e usuário
-      if (currentLocal.some((d: any) => d.user_id === userId && d.debt_date === date)) {
-        showToast('Você já pendurou a aposta de hoje!');
-        return;
-      }
-      const newDebt = {
-        id: Date.now(), // id temporário único local
-        user_id: userId,
-        amount: 2.50,
-        debt_date: date,
-        created_at: new Date().toISOString()
-      };
-      const updated = [...currentLocal, newDebt];
-      saveLocalDebts(updated);
-      
-      // Atualiza o estado
-      setDebts(updated.map((d: any) => ({
-        id: d.id,
-        userId: d.user_id,
-        amount: Number(d.amount),
-        debtDate: d.debt_date,
-        createdAt: d.created_at
-      })));
-      showToast('Pendurado localmente!', 'success');
+      showToast(`Erro ao pendurar aposta: ${dbError.message}`);
       return;
     }
 
@@ -615,25 +569,10 @@ function App() {
 
   // Handler para pagar/dar baixa no fiado
   const handleRemoveDebt = async (debtId: number) => {
-    // 1. Tenta deletar no Supabase
     const { error: dbError } = await supabase.from('debts').delete().eq('id', debtId);
 
     if (dbError) {
-      console.warn("Falha ao deletar fiado no Supabase. Atualizando localmente.");
-      // 2. Fallback para localStorage
-      const currentLocal = getLocalDebts();
-      const updated = currentLocal.filter((d: any) => d.id !== debtId);
-      saveLocalDebts(updated);
-
-      // Atualiza o estado
-      setDebts(updated.map((d: any) => ({
-        id: d.id,
-        userId: d.user_id,
-        amount: Number(d.amount),
-        debtDate: d.debt_date,
-        createdAt: d.created_at
-      })));
-      showToast('Baixa realizada localmente!', 'success');
+      showToast(`Erro ao dar baixa no fiado: ${dbError.message}`);
       return;
     }
 
@@ -643,25 +582,10 @@ function App() {
 
   // Handler para quitar TODOS os fiados de um usuário de uma vez
   const handleRemoveAllDebts = async (userId: string) => {
-    // 1. Tenta deletar tudo no Supabase
     const { error: dbError } = await supabase.from('debts').delete().eq('user_id', userId);
 
     if (dbError) {
-      console.warn("Falha ao quitar fiados no Supabase. Atualizando localmente.");
-      // 2. Fallback para localStorage
-      const currentLocal = getLocalDebts();
-      const updated = currentLocal.filter((d: any) => d.user_id !== userId);
-      saveLocalDebts(updated);
-
-      // Atualiza o estado
-      setDebts(updated.map((d: any) => ({
-        id: d.id,
-        userId: d.user_id,
-        amount: Number(d.amount),
-        debtDate: d.debt_date,
-        createdAt: d.created_at
-      })));
-      showToast('Fiados quitados localmente!', 'success');
+      showToast(`Erro ao quitar fiados: ${dbError.message}`);
       return;
     }
 

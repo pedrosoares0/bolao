@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { runNotifications } from './notify-core.mts';
 
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
 // e grava/atualiza na tabela `matches` do Supabase usando a service_role.
@@ -48,8 +49,23 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
   }));
 
   if (rows.length > 0) {
+    // Estado ANTERIOR (antes de sobrescrever) — usado para detectar
+    // transições (começou / gol / intervalo / fim) e notificar o WhatsApp.
+    const { data: prevRows } = await supabase
+      .from('matches')
+      .select('id, status, home_score, away_score')
+      .in('id', rows.map((r: any) => r.id));
+    const prevById = new Map((prevRows ?? []).map((r: any) => [r.id, r]));
+
     const { error } = await supabase.from('matches').upsert(rows);
     if (error) throw new Error(`Erro ao gravar partidas no Supabase: ${error.message}`);
+
+    // Notificações são best-effort: nunca derrubam a sincronização.
+    try {
+      await runNotifications(supabase, prevById, rows);
+    } catch (err) {
+      console.error('Falha ao enviar notificações:', err);
+    }
   }
 
   await supabase.from('sync_state').upsert({ id: 1, last_sync: new Date().toISOString() });
