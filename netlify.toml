@@ -5,6 +5,28 @@
 [functions]
   directory = "netlify/functions"
 
+# ------------------------------------------------------------
+# Headers de segurança (aplicados a todas as respostas do site).
+# Não mudam o comportamento do app — só endurecem o navegador.
+#
+# A CSP foi montada conforme o que o app realmente carrega:
+#   - script-src 'self'      → só o nosso bundle (sem CDNs de script)
+#   - style-src 'unsafe-inline' → necessário pelos estilos inline do React (style={{...}})
+#   - img-src https:         → bandeiras (flagcdn), ícones (thiings/pinimg/magnific), crests
+#   - connect-src supabase   → REST + Realtime (WebSocket) do Supabase, e as Functions ('self')
+# Se algum recurso novo for adicionado no futuro e o navegador bloquear,
+# é AQUI que se libera a origem correspondente.
+# ------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+
 # SPA: qualquer rota cai no index.html (as functions têm prioridade sobre redirects)
 [[redirects]]
   from = "/*"

@@ -1,3 +1,8 @@
+// ============================================================
+// PalpitesTab — aba "Palpites": (1) os palpites especiais da Copa (campeão e
+// até onde o Brasil vai, 5 pts cada, editáveis até 28/06) e (2) o histórico
+// pessoal do usuário, agrupado por dia e paginado, com os pontos jogo a jogo.
+// ============================================================
 import React, { useMemo, useState } from 'react';
 import type { Match, Bet, Participant, SpecialPrediction, BrazilStage } from '../types';
 import { analyzeBet } from '../utils/rules';
@@ -15,9 +20,9 @@ interface PalpitesTabProps {
   matches: Match[];
   bets: Bet[];
   participants: Participant[];
-  specials: SpecialPrediction[];
+  specials: SpecialPrediction[]; // palpites especiais de todos
   currentUser: Participant;
-  nowTs: number;
+  nowTs: number; // relógio do app (define se os especiais já travaram)
   onSave: (championTeam: string, brazilStage: BrazilStage) => Promise<void>;
 }
 

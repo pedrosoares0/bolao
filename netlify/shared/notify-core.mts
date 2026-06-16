@@ -16,6 +16,8 @@
 //   id_grupo (JID do grupo, ex.: 120363409600953192) e url_bolao.
 // ============================================================
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 // ---- Linha crua da tabela `matches` (o que sync-core monta) ----
 interface MatchRow {
   id: number;
@@ -180,7 +182,7 @@ const sendText = async (text: string): Promise<boolean> => {
 
 // Reserva atômica da chave (insere; true se foi NOVA, false se já existia
 // ou se a tabela não existe — nesse caso não enviamos para evitar repetição).
-const reserve = async (supabase: any, key: string): Promise<boolean> => {
+const reserve = async (supabase: SupabaseClient, key: string): Promise<boolean> => {
   const { data, error } = await supabase
     .from('sent_notifications')
     .upsert({ dedup_key: key }, { onConflict: 'dedup_key', ignoreDuplicates: true })
@@ -192,12 +194,12 @@ const reserve = async (supabase: any, key: string): Promise<boolean> => {
   return Array.isArray(data) && data.length > 0;
 };
 
-const release = async (supabase: any, key: string): Promise<void> => {
+const release = async (supabase: SupabaseClient, key: string): Promise<void> => {
   await supabase.from('sent_notifications').delete().eq('dedup_key', key);
 };
 
 // Envia só se a chave for nova; se o envio falhar, libera a chave p/ retry.
-const sendOnce = async (supabase: any, key: string, text: string): Promise<void> => {
+const sendOnce = async (supabase: SupabaseClient, key: string, text: string): Promise<void> => {
   if (!(await reserve(supabase, key))) return;
   const ok = await sendText(text);
   if (!ok) await release(supabase, key);
@@ -289,7 +291,7 @@ const isPre = (s: string) => s === 'SCHEDULED' || s === 'TIMED';
 const isLive = (s: string) => s === 'IN_PLAY' || s === 'PAUSED';
 
 export async function runNotifications(
-  supabase: any,
+  supabase: SupabaseClient,
   prevById: Map<number, PrevState>,
   rows: MatchRow[]
 ): Promise<void> {
@@ -313,7 +315,7 @@ export async function runNotifications(
     if (mins <= 0 || mins > 60) continue;
     // quem ainda não palpitou NESTE jogo
     const { data: betRows } = await supabase.from('bets').select('user_id').eq('match_id', m.id);
-    const apostaram = new Set((betRows ?? []).map((b: any) => b.user_id));
+    const apostaram = new Set(((betRows ?? []) as { user_id: string }[]).map((b) => b.user_id));
     const missing = participants.filter((p) => !apostaram.has(p.id)).map((p) => p.name);
     if (missing.length === 0) continue; // todos já palpitaram → não envia lembrete
     const key = `pre60:${m.id}`;
@@ -352,13 +354,13 @@ export async function runNotifications(
         .from('bets')
         .select('user_id, home_score, away_score')
         .eq('match_id', m.id);
-      const scorers = (betRows ?? [])
-        .map((b: any) => {
+      const scorers = ((betRows ?? []) as BetRow[])
+        .map((b) => {
           const a = analyze(b, m);
           return { name: nameByUid.get(b.user_id) || '??', points: a.points, type: a.type };
         })
-        .filter((s: any) => s.points > 0)
-        .sort((a: any, b: any) => b.points - a.points);
+        .filter((s) => s.points > 0)
+        .sort((a, b) => b.points - a.points);
       await sendOnce(supabase, `end:${m.id}`, msgEnd(m, scorers));
       finishedDatesTouched.add(isoDateOf(m.utc_date));
     }
@@ -375,7 +377,7 @@ export async function runNotifications(
     // todas as apostas (para somar rodada + geral)
     const { data: allBets } = await supabase.from('bets').select('user_id, match_id, home_score, away_score');
     const betsByKey = new Map<string, BetRow>();
-    (allBets ?? []).forEach((b: any) => betsByKey.set(`${b.user_id}_${b.match_id}`, b));
+    ((allBets ?? []) as BetRow[]).forEach((b) => betsByKey.set(`${b.user_id}_${b.match_id}`, b));
 
     const finishedAll = rows.filter((r) => r.status === 'FINISHED');
 
@@ -403,12 +405,12 @@ export async function runNotifications(
     .select('dedup_key, sent_at')
     .like('dedup_key', 'dayfinal:%');
 
-  for (const df of dayFinals ?? []) {
+  for (const df of (dayFinals ?? []) as { dedup_key: string; sent_at: string }[]) {
     const sentMs = Date.parse(df.sent_at);
     const elapsed = now - sentMs;
     if (elapsed < THIRTY_MIN || elapsed > SIX_HOURS) continue; // cedo demais ou antigo demais
 
-    const dayIso = (df.dedup_key as string).slice('dayfinal:'.length);
+    const dayIso = df.dedup_key.slice('dayfinal:'.length);
     const nextIso = rows
       .map((r) => isoDateOf(r.utc_date))
       .filter((iso) => iso > dayIso)

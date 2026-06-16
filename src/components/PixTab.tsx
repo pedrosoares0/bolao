@@ -1,8 +1,14 @@
+// ============================================================
+// PixTab — aba "Pagamento": mostra o pote acumulado, os dados do PIX da
+// taxa diária e a caderneta de fiados (pendurar/quitar). Por transparência
+// todos veem os fiados de todos, mas pendurar/dar baixa só no próprio nome
+// (a UI só libera os botões para `isSelf` e o App + RLS reforçam isso).
+// ============================================================
 import React from 'react';
 import { POT_PER_DAY, POT_PER_PERSON_DAY } from '../utils/pot';
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './PixKeyCopy';
 
-// Helper para separar parte inteira e decimal de um valor monetário
+// Separa um valor monetário em parte inteira e centavos (ex.: 12.5 -> "12","50")
 const formatMoneyParts = (value: number) => {
   const formatted = value.toFixed(2);
   const [integerPart, decimalPart] = formatted.split('.');
@@ -36,15 +42,16 @@ const PixPaymentCard: React.FC = () => {
 import type { Participant, Debt } from '../types';
 
 interface PixTabProps {
-  accumulated: number;
-  currentUser: Participant | null;
-  participants: Participant[];
-  debts: Debt[];
-  onRegisterDebt: (userId: string, date: string) => Promise<void>;
-  onRemoveDebt: (debtId: number) => Promise<void>;
-  onRemoveAllDebts: (userId: string) => Promise<void>;
+  accumulated: number; // pote acumulado em R$ (calculado em utils/pot.ts)
+  currentUser: Participant | null; // usuário logado (define quem pode pendurar/quitar)
+  participants: Participant[]; // todos os participantes (a caderneta lista todos)
+  debts: Debt[]; // fiados de todos (filtrados por usuário na renderização)
+  onRegisterDebt: (userId: string, date: string) => Promise<void>; // pendurar a taxa do dia
+  onRemoveDebt: (debtId: number) => Promise<void>; // dar baixa em UM fiado
+  onRemoveAllDebts: (userId: string) => Promise<void>; // quitar todos os fiados do usuário
 }
 
+// "2026-06-17" -> "17/06" (rótulo curto do dia do fiado)
 const formatIsoDateToBr = (isoDate: string) => {
   const parts = isoDate.split('-');
   if (parts.length === 3) {

@@ -33,8 +33,11 @@ Netlify (site estático)
 ### 1. Supabase
 1. Crie um projeto em [supabase.com](https://supabase.com).
 2. No **SQL Editor**, rode [`supabase/schema.sql`](supabase/schema.sql) (tabelas, segurança, regras).
-3. Rode [`supabase/realtime.sql`](supabase/realtime.sql) (atualizações ao vivo de placares e palpites).
-4. Rode as migrations em ordem (`supabase/update-00X-*.sql`). A última, [`update-005-notificacoes-whatsapp.sql`](supabase/update-005-notificacoes-whatsapp.sql), cria a tabela `sent_notifications` usada pelas notificações do WhatsApp (sem ela, **nenhuma** mensagem é enviada — proteção contra spam).
+3. Rode [`supabase/realtime.sql`](supabase/realtime.sql) (atualizações ao vivo de placares, palpites e fiados).
+4. Rode as migrations em ordem (`supabase/update-00X-*.sql`):
+   - [`update-005-notificacoes-whatsapp.sql`](supabase/update-005-notificacoes-whatsapp.sql) cria a tabela `sent_notifications` usada pelas notificações do WhatsApp (sem ela, **nenhuma** mensagem é enviada — proteção contra spam).
+   - [`update-005-fiados.sql`](supabase/update-005-fiados.sql) cria a caderneta de fiados (`debts`) com RLS: cada um só pendura/quita o **próprio** fiado.
+   - [`update-006-debts-realtime.sql`](supabase/update-006-debts-realtime.sql) coloca os fiados no Realtime (só precisa se você rodou o `realtime.sql` antigo, sem `debts`).
 5. Edite as 4 senhas em [`supabase/seed.sql`](supabase/seed.sql) e rode-o (cria os usuários pedro/alex/rodrigo/neto).
    - Se der erro, crie os usuários manualmente em **Authentication > Users > Add user** com e-mails `pedro@bolao.app` etc. e "Auto Confirm" — o perfil é criado sozinho.
 
@@ -67,7 +70,11 @@ Copie `.env.example` para `.env` e preencha (instruções de onde achar cada val
 npm install
 npx netlify dev   # roda o Vite + as Functions juntos (recomendado)
 # ou: npm run dev (só o front; os jogos vêm do que já está no Supabase)
-npm test          # testes das regras de pontuação (src/utils/rules.test.ts)
+
+npm run lint      # ESLint (app + Netlify Functions)
+npx tsc -b        # type-check do app e das funções (.mts)
+npm test          # testes das regras de pontuação e do pote (Vitest)
+npm run build     # build de produção (tsc -b + vite build)
 ```
 
 ---
@@ -102,15 +109,34 @@ A cada sincronização (cron de ~2 min), o backend compara o estado **anterior**
 >
 > Toda a lógica vive em [`netlify/shared/notify-core.mts`](netlify/shared/notify-core.mts) e é acionada por [`netlify/shared/sync-core.mts`](netlify/shared/sync-core.mts).
 
+## 🔒 Segurança
+
+A regra de ouro: **o navegador nunca é confiável**. A chave que o front usa (`VITE_SUPABASE_ANON_KEY`) é **pública por design** — quem protege os dados é o Postgres, não o app.
+
+- **Row Level Security (RLS)** em todas as tabelas: participantes autenticados só leem o que devem e só escrevem o que é seu. Apostas entram **apenas** pela RPC `submit_bets` (que revalida o lockout com a hora do **servidor** — não adianta mexer no relógio). Fiados: cada um só pendura/quita o próprio (reforçado também no [App.tsx](src/App.tsx)).
+- **Chave secreta (`service_role`)** vive só nas variáveis de ambiente do Netlify, nunca no bundle do navegador. As Functions a usam server-side.
+- **Headers de segurança** no [`netlify.toml`](netlify.toml): `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy`. A CSP libera só as origens que o app realmente usa (Supabase, flagcdn, ícones); recurso novo de outra origem precisa ser liberado ali.
+- **Endpoint público `sync-matches`**: tem throttle de 3 min (tabela `sync_state`) e devolve erro genérico (o detalhe técnico fica só no log do servidor).
+- **`.env` nunca é commitado** (ver `.gitignore`); use `.env.example` como referência.
+
+## ✅ Qualidade
+
+- **Lint**: ESLint cobre o app (React) e as Netlify Functions (`.mts`).
+- **Type-check**: `tsc -b` valida o app **e** as funções (via `tsconfig.netlify.json`).
+- **Testes** (Vitest): `src/utils/rules.test.ts` (pontuação/ranking/palpites especiais) e `src/utils/pot.test.ts` (pote acumulado) — a "regra do dinheiro" não pode ter bug.
+- **CI** (GitHub Actions, [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): roda lint + type-check + testes + build a cada push/PR.
+
 ## 📁 Estrutura
 
-- `src/App.tsx` — telas (login/splash/app) e camada de dados (Supabase).
+- `src/App.tsx` — telas (login/splash/app) e camada de dados (Supabase + Realtime).
 - `src/lib/supabase.ts` — cliente Supabase.
 - `src/lib/teamMaps.ts` — tradução de seleções, bandeiras (flagcdn) e fases.
-- `src/utils/rules.ts` — pontuação e ranking.
-- `src/components/StandingsTable.tsx` — aba Ranking (slideshow + prêmio + pílulas).
+- `src/utils/rules.ts` — pontuação e ranking · `src/utils/specials.ts` — palpites especiais · `src/utils/pot.ts` — pote acumulado.
+- `src/utils/shareRanking.ts` — gera/compartilha a imagem do ranking (canvas).
+- `src/components/` — abas (`StandingsTable`, `PixTab`, `PalpitesTab`) e fundos WebGL vendados (`Aurora`, `LightRays`).
 - `netlify/functions/` — sincronização dos jogos (HTTP + cron a cada 2 min).
 - `netlify/shared/sync-core.mts` — busca jogos na football-data.org, faz upsert e aciona as notificações.
 - `netlify/shared/notify-core.mts` — monta e envia as mensagens do WhatsApp (Evolution API).
 - `supabase/` — SQL de schema, seed e migrations (`update-00X-*.sql`).
 - `docs/` — documentação de arquitetura. Ver [`docs/ESCALABILIDADE.md`](docs/ESCALABILIDADE.md) (plano para virar plataforma multi-grupo com parceiros, prêmios e infra por fases).
+- Detalhes de funcionalidades específicas (fiados, "On Fire", deck, ranking) em [`README_BACKEND.md`](README_BACKEND.md).

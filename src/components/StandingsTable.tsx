@@ -1,3 +1,9 @@
+// ============================================================
+// StandingsTable — aba "Ranking". Mostra o MVP da rodada, o pódio (1º/2º),
+// o restante da classificação, o card "On Fire" (sequências de acertos), um
+// deck 3D de fotos dos participantes e o botão de compartilhar o ranking como
+// imagem (utils/shareRanking.ts). Aurora/LightRays são fundos WebGL.
+// ============================================================
 import React from 'react';
 import type { ParticipantStanding, Match, Bet } from '../types';
 import { analyzeBet } from '../utils/rules';
@@ -6,12 +12,13 @@ import LightRays from './LightRays';
 import Aurora from './Aurora';
 
 interface StandingsTableProps {
-  standings: ParticipantStanding[];
+  standings: ParticipantStanding[]; // já ordenado (ver calculateStandings)
   matches: Match[];
   bets: Bet[];
-  rankChanges?: Record<string, number>;
+  rankChanges?: Record<string, number>; // variação de posição desde a última rodada
 }
 
+// Deck 3D de fotos dos participantes com arraste/swipe (puramente visual)
 const Slideshow: React.FC = () => {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [dragX, setDragX] = React.useState(0);

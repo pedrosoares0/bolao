@@ -1,6 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
 import { runNotifications } from './notify-core.mts';
 
+// ---- Formato cru de uma partida na football-data.org (só os campos que usamos) ----
+interface ApiTeam {
+  name?: string;
+  tla?: string;
+  crest?: string;
+}
+interface ApiMatch {
+  id: number;
+  utcDate: string;
+  status: string;
+  stage?: string | null;
+  group?: string | null;
+  homeTeam?: ApiTeam | null;
+  awayTeam?: ApiTeam | null;
+  score?: {
+    fullTime?: { home?: number | null; away?: number | null } | null;
+    winner?: string | null;
+  } | null;
+}
+
+// ---- Estado anterior de um jogo (para detectar transições e notificar) ----
+interface PrevState {
+  id: number;
+  status: string;
+  home_score: number | null;
+  away_score: number | null;
+}
+
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
 // e grava/atualiza na tabela `matches` do Supabase usando a service_role.
 // Throttle: se sincronizou há menos de 3 minutos, pula (limite free: 10 req/min).
@@ -29,8 +57,8 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     throw new Error(`football-data.org respondeu ${res.status}: ${await res.text()}`);
   }
 
-  const data = await res.json();
-  const rows = (data.matches ?? []).map((m: any) => ({
+  const data = (await res.json()) as { matches?: ApiMatch[] };
+  const rows = (data.matches ?? []).map((m) => ({
     id: m.id,
     utc_date: m.utcDate,
     status: m.status,
@@ -54,8 +82,10 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     const { data: prevRows } = await supabase
       .from('matches')
       .select('id, status, home_score, away_score')
-      .in('id', rows.map((r: any) => r.id));
-    const prevById = new Map((prevRows ?? []).map((r: any) => [r.id, r]));
+      .in('id', rows.map((r) => r.id));
+    const prevById = new Map(
+      ((prevRows ?? []) as PrevState[]).map((r) => [r.id, r] as const)
+    );
 
     const { error } = await supabase.from('matches').upsert(rows);
     if (error) throw new Error(`Erro ao gravar partidas no Supabase: ${error.message}`);

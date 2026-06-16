@@ -1,6 +1,11 @@
+// ============================================================
+// shareRanking — gera uma imagem (PNG) do ranking desenhada 100% no <canvas>
+// (capa, pódio 1º/2º, demais posições, fogos e setas de evolução) e a
+// compartilha pela Web Share API; sem suporte, baixa o arquivo.
+// ============================================================
 import type { ParticipantStanding } from '../types';
 
-// Desenha um retângulo arredondado no contexto do canvas
+// Desenha um retângulo arredondado no contexto do canvas (usado nos cards)
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,

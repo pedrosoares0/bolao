@@ -1,11 +1,27 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+// ============================================================
+// App.tsx — componente raiz do bolão.
+//
+// Responsabilidades:
+//  - Autenticação (Supabase Auth: nome -> nome@bolao.app) e telas login/splash/app.
+//  - Carregar e manter sincronizados (Supabase Realtime) jogos, apostas,
+//    lançamentos, palpites especiais e fiados.
+//  - Regras de janela de aposta (editável até 1 min antes do kickoff) e o
+//    conceito de "rodada" (jogos de madrugada entram na rodada do dia anterior).
+//  - Renderizar a aba de Partidas/Apostas; Ranking, Palpites e Pagamento são
+//    componentes carregados sob demanda (lazy).
+// A validação que vale dinheiro (lockout das apostas) é refeita no servidor
+// pela RPC submit_bets — o cliente só faz a checagem otimista.
+// ============================================================
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
-import { StandingsTable } from './components/StandingsTable';
-import { PixTab } from './components/PixTab';
-import { PalpitesTab } from './components/PalpitesTab';
+// Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
+// WebGL do Ranking (ogl) — quando o usuário abre a aba, deixando o boot mais leve.
+const StandingsTable = lazy(() => import('./components/StandingsTable'));
+const PixTab = lazy(() => import('./components/PixTab'));
+const PalpitesTab = lazy(() => import('./components/PalpitesTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
@@ -200,6 +216,13 @@ function App() {
     </div>
   );
 
+  // Placeholder rápido enquanto o chunk de uma aba (lazy) termina de baixar
+  const tabFallback = (
+    <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>
+      Carregando…
+    </div>
+  );
+
   // 3. Validar a sessão do Supabase ao abrir o app
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -234,7 +257,14 @@ function App() {
     try {
       const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes] = await Promise.all([
         supabase.from('participants').select('id, username, name, avatar_url').order('username'),
-        supabase.from('matches').select('*').order('utc_date'),
+        // Só as colunas que o app usa (ver MatchDbRow) — evita trafegar a linha
+        // inteira a cada evento do Realtime, que recarrega ~104 jogos de uma vez.
+        supabase
+          .from('matches')
+          .select(
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner'
+          )
+          .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score'),
         supabase.from('submissions').select('bet_date').eq('user_id', uid),
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
@@ -275,8 +305,10 @@ function App() {
 
       setError(null);
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      // Loga o detalhe técnico no console e mostra um aviso genérico na tela
+      // (não expõe mensagens internas do banco para o usuário).
+      console.error('Erro ao carregar dados do Supabase:', err);
+      setError('Não foi possível carregar os dados agora. Verifique sua conexão e recarregue a página.');
     } finally {
       if (withSpinner) setLoading(false);
     }
@@ -324,6 +356,9 @@ function App() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
+    // loadAll é recriada a cada render; incluí-la aqui re-assinaria o Realtime
+    // a todo momento. O efeito deve rodar só quando o usuário logado muda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid]);
 
   // 5. Mapear apostas cruas (uuid) para o formato do app (username)
@@ -345,6 +380,15 @@ function App() {
       })),
     [betRows, usernameByUid]
   );
+
+  // Índice O(1) das apostas por (jogo + participante). Evita varrer a lista
+  // inteira com bets.find() dentro dos loops de render e dos cálculos — com
+  // dezenas de jogos × participantes, isso troca um custo O(n²) por O(n).
+  const betByMatchUser = useMemo(() => {
+    const map = new Map<string, Bet>();
+    bets.forEach((b) => map.set(`${b.matchId}|${b.participantId}`, b));
+    return map;
+  }, [bets]);
 
   const specials = useMemo<SpecialPrediction[]>(
     () =>
@@ -400,7 +444,7 @@ function App() {
     const map: { [matchId: string]: { homeScore: string, awayScore: string } } = {};
     matches.forEach((match) => {
       const own = currentUser
-        ? bets.find((b) => b.matchId === match.id && b.participantId === currentUser.id)
+        ? betByMatchUser.get(`${match.id}|${currentUser.id}`)
         : undefined;
       // campo a campo: o rascunho pode existir com só um dos lados digitado
       map[match.id] = {
@@ -409,7 +453,7 @@ function App() {
       };
     });
     return map;
-  }, [matches, bets, draftBets, currentUser]);
+  }, [matches, betByMatchUser, draftBets, currentUser]);
 
   // Agrupar partidas por data para renderização eficiente
   const groupedMatches = useMemo(() => {
@@ -455,13 +499,13 @@ function App() {
   const hasChangesToLaunch = useMemo(() => {
     if (!currentUser) return false;
     return playableMatches.some((m) => {
-      const own = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
+      const own = betByMatchUser.get(`${m.id}|${currentUser.id}`);
       const draft = displayDrafts[m.id];
       if (!draft) return false;
       if (!own) return draft.homeScore.trim() !== '' || draft.awayScore.trim() !== '';
       return draft.homeScore !== String(own.homeScore) || draft.awayScore !== String(own.awayScore);
     });
-  }, [playableMatches, bets, displayDrafts, currentUser]);
+  }, [playableMatches, betByMatchUser, displayDrafts, currentUser]);
 
   // Ao cruzar um kickoff, recarrega os dados para atualizar o estado do jogo.
   useEffect(() => {
@@ -565,7 +609,9 @@ function App() {
     });
 
     if (rpcError) {
-      showToast(`Erro ao lançar apostas: ${rpcError.message}`);
+      console.error('Erro ao lançar apostas:', rpcError);
+      // Mensagem amigável; o detalhe técnico fica só no console (não expõe o banco).
+      showToast('Não foi possível lançar as apostas. Confira se os jogos ainda não começaram e tente de novo.');
       return;
     }
 
@@ -585,15 +631,22 @@ function App() {
       updated_at: new Date().toISOString(),
     });
     if (spError) {
-      showToast(`Erro ao salvar palpites: ${spError.message}`);
+      console.error('Erro ao salvar palpites especiais:', spError);
+      showToast('Não foi possível salvar os palpites. Tente de novo.');
       return;
     }
     await loadAll(currentUser.uid, false);
     showToast('Palpites da Copa salvos!', 'success');
   };
 
-  // Handler para pendurar aposta (R$ 2,50)
+  // Handler para pendurar aposta (R$ 2,50).
+  // Defesa em profundidade: só deixa pendurar no PRÓPRIO nome (além da UI e do
+  // RLS `debts_insert_own`, garante aqui que ninguém pendura por outra pessoa).
   const handleRegisterDebt = async (userId: string, date: string) => {
+    if (!currentUser?.uid || userId !== currentUser.uid) {
+      showToast('Você só pode pendurar a sua própria aposta!');
+      return;
+    }
     // Evita duplicado para o mesmo dia e usuário
     if (debts.some((d) => d.userId === userId && d.debtDate === date)) {
       showToast('Você já pendurou a aposta de hoje!');
@@ -607,38 +660,56 @@ function App() {
     });
 
     if (dbError) {
-      showToast(`Erro ao pendurar aposta: ${dbError.message}`);
+      console.error('Erro ao pendurar aposta:', dbError);
+      showToast('Não foi possível pendurar a aposta. Tente de novo.');
       return;
     }
 
     showToast('Aposta pendurada com sucesso!', 'success');
-    if (currentUser?.uid) await loadAll(currentUser.uid, false);
+    await loadAll(currentUser.uid, false);
   };
 
-  // Handler para pagar/dar baixa no fiado
+  // Handler para pagar/dar baixa em UM fiado.
+  // O filtro extra por `user_id` garante que só dá baixa em fiado PRÓPRIO,
+  // mesmo que o id de outro participante chegasse por engano (o RLS também barra).
   const handleRemoveDebt = async (debtId: number) => {
-    const { error: dbError } = await supabase.from('debts').delete().eq('id', debtId);
+    if (!currentUser?.uid) return;
+    const { error: dbError } = await supabase
+      .from('debts')
+      .delete()
+      .eq('id', debtId)
+      .eq('user_id', currentUser.uid);
 
     if (dbError) {
-      showToast(`Erro ao dar baixa no fiado: ${dbError.message}`);
+      console.error('Erro ao dar baixa no fiado:', dbError);
+      showToast('Não foi possível dar baixa no fiado. Tente de novo.');
       return;
     }
 
     showToast('Baixa no fiado realizada com sucesso!', 'success');
-    if (currentUser?.uid) await loadAll(currentUser.uid, false);
+    await loadAll(currentUser.uid, false);
   };
 
-  // Handler para quitar TODOS os fiados de um usuário de uma vez
+  // Handler para quitar TODOS os fiados de uma vez — sempre os do PRÓPRIO usuário.
+  // Ignora o userId recebido e usa o uid logado: ninguém quita o fiado de outro.
   const handleRemoveAllDebts = async (userId: string) => {
-    const { error: dbError } = await supabase.from('debts').delete().eq('user_id', userId);
+    if (!currentUser?.uid || userId !== currentUser.uid) {
+      showToast('Você só pode quitar os seus próprios fiados!');
+      return;
+    }
+    const { error: dbError } = await supabase
+      .from('debts')
+      .delete()
+      .eq('user_id', currentUser.uid);
 
     if (dbError) {
-      showToast(`Erro ao quitar fiados: ${dbError.message}`);
+      console.error('Erro ao quitar fiados:', dbError);
+      showToast('Não foi possível quitar os fiados. Tente de novo.');
       return;
     }
 
     showToast('Todos os fiados foram quitados!', 'success');
-    if (currentUser?.uid) await loadAll(currentUser.uid, false);
+    await loadAll(currentUser.uid, false);
   };
 
   // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
@@ -689,9 +760,11 @@ function App() {
 
         <form onSubmit={handleLoginSubmit} className="login-form-container">
           <div className="login-form-group">
-            <label className="login-field-label">Nome</label>
+            <label className="login-field-label" htmlFor="login-username">Nome</label>
             <input
+              id="login-username"
               type="text"
+              autoComplete="username"
               className="login-field-input"
               value={usernameInput}
               onChange={(e) => setUsernameInput(e.target.value)}
@@ -700,9 +773,11 @@ function App() {
           </div>
 
           <div className="login-form-group">
-            <label className="login-field-label">Senha</label>
+            <label className="login-field-label" htmlFor="login-password">Senha</label>
             <input
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               className="login-field-input"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
@@ -838,7 +913,7 @@ function App() {
                     const finishedTitles = isFinished && match.homeScore !== null && match.awayScore !== null;
                     const bettorTypes = finishedTitles
                       ? participants
-                          .map((p) => bets.find((b) => b.matchId === match.id && b.participantId === p.id))
+                          .map((p) => betByMatchUser.get(`${match.id}|${p.id}`))
                           .filter((b): b is Bet => !!b)
                           .map((b) => ({ id: b.participantId, type: analyzeBet(b, match).type }))
                       : [];
@@ -888,6 +963,7 @@ function App() {
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 min="0"
+                                aria-label={`Seu palpite de gols para ${match.homeTeam}`}
                                 className="score-input-field-p16"
                                 value={displayDrafts[match.id]?.homeScore || ''}
                                 onChange={(e) => {
@@ -930,6 +1006,7 @@ function App() {
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 min="0"
+                                aria-label={`Seu palpite de gols para ${match.awayTeam}`}
                                 className="score-input-field-p16"
                                 value={displayDrafts[match.id]?.awayScore || ''}
                                 onChange={(e) => {
@@ -968,7 +1045,7 @@ function App() {
                         <div className={`inline-guesses-list-wrapper-p16 ${expandedMatches[match.id] ? 'expanded' : ''}`}>
                           <div className="inline-guesses-list-inner-p16">
                             {participants.map((p) => {
-                            const bet = bets.find((b) => b.matchId === match.id && b.participantId === p.id);
+                            const bet = betByMatchUser.get(`${match.id}|${p.id}`);
                             const analysis = analyzeBet(bet, match);
 
                             // Mini-títulos do jogo
@@ -1108,34 +1185,40 @@ function App() {
 
         {/* ABA: PALPITES (especiais + histórico pessoal) */}
         {activeTab === 'palpites' && currentUser && (
-          <PalpitesTab
-            matches={matches}
-            bets={bets}
-            participants={participants}
-            specials={specials}
-            currentUser={currentUser}
-            nowTs={nowTs}
-            onSave={handleSaveSpecial}
-          />
+          <Suspense fallback={tabFallback}>
+            <PalpitesTab
+              matches={matches}
+              bets={bets}
+              participants={participants}
+              specials={specials}
+              currentUser={currentUser}
+              nowTs={nowTs}
+              onSave={handleSaveSpecial}
+            />
+          </Suspense>
         )}
 
         {/* ABA: PAGAMENTO (PIX) */}
         {activeTab === 'pix' && (
-          <PixTab
-            accumulated={accumulatedPot}
-            currentUser={currentUser}
-            participants={participants}
-            debts={debts}
-            onRegisterDebt={handleRegisterDebt}
-            onRemoveDebt={handleRemoveDebt}
-            onRemoveAllDebts={handleRemoveAllDebts}
-          />
+          <Suspense fallback={tabFallback}>
+            <PixTab
+              accumulated={accumulatedPot}
+              currentUser={currentUser}
+              participants={participants}
+              debts={debts}
+              onRegisterDebt={handleRegisterDebt}
+              onRemoveDebt={handleRemoveDebt}
+              onRemoveAllDebts={handleRemoveAllDebts}
+            />
+          </Suspense>
         )}
 
         {/* ABA: RANKING */}
         {activeTab === 'ranking' && (
           <div>
-            <StandingsTable standings={standings} matches={matches} bets={bets} rankChanges={rankChanges} />
+            <Suspense fallback={tabFallback}>
+              <StandingsTable standings={standings} matches={matches} bets={bets} rankChanges={rankChanges} />
+            </Suspense>
 
             {/* Logout em baixo do Ranking */}
             <div style={{ padding: '2rem 1rem 0 1rem', display: 'flex', justifyContent: 'center' }}>

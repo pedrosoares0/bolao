@@ -1,6 +1,6 @@
-# Documentação Técnica das Implementações Recentes (Frontend → Backend)
+# Documentação Técnica das Funcionalidades (Frontend ↔ Supabase)
 
-Este documento foi criado para detalhar as novas funcionalidades e mudanças implementadas no frontend para que a equipe de backend possa alinhar a integração de banco de dados, criar as tabelas necessárias no Supabase e conhecer as regras de negócio aplicadas no cliente.
+Este documento detalha funcionalidades específicas do app e como elas se conectam ao Supabase. **Todas já estão implementadas** (a tabela `debts`, o cálculo "On Fire", o deck de participantes e os refinamentos do ranking). Para o setup geral e a arquitetura, veja o [README.md](README.md).
 
 ---
 
@@ -8,7 +8,7 @@ Este documento foi criado para detalhar as novas funcionalidades e mudanças imp
 Permite que participantes pendurem a aposta diária de **R$ 2,50** na caderneta de fiados caso não queiram/possam realizar o Pix imediatamente.
 
 ### Integração no Banco de Dados (Supabase)
-O frontend consome a tabela `debts` no Supabase nas funções `handleRegisterDebt` e `handleRemoveDebt` dentro de [App.tsx](file:///c:/Users/Pedro/Desktop/apostados/src/App.tsx).
+O frontend consome a tabela `debts` no Supabase nas funções `handleRegisterDebt`, `handleRemoveDebt` e `handleRemoveAllDebts` dentro de [App.tsx](src/App.tsx). A tabela e suas políticas de segurança (RLS: cada um só insere/remove o próprio fiado) ficam em [supabase/update-005-fiados.sql](supabase/update-005-fiados.sql), e o Realtime em [supabase/update-006-debts-realtime.sql](supabase/update-006-debts-realtime.sql).
 
 #### Schema Recomendado para PostgreSQL (Supabase):
 ```sql
@@ -36,7 +36,7 @@ CREATE INDEX idx_debts_date ON public.debts(debt_date);
 Identifica e exibe de forma destacada (entre o ranking geral e a lista de participantes) se algum participante está em uma sequência "On Fire" de pontuação consecutiva.
 
 ### Regra de Negócio e Cálculo:
-O status é calculado dinamicamente no frontend na função `getOnFireInfo` em [StandingsTable.tsx](file:///c:/Users/Pedro/Desktop/apostados/src/components/StandingsTable.tsx) com as seguintes condições:
+O status é calculado dinamicamente no frontend na função `getFireCounts` em [StandingsTable.tsx](src/components/StandingsTable.tsx) com as seguintes condições:
 1. Busca todos os jogos finalizados (`status === 'finished'` com placares preenchidos).
 2. Ordena os jogos cronologicamente pelo horário de kickoff.
 3. Filtra apenas os jogos finalizados **em que o participante de fato realizou um palpite** (evitando que jogos que o usuário não apostou quebrem sua sequência).
@@ -50,7 +50,7 @@ O status é calculado dinamicamente no frontend na função `getOnFireInfo` em [
 ---
 
 ## 3. Carrossel de Participantes Empilhado (Layout Deck 3D)
-O slideshow rotativo e a visualização em grade colapsável foram substituídos por um **deck interativo de fotos empilhadas 3D** em [StandingsTable.tsx](file:///c:/Users/Pedro/Desktop/apostados/src/components/StandingsTable.tsx).
+O slideshow rotativo e a visualização em grade colapsável foram substituídos por um **deck interativo de fotos empilhadas 3D** em [StandingsTable.tsx](src/components/StandingsTable.tsx).
 
 * **Visual:** As fotos estão empilhadas no centro com deslocamento e rotação gradual, simulando um monte físico de cartas. O cabeçalho é estático (não colapsável) e o visual é extremamente polido.
 * **Interação:** Suporta gestos de arrasto (drag/swipe) com o mouse ou toque.

@@ -1,3 +1,9 @@
+// ============================================================
+// Aurora — fundo animado de "aurora boreal" em WebGL (shader via ogl).
+// Componente VENDADO do reactbits.dev, mantido o mais próximo do original.
+// Puramente decorativo (position:absolute, pointerEvents:none, zIndex:0).
+// Usado atrás do MVP e do pódio no Ranking. Ver override no eslint.config.js.
+// ============================================================
 import { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
 

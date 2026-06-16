@@ -1,3 +1,9 @@
+// ============================================================
+// LightRays — raios de luz animados em WebGL (shader via ogl).
+// Componente VENDADO do reactbits.dev, mantido próximo do original.
+// Puramente decorativo; usado como brilho de fogo atrás do card "On Fire"
+// no Ranking. Ver override de lint no eslint.config.js.
+// ============================================================
 import { useRef, useEffect, useState } from 'react';
 import { Renderer, Program, Triangle, Mesh } from 'ogl';
 

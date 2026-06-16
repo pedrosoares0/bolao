@@ -57,6 +57,11 @@ export function calculateStandings(
   const pricePerDay = 2.50;
   const totalPaidPerParticipant = totalDays * pricePerDay;
 
+  // Índice O(1) das apostas por (participante + jogo). Montado uma única vez,
+  // evita o filter()+find() por participante×jogo (custo O(n²)) no loop abaixo.
+  const betIndex = new Map<string, Bet>();
+  bets.forEach((b) => betIndex.set(`${b.participantId}|${b.matchId}`, b));
+
   const standings: ParticipantStanding[] = participants.map((p) => {
     let points = 0;
     let exactScoreCount = 0;
@@ -65,13 +70,10 @@ export function calculateStandings(
     let wrongCount = 0;
     let totalBets = 0;
 
-    // Filtra palpites deste participante
-    const participantBets = bets.filter((b) => b.participantId === p.id);
-
     matches.forEach((match) => {
-      // Encontra a aposta para este jogo
-      const bet = participantBets.find((b) => b.matchId === match.id);
-      
+      // Encontra a aposta deste participante para este jogo
+      const bet = betIndex.get(`${p.id}|${match.id}`);
+
       if (match.status === 'finished' && match.homeScore !== null && match.awayScore !== null) {
         totalBets++;
         const analysis = analyzeBet(bet, match);

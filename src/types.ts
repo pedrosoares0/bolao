@@ -1,3 +1,7 @@
+// Tipos de domínio compartilhados pelo app (participantes, jogos, apostas,
+// palpites especiais, classificação e fiados). As linhas cruas do banco
+// (BetRow/MatchDbRow) ficam em App.tsx e são convertidas para estes tipos.
+
 export interface Participant {
   id: string; // username (ex: 'pedro') — usado nos caminhos de imagem e no ranking
   uid?: string; // uuid do Supabase Auth
