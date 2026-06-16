@@ -20,8 +20,10 @@ Netlify (site estático)
  │                                 ▲ RPC submit_bets: rejeita aposta após o início do jogo
  └── Functions
       ├── sync-matches       (HTTP: chamada quando o app abre, com throttle de 3 min)
-      └── sync-matches-cron  (agendada: a cada 2 min)
-            └─► football-data.org ──► upsert na tabela matches
+      └── sync-matches-cron  (agendada: a cada 1 min)
+            └─► football-data.org ──► jogos, IDs, fases e resultado oficial (fonte/fallback)
+            └─► ESPN (API pública) ──► placar/tempo AO VIVO sobrepõe o football-data
+                                  └─► upsert na tabela matches
                                   └─► compara estado antigo × novo
                                         └─► Evolution API ──► grupo do WhatsApp
 ```
@@ -38,6 +40,7 @@ Netlify (site estático)
    - [`update-005-notificacoes-whatsapp.sql`](supabase/update-005-notificacoes-whatsapp.sql) cria a tabela `sent_notifications` usada pelas notificações do WhatsApp (sem ela, **nenhuma** mensagem é enviada — proteção contra spam).
    - [`update-005-fiados.sql`](supabase/update-005-fiados.sql) cria a caderneta de fiados (`debts`) com RLS: cada um só pendura/quita o **próprio** fiado.
    - [`update-006-debts-realtime.sql`](supabase/update-006-debts-realtime.sql) coloca os fiados no Realtime (só precisa se você rodou o `realtime.sql` antigo, sem `debts`).
+   - [`update-007-espn-ao-vivo.sql`](supabase/update-007-espn-ao-vivo.sql) adiciona a coluna `live_clock` usada pelo placar/tempo ao vivo da ESPN.
 5. Edite as 4 senhas em [`supabase/seed.sql`](supabase/seed.sql) e rode-o (cria os usuários pedro/alex/rodrigo/neto).
    - Se der erro, crie os usuários manualmente em **Authentication > Users > Add user** com e-mails `pedro@bolao.app` etc. e "Auto Confirm" — o perfil é criado sozinho.
 
@@ -90,6 +93,17 @@ npm run build     # build de produção (tsc -b + vite build)
 - **Desempate no ranking**: pontos > placares exatos > empates certos > vencedores certos > nome.
 - **Prêmio**: R$ 2,50 por pessoa por dia com jogos finalizados; o card do Ranking soma tudo.
 
+## 📡 Dados dos jogos (fonte híbrida)
+
+Para ter **ao vivo rápido sem pagar**, o app usa duas fontes que se complementam:
+
+- **football-data.org** (oficial, com chave): é a **fonte da verdade** — define a lista de jogos, os **IDs** (que as apostas referenciam), as fases e o **resultado oficial**. É também o **fallback**.
+- **ESPN** (API pública, sem chave): entra **só como turbo do ao vivo**. A cada sincronização, o backend busca o scoreboard da Copa na ESPN (muito mais rápido que o football-data free) e **sobrepõe o placar, o status e o minuto** (`live_clock`, ex.: `28'`) nos jogos que casam por **par de seleções + dia**.
+
+Se a ESPN cair, sair do ar ou mudar o formato, o `mergeEspnLive` simplesmente devolve os dados do football-data — **nada quebra** e o ranking continua correto. Toda a lógica da ESPN fica isolada em [`netlify/shared/espn-core.mts`](netlify/shared/espn-core.mts).
+
+> ⚠️ A API da ESPN é **não documentada** (pode mudar sem aviso) — por isso ela **nunca** é a fonte única: é só uma camada de velocidade por cima da fonte oficial.
+
 ## 📲 Notificações no WhatsApp
 
 A cada sincronização (cron de ~2 min), o backend compara o estado **anterior** dos jogos com o **novo** e dispara mensagens no grupo via Evolution API. Cada mensagem tem uma chave única em `sent_notifications`, então **nunca é enviada duas vezes** (ex.: "Gol 1x0" não repete).
@@ -138,7 +152,8 @@ A regra de ouro: **o navegador nunca é confiável**. A chave que o front usa (`
 - `src/utils/shareRanking.ts` — gera/compartilha a imagem do ranking (canvas).
 - `src/components/` — abas (`StandingsTable`, `PixTab`, `PalpitesTab`) e fundos WebGL vendados (`Aurora`, `LightRays`).
 - `netlify/functions/` — sincronização dos jogos (HTTP + cron a cada 2 min).
-- `netlify/shared/sync-core.mts` — busca jogos na football-data.org, faz upsert e aciona as notificações.
+- `netlify/shared/sync-core.mts` — busca jogos na football-data.org, mescla o ao vivo da ESPN, faz upsert e aciona as notificações.
+- `netlify/shared/espn-core.mts` — placar/tempo ao vivo da API pública da ESPN (turbo do ao vivo, com fallback).
 - `netlify/shared/notify-core.mts` — monta e envia as mensagens do WhatsApp (Evolution API).
 - `supabase/` — SQL de schema, seed e migrations (`update-00X-*.sql`).
 - `docs/` — documentação de arquitetura. Ver [`docs/ESCALABILIDADE.md`](docs/ESCALABILIDADE.md) (plano para virar plataforma multi-grupo com parceiros, prêmios e infra por fases).

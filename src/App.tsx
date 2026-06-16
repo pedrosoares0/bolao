@@ -96,6 +96,7 @@ interface MatchDbRow {
   home_score: number | null;
   away_score: number | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
+  live_clock: string | null;
 }
 
 // Converte uma linha da tabela `matches` do Supabase para o formato do app
@@ -125,6 +126,7 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     stage: r.stage ?? 'GROUP_STAGE',
     winner: r.winner ?? null,
     isLive: ['IN_PLAY', 'PAUSED', 'LIVE', 'EXTRA_TIME', 'PENALTY_SHOOTOUT'].includes(r.status?.toUpperCase() || ''),
+    liveClock: r.live_clock ?? null,
   };
 };
 
@@ -262,7 +264,7 @@ function App() {
         supabase
           .from('matches')
           .select(
-            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner'
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock'
           )
           .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score'),
@@ -929,7 +931,7 @@ function App() {
                           {match.isLive ? (
                             <span className="live-badge-p16">
                               <span className="live-dot-p16"></span>
-                              AO VIVO
+                              AO VIVO{match.liveClock ? ` · ${match.liveClock}` : ''}
                             </span>
                           ) : isFinished ? (
                             <span className="finished-badge-p16">

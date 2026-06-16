@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { runNotifications } from './notify-core.mts';
+import { fetchEspnOverrides, norm, pairKey } from './espn-core.mts';
 
 // ---- Formato cru de uma partida na football-data.org (só os campos que usamos) ----
 interface ApiTeam {
@@ -27,6 +28,26 @@ interface PrevState {
   status: string;
   home_score: number | null;
   away_score: number | null;
+}
+
+// ---- Linha gravada na tabela `matches` (o que montamos para o upsert) ----
+interface MatchUpsertRow {
+  id: number;
+  utc_date: string;
+  status: string;
+  stage: string | null;
+  group_name: string | null;
+  home_team: string;
+  away_team: string;
+  home_tla: string;
+  away_tla: string;
+  home_crest: string;
+  away_crest: string;
+  home_score: number | null;
+  away_score: number | null;
+  winner: string | null;
+  live_clock: string | null;
+  updated_at: string;
 }
 
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
@@ -58,7 +79,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
   }
 
   const data = (await res.json()) as { matches?: ApiMatch[] };
-  const rows = (data.matches ?? []).map((m) => ({
+  const rows: MatchUpsertRow[] = (data.matches ?? []).map((m): MatchUpsertRow => ({
     id: m.id,
     utc_date: m.utcDate,
     status: m.status,
@@ -73,26 +94,33 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     home_score: m.score?.fullTime?.home ?? null,
     away_score: m.score?.fullTime?.away ?? null,
     winner: m.score?.winner ?? null,
+    live_clock: null, // preenchido abaixo com o minuto da ESPN, quando ao vivo
     updated_at: new Date().toISOString(),
   }));
 
-  if (rows.length > 0) {
+  // ---- AO VIVO via ESPN (best-effort, com fallback no football-data) ----
+  // Buscamos o placar/tempo ao vivo na ESPN (mais rápida) e sobrescrevemos as
+  // linhas do football-data quando casamos o confronto (por par de seleções +
+  // dia). Se a ESPN falhar/cair, `mergedRows` = `rows` e nada muda.
+  const mergedRows = await mergeEspnLive(rows);
+
+  if (mergedRows.length > 0) {
     // Estado ANTERIOR (antes de sobrescrever) — usado para detectar
     // transições (começou / gol / intervalo / fim) e notificar o WhatsApp.
     const { data: prevRows } = await supabase
       .from('matches')
       .select('id, status, home_score, away_score')
-      .in('id', rows.map((r) => r.id));
+      .in('id', mergedRows.map((r) => r.id));
     const prevById = new Map(
       ((prevRows ?? []) as PrevState[]).map((r) => [r.id, r] as const)
     );
 
-    const { error } = await supabase.from('matches').upsert(rows);
+    const { error } = await supabase.from('matches').upsert(mergedRows);
     if (error) throw new Error(`Erro ao gravar partidas no Supabase: ${error.message}`);
 
     // Notificações são best-effort: nunca derrubam a sincronização.
     try {
-      await runNotifications(supabase, prevById, rows);
+      await runNotifications(supabase, prevById, mergedRows);
     } catch (err) {
       console.error('Falha ao enviar notificações:', err);
     }
@@ -100,5 +128,42 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
 
   await supabase.from('sync_state').upsert({ id: 1, last_sync: new Date().toISOString() });
 
-  return { skipped: false, count: rows.length };
+  return { skipped: false, count: mergedRows.length };
+}
+
+// Sobrepõe o placar/tempo AO VIVO da ESPN nas linhas do football-data.
+// É best-effort: se a ESPN cair (rede/403/formato), devolve as linhas
+// originais — o football-data continua sendo a fonte (fallback).
+async function mergeEspnLive(rows: MatchUpsertRow[]): Promise<MatchUpsertRow[]> {
+  let overrides;
+  try {
+    overrides = await fetchEspnOverrides();
+  } catch (err) {
+    console.warn('ESPN indisponível — usando football-data (fallback):', err);
+    return rows;
+  }
+  if (overrides.size === 0) return rows;
+
+  let applied = 0;
+  const merged = rows.map((r) => {
+    const ov = overrides.get(pairKey(r.home_team, r.away_team));
+    if (!ov) return r;
+    // Confere que é o MESMO dia (UTC) — evita casar um confronto que se repete
+    // (ex.: mesmas seleções na fase de grupos e depois no mata-mata).
+    if (ov.dateIso && r.utc_date.slice(0, 10) !== ov.dateIso) return r;
+    // Alinha o placar à orientação (mandante/visitante) do football-data,
+    // caso a ESPN liste os times na ordem inversa.
+    const fdHomeIsEspnHome = norm(r.home_team) === ov.homeNorm;
+    applied++;
+    return {
+      ...r,
+      status: ov.status,
+      home_score: fdHomeIsEspnHome ? ov.homeScore : ov.awayScore,
+      away_score: fdHomeIsEspnHome ? ov.awayScore : ov.homeScore,
+      live_clock: ov.liveClock,
+    };
+  });
+
+  if (applied > 0) console.log(`ESPN: placar ao vivo aplicado em ${applied} jogo(s).`);
+  return merged;
 }
