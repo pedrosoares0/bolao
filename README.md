@@ -124,7 +124,10 @@ A regra de ouro: **o navegador nunca é confiável**. A chave que o front usa (`
 - **Lint**: ESLint cobre o app (React) e as Netlify Functions (`.mts`).
 - **Type-check**: `tsc -b` valida o app **e** as funções (via `tsconfig.netlify.json`).
 - **Testes** (Vitest): `src/utils/rules.test.ts` (pontuação/ranking/palpites especiais) e `src/utils/pot.test.ts` (pote acumulado) — a "regra do dinheiro" não pode ter bug.
-- **CI** (GitHub Actions, [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): roda lint + type-check + testes + build a cada push/PR.
+- **Antes de cada push**, rode os checks localmente:
+  ```bash
+  npm run lint && npx tsc -b && npm test && npm run build
+  ```
 
 ## 📁 Estrutura
 
