@@ -4885,3 +4885,73 @@ body {
   text-align: center;
 }
 
+
+/* ==========================================================================
+   EFEITOS DE FUNDO EM CSS (substituem o WebGL/ogl) — leves e universais
+   ========================================================================== */
+
+/* AURORA — brilho dourado fluido no topo (atrás do MVP e do pódio) */
+.aurora-css {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    radial-gradient(55% 70% at 22% 0%, var(--aurora-c1, #f5b300), transparent 60%),
+    radial-gradient(55% 70% at 78% 0%, var(--aurora-c3, #c58c00), transparent 60%),
+    radial-gradient(80% 65% at 50% -8%, var(--aurora-c2, #ffe066), transparent 62%);
+  background-repeat: no-repeat;
+  background-size: 150% 150%, 150% 150%, 170% 150%;
+  filter: blur(28px) saturate(1.15);
+  animation: auroraShift 11s ease-in-out infinite alternate;
+}
+@keyframes auroraShift {
+  0%   { background-position: 0% 0%, 100% 0%, 50% 0%; }
+  100% { background-position: 42% 7%, 60% 3%, 56% 9%; }
+}
+
+/* LIGHT RAYS — raios + brilho pulsante (vermelho) do card "On Fire" */
+.lightrays-css {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+/* base: brilho que sobe do rodapé, pulsando */
+.lightrays-css::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(75% 95% at 50% 118%, var(--rays-color, #ff4d1c), transparent 64%);
+  opacity: 0.5;
+  animation: raysPulse 2.6s ease-in-out infinite;
+}
+/* raios saindo da base-centro */
+.lightrays-css::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -25%;
+  width: 170%;
+  aspect-ratio: 1 / 1;
+  transform: translateX(-50%);
+  background: repeating-conic-gradient(from 180deg at 50% 100%,
+    var(--rays-color, #ff4d1c) 0deg 1.4deg, transparent 1.4deg 9deg);
+  -webkit-mask-image: radial-gradient(72% 72% at 50% 100%, #000 0%, transparent 72%);
+  mask-image: radial-gradient(72% 72% at 50% 100%, #000 0%, transparent 72%);
+  opacity: 0.16;
+  animation: raysPulse 2.6s ease-in-out infinite;
+}
+@keyframes raysPulse {
+  0%, 100% { opacity: 0.14; }
+  50%      { opacity: 0.34; }
+}
+
+/* Respeita quem prefere menos animação */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-css, .lightrays-css::before, .lightrays-css::after { animation: none; }
+}
