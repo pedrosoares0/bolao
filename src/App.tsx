@@ -345,18 +345,48 @@ function App() {
 
     initialLoad();
 
-    // Atualizações ao vivo via Supabase Realtime: qualquer mudança em
-    // jogos/apostas/lançamentos recarrega os dados. O debounce agrupa as
-    // rajadas de eventos (a sincronização atualiza ~104 jogos de uma vez).
+    // Atualizações ao vivo via Supabase Realtime. Para as outras tabelas
+    // (apostas/lançamentos/fiados) recarrega tudo com debounce. O debounce agrupa
+    // as rajadas de eventos (a sincronização atualiza ~104 jogos de uma vez).
     let reloadTimer: number | undefined;
     const scheduleReload = () => {
       window.clearTimeout(reloadTimer);
       reloadTimer = window.setTimeout(() => loadAll(uid, false), 800);
     };
 
+    // Placar AO VIVO instantâneo: em vez de rebuscar tudo do servidor, aplica a
+    // própria linha que veio no evento do Realtime direto no estado. O número
+    // muda na hora (sem ida extra ao banco) e alivia a carga. Um micro-debounce
+    // de 200ms agrupa a rajada do sync completo num único setMatches.
+    const pendingMatches = new Map<string, Match>();
+    let matchFlushTimer: number | undefined;
+    const flushMatches = () => {
+      if (pendingMatches.size === 0) return;
+      const updates = new Map(pendingMatches);
+      pendingMatches.clear();
+      setMatches((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        updates.forEach((m, id) => byId.set(id, m));
+        return Array.from(byId.values()).sort(
+          (a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff)
+        );
+      });
+    };
+    const onMatchChange = (payload: { eventType: string; new: Partial<MatchDbRow> }) => {
+      const row = payload.new;
+      // DELETE (ou payload sem dados) é raro aqui — cai no reload completo.
+      if (payload.eventType === 'DELETE' || row?.id == null) {
+        scheduleReload();
+        return;
+      }
+      pendingMatches.set(String(row.id), mapRowToMatch(row as MatchDbRow));
+      window.clearTimeout(matchFlushTimer);
+      matchFlushTimer = window.setTimeout(flushMatches, 200);
+    };
+
     const channel = supabase
       .channel('bolao-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, onMatchChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, scheduleReload)
@@ -367,6 +397,7 @@ function App() {
 
     return () => {
       window.clearTimeout(reloadTimer);
+      window.clearTimeout(matchFlushTimer);
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
