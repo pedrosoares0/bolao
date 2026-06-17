@@ -20,6 +20,10 @@ dist-ssr
 # Netlify
 .netlify
 
+# Apresentação em Remotion (projeto separado — não vai pro app/deploy)
+apresentacao/
+apresentacao-remotion/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

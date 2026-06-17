@@ -895,11 +895,20 @@ function App() {
     return (
       <div className="splash-screen" onClick={() => setCurrentScreen(currentUser ? 'app' : 'login')}>
         <video
-          ref={splashVideoRef}
+          // ref callback: garante a PROPRIEDADE muted no instante em que o
+          // elemento monta — ANTES de qualquer tentativa de play (o iOS exige
+          // isso e o React nem sempre seta a propriedade só pelo atributo).
+          ref={(el) => {
+            splashVideoRef.current = el;
+            if (el) { el.muted = true; el.defaultMuted = true; }
+          }}
           src={splashVideo === 'intro' ? '/imagens/intro.mp4' : '/imagens/reload.mp4'}
-          autoPlay
           muted
           playsInline
+          // Sem `autoPlay`: o atributo dispara cedo demais (antes do muted valer)
+          // e o iOS bloqueia mostrando o botão de play. Disparamos o play() nós
+          // mesmos quando o vídeo está pronto, já com muted garantido.
+          onLoadedData={(e) => { e.currentTarget.play().catch(() => {}); }}
           className="splash-gif"
           onEnded={() => setCurrentScreen(currentUser ? 'app' : 'login')}
         />
