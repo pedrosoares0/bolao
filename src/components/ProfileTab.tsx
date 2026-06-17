@@ -177,6 +177,13 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             amplitude={1.0}
             speed={0.45}
           />
+          <div className="card-particles">
+            <div className="particle p1"></div>
+            <div className="particle p2"></div>
+            <div className="particle p3"></div>
+            <div className="particle p4"></div>
+            <div className="particle p5"></div>
+          </div>
           <div className="achievement-rect-left">
             <span className="achievement-rect-emoji animate-pulse">🔥</span>
           </div>
@@ -190,6 +197,9 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                   className="onfire-progress-fill"
                   style={{ width: `${(Math.min(userFire.currentStreak, 5) / 5) * 100}%` }}
                 />
+                {Math.min(userFire.currentStreak, 5) < 5 && (
+                  <div className="onfire-progress-milestone-dot" />
+                )}
               </div>
               <span className="onfire-progress-label">{Math.min(userFire.currentStreak, 5)}/5</span>
             </div>
@@ -207,6 +217,13 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             amplitude={1.0}
             speed={0.45}
           />
+          <div className="card-particles">
+            <div className="particle p1"></div>
+            <div className="particle p2"></div>
+            <div className="particle p3"></div>
+            <div className="particle p4"></div>
+            <div className="particle p5"></div>
+          </div>
           <div className="achievement-rect-left">
             <span className="achievement-rect-emoji">🔮</span>
           </div>
@@ -286,8 +303,8 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
               const bet = c.bet;
               const isProfeta = c.type === 'profeta';
 
-              const badgeClass = isProfeta ? 'exact' : 'pe-frio-badge';
-              const badgeText = isProfeta ? '🔮 PROFETA (+3 PTS)' : 'PÉ FRIO (0 PTS)';
+              const badgeClass = isProfeta ? 'profeta-badge' : 'pe-frio-badge';
+              const badgeText = isProfeta ? '🔮 PROFETA' : 'PÉ FRIO';
 
               return (
                 <div key={idx} className="history-row">
@@ -344,27 +361,48 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                   )}
                 </div>
               );
-            } else {
-              // Conquistas de ON FIRE ou MVP (não associadas a um jogo específico)
-              const isMvp = c.type === 'mvp';
-              const badgeClass = isMvp ? 'draw' : 'winner';
-              const badgeText = isMvp ? 'MVP DA RODADA' : 'ON FIRE!';
-
+            } else if (c.type === 'mvp') {
               return (
                 <div key={idx} className="history-row">
                   <div className="history-row-header">
                     <span className="history-date">Rodada · {c.date}</span>
-                    <div className={`inline-guess-badge-p16 ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {isMvp ? (
-                        <img
-                          src="/imagens/coroa-mvp.png"
-                          alt="MVP"
-                          style={{ width: '12px', height: '12px', objectFit: 'contain' }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: '10px' }}>🔥</span>
-                      )}
-                      <span>{badgeText}</span>
+                    <div className="inline-guess-badge-p16 mvp-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <img
+                        src="/imagens/coroa-mvp.png"
+                        alt="MVP"
+                        style={{ width: '12px', height: '12px', objectFit: 'contain' }}
+                      />
+                      <span>MVP DA RODADA</span>
+                    </div>
+                  </div>
+
+                  <div className="mvp-timeline-body">
+                    <h4 className="mvp-timeline-title">🏆 MELHOR DESEMPENHO DO DIA</h4>
+                    <div className="mvp-timeline-stats">
+                      <div className="mvp-timeline-stat-box">
+                        <span className="stat-value">{c.points ?? 0}</span>
+                        <span className="stat-label">Pontos</span>
+                      </div>
+                      <div className="mvp-timeline-stat-box">
+                        <span className="stat-value">{c.exacts ?? 0}</span>
+                        <span className="stat-label">{c.exacts === 1 ? 'Placar Exato' : 'Placares Exatos'}</span>
+                      </div>
+                    </div>
+                    <div className="mvp-timeline-desc">
+                      Você foi o participante que mais pontuou nesta rodada!
+                    </div>
+                  </div>
+                </div>
+              );
+            } else {
+              // Conquistas de ON FIRE (não associadas a um jogo específico)
+              return (
+                <div key={idx} className="history-row">
+                  <div className="history-row-header">
+                    <span className="history-date">Rodada · {c.date}</span>
+                    <div className="inline-guess-badge-p16 onfire-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '10px' }}>🔥</span>
+                      <span>ON FIRE!</span>
                     </div>
                   </div>
 

@@ -286,6 +286,8 @@ export interface Conquest {
   timestamp: number;
   match?: Match;
   bet?: Bet;
+  points?: number;
+  exacts?: number;
 }
 
 // Compila a linha do tempo cronológica de conquistas de um participante
@@ -412,12 +414,15 @@ export function calculateConquestTimeline(
         const dateLabel = dayMatches[0]?.date ?? '';
         // Kickoff mais recente do dia para ordenar
         const maxKickoff = Math.max(...dayMatches.map((m) => Date.parse(m.kickoff)));
+        const exactsText = maxExacts === 1 ? '1 placar exato' : maxExacts > 1 ? `${maxExacts} placares exatos` : 'nenhum placar exato';
         conquestTimeline.push({
           type: 'mvp',
           date: dateLabel,
           title: '🏆 MVP da Rodada',
-          description: `Melhor pontuador do dia com ${maxPts} pontos (${maxExacts} placar(es) exato(s))`,
+          description: `Melhor pontuador da rodada: fez ${maxPts} pontos e cravou ${exactsText}.`,
           timestamp: maxKickoff + 4,
+          points: maxPts,
+          exacts: maxExacts,
         });
       }
     }

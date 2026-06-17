@@ -13,7 +13,7 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
@@ -1229,13 +1229,12 @@ function App() {
               {/* ACTION BAR DE LANÇAMENTO (exibe quando a rodada está aberta e há partidas jogáveis) */}
               {playableMatches.length > 0 && (
                 <div className="launch-action-bar-p16">
-                  <div className="launch-edit-icon-circle-p16">
-                    {isSubmittedForSelectedDate && !hasChangesToLaunch ? <CheckSquare size={18} color="#ffffff" /> : <PencilLine size={18} color="#ffffff" />}
-                  </div>
-
                   {isSubmittedForSelectedDate && !hasChangesToLaunch ? (
                     <button className="launch-bet-btn-p16 submitted" disabled>
-                      APOSTA LANÇADA
+                      <span className="launch-bet-btn-inner">
+                        <span>APOSTA LANÇADA</span>
+                        <Clover size={18} className="launch-btn-icon" />
+                      </span>
                     </button>
                   ) : (
                     <button
@@ -1243,7 +1242,10 @@ function App() {
                       disabled={!areAllPredictionsFilled}
                       onClick={handleLaunchBets}
                     >
-                      LANÇAR APOSTA
+                      <span className="launch-bet-btn-inner">
+                        <span>LANÇAR APOSTA</span>
+                        <Clover size={18} className="launch-btn-icon" />
+                      </span>
                     </button>
                   )}
                 </div>
