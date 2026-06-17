@@ -183,6 +183,16 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           <div className="achievement-rect-middle">
             <span className="achievement-rect-title">ON FIRE</span>
             <span className="achievement-rect-desc">Pontuou em 5 jogos seguidos ou acertou 3 placares exatos em sequência.</span>
+            {/* Progresso rumo ao próximo fogo pela regra dos 5 jogos pontuando */}
+            <div className="onfire-progress">
+              <div className="onfire-progress-track">
+                <div
+                  className="onfire-progress-fill"
+                  style={{ width: `${(Math.min(userFire.currentStreak, 5) / 5) * 100}%` }}
+                />
+              </div>
+              <span className="onfire-progress-label">{Math.min(userFire.currentStreak, 5)}/5</span>
+            </div>
           </div>
           <div className="achievement-rect-right">
             <span className="achievement-rect-count">{userFire.fires}</span>
