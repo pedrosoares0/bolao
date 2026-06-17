@@ -4912,7 +4912,9 @@ body {
   100% { background-position: 42% 7%, 60% 3%, 56% 9%; }
 }
 
-/* LIGHT RAYS — raios + brilho pulsante (vermelho) do card "On Fire" */
+/* LIGHT RAYS — raios + brilho pulsante (vermelho) do card "On Fire".
+   Altura EXPLÍCITA nos raios (não usar aspect-ratio: alguns navegadores
+   calculam altura 0 e os raios somem — era o caso aqui). */
 .lightrays-css {
   position: absolute;
   inset: 0;
@@ -4921,34 +4923,36 @@ body {
   overflow: hidden;
   border-radius: inherit;
 }
-/* base: brilho que sobe do rodapé, pulsando */
-.lightrays-css::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(75% 95% at 50% 118%, var(--rays-color, #ff4d1c), transparent 64%);
-  opacity: 0.5;
-  animation: raysPulse 2.6s ease-in-out infinite;
-}
 /* raios saindo da base-centro */
 .lightrays-css::before {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -25%;
-  width: 170%;
-  aspect-ratio: 1 / 1;
+  bottom: -75%;
+  width: 220%;
+  height: 220%;
   transform: translateX(-50%);
   background: repeating-conic-gradient(from 180deg at 50% 100%,
-    var(--rays-color, #ff4d1c) 0deg 1.4deg, transparent 1.4deg 9deg);
-  -webkit-mask-image: radial-gradient(72% 72% at 50% 100%, #000 0%, transparent 72%);
-  mask-image: radial-gradient(72% 72% at 50% 100%, #000 0%, transparent 72%);
-  opacity: 0.16;
-  animation: raysPulse 2.6s ease-in-out infinite;
+    transparent 0deg 3.6deg,
+    var(--rays-color, #ff4d1c) 3.6deg 5.2deg,
+    transparent 5.2deg 9deg);
+  -webkit-mask-image: radial-gradient(58% 62% at 50% 100%, #000 8%, transparent 78%);
+  mask-image: radial-gradient(58% 62% at 50% 100%, #000 8%, transparent 78%);
+  opacity: 0.42;
+  animation: raysGlow 3.2s ease-in-out infinite;
 }
-@keyframes raysPulse {
-  0%, 100% { opacity: 0.14; }
-  50%      { opacity: 0.34; }
+/* brilho que sobe do rodapé, pulsando */
+.lightrays-css::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(72% 85% at 50% 114%, var(--rays-color, #ff4d1c), transparent 60%);
+  opacity: 0.6;
+  animation: raysGlow 3.2s ease-in-out infinite;
+}
+@keyframes raysGlow {
+  0%, 100% { opacity: 0.34; }
+  50%      { opacity: 0.64; }
 }
 
 /* Respeita quem prefere menos animação */
