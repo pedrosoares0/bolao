@@ -108,18 +108,28 @@ export function calculateStandings(
     };
   });
 
+  const fireCounts = calculateFireCounts(matches, bets, participants);
+  const peFrioCounts = calculatePeFrioCounts(matches, bets, participants);
+
   // Ordena por:
   // 1. Pontos (decrescente)
-  // 2. Número de placares exatos (decrescente)
-  // 3. Número de empates corretos (decrescente)
-  // 4. Número de vencedores corretos (decrescente)
-  // 5. Nome (alfabética)
+  // 2. Mais ON FIRE (fires) (decrescente)
+  // 3. Mais Profeta (exactScoreCount) (decrescente)
+  // 4. Menos Pé Frio (peFrioCounts) (crescente)
   return standings.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
+
+    const firesA = fireCounts[a.participantId]?.fires || 0;
+    const firesB = fireCounts[b.participantId]?.fires || 0;
+    if (firesB !== firesA) return firesB - firesA;
+
     if (b.exactScoreCount !== a.exactScoreCount) return b.exactScoreCount - a.exactScoreCount;
-    if (b.correctDrawCount !== a.correctDrawCount) return b.correctDrawCount - a.correctDrawCount;
-    if (b.correctWinnerCount !== a.correctWinnerCount) return b.correctWinnerCount - a.correctWinnerCount;
-    return a.name.localeCompare(b.name);
+
+    const peFrioA = peFrioCounts[a.participantId] || 0;
+    const peFrioB = peFrioCounts[b.participantId] || 0;
+    if (peFrioA !== peFrioB) return peFrioA - peFrioB; // Menos Pé Frio prevalece (ordem crescente)
+
+    return 0;
   });
 }
 

@@ -178,13 +178,34 @@ describe('calculateStandings', () => {
     expect(standings[0].totalPaid).toBe(5.0);
   });
 
-  it('desempata por número de placares exatos', () => {
+  it('desempata por mais ON FIRE (fires) antes de exatos', () => {
+    // 5 partidas finalizadas para Pedro conseguir sequência ON FIRE de 5
+    const matches = Array.from({ length: 5 }, (_, i) =>
+      finishedMatch(1, 0, { id: `m${i}`, kickoff: `2026-06-12T10:0${i}:00Z` })
+    );
+    // Pedro: 5 acertos vencedores = 5 pontos (1 fire, 0 exatos)
+    // Alex: 1 acerto exato + 2 acertos vencedores = 5 pontos (0 fire, 1 exato)
+    const bets = [
+      ...matches.map((m) => makeBet(2, 0, 'pedro', m.id)), // todos vencedor mandante (5 pts)
+      makeBet(1, 0, 'alex', 'm0'), // exato (3 pts)
+      makeBet(2, 0, 'alex', 'm1'), // vencedor (1 pt)
+      makeBet(2, 0, 'alex', 'm2'), // vencedor (1 pt)
+      // restando m3 e m4 sem aposta de alex para pontuar
+    ];
+
+    const standings = calculateStandings([alex, pedro], matches, bets);
+    expect(standings[0].points).toBe(5);
+    expect(standings[1].points).toBe(5);
+    expect(standings[0].participantId).toBe('pedro'); // Mais ON FIRE (1 vs 0) vence, mesmo Alex tendo mais exatos
+  });
+
+  it('desempata por número de placares exatos (caso pontos e onfire sejam iguais)', () => {
     const matches = [
       finishedMatch(2, 1, { id: 'm1' }),
       finishedMatch(1, 1, { id: 'm2' }),
       finishedMatch(3, 0, { id: 'm3' }),
     ];
-    // pedro: 1 exato (3 pts) | alex: 1 empate + 1 vencedor (2+1 = 3 pts)
+    // pedro: 1 exato (3 pts, 0 fires) | alex: 1 empate + 1 vencedor (2+1 = 3 pts, 0 fires)
     const bets = [
       makeBet(2, 1, 'pedro', 'm1'),
       makeBet(0, 0, 'alex', 'm2'),
@@ -194,13 +215,55 @@ describe('calculateStandings', () => {
     const standings = calculateStandings([alex, pedro], matches, bets);
     expect(standings[0].points).toBe(3);
     expect(standings[1].points).toBe(3);
-    expect(standings[0].participantId).toBe('pedro'); // mais exatos vence o empate
+    expect(standings[0].participantId).toBe('pedro'); // mais exatos (1 vs 0) vence
   });
 
-  it('desempata por ordem alfabética quando tudo é igual', () => {
+  it('desempata por menos Pé Frio quando pontos, onfire e exatos são iguais', () => {
+    const bruno = makeParticipant('bruno', 'Bruno');
+    const matches = [
+      finishedMatch(1, 0, { id: 'm0' }),
+      finishedMatch(2, 0, { id: 'm1' }),
+      finishedMatch(3, 0, { id: 'm2' }),
+    ];
+    const bets = [
+      // m0: pedro e alex exato (3 pts), bruno erra (0 pt)
+      makeBet(1, 0, 'pedro', 'm0'),
+      makeBet(1, 0, 'alex', 'm0'),
+      makeBet(0, 0, 'bruno', 'm0'),
+
+      // m1: pedro erra (0 pt), alex vencedor (1 pt), bruno vencedor (1 pt)
+      // Pedro é o único a zerar (Pé Frio = 1)
+      makeBet(0, 1, 'pedro', 'm1'),
+      makeBet(1, 0, 'alex', 'm1'),
+      makeBet(1, 0, 'bruno', 'm1'),
+
+      // m2: pedro vencedor (1 pt), alex erra (0 pt), bruno erra (0 pt)
+      // Alex não é Pé Frio porque bruno também errou
+      makeBet(2, 0, 'pedro', 'm2'),
+      makeBet(0, 1, 'alex', 'm2'),
+      makeBet(0, 1, 'bruno', 'm2'),
+    ];
+
+    // Pontos totais:
+    // Pedro: 3 (m0) + 0 (m1) + 1 (m2) = 4 pts. exatos = 1. fires = 0. pé frio = 1.
+    // Alex: 3 (m0) + 1 (m1) + 0 (m2) = 4 pts. exatos = 1. fires = 0. pé frio = 0.
+    const standings = calculateStandings([pedro, alex, bruno], matches, bets);
+    const pedroStanding = standings.find(s => s.participantId === 'pedro')!;
+    const alexStanding = standings.find(s => s.participantId === 'alex')!;
+
+    expect(pedroStanding.points).toBe(4);
+    expect(alexStanding.points).toBe(4);
+    expect(standings[0].participantId).toBe('alex'); // alex vence no tiebreak por ter menos pé frio (0 vs 1)
+  });
+
+  it('mantém a ordem original quando tudo é igual', () => {
     const standings = calculateStandings([pedro, alex], [], []);
-    expect(standings[0].name).toBe('Alex');
-    expect(standings[1].name).toBe('Pedro');
+    expect(standings[0].participantId).toBe('pedro');
+    expect(standings[1].participantId).toBe('alex');
+
+    const standings2 = calculateStandings([alex, pedro], [], []);
+    expect(standings2[0].participantId).toBe('alex');
+    expect(standings2[1].participantId).toBe('pedro');
   });
 
   it('soma 5 pontos para o palpite certo de campeão', () => {
