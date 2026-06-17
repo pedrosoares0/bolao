@@ -171,12 +171,17 @@ body {
 }
 
 /* ==========================================================================
-   SPLASH SCREEN — INTRO.GIF FULLSCREEN
+   SPLASH SCREEN — INTRO.MP4 FULLSCREEN
    ========================================================================== */
 
 .splash-screen {
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
   z-index: 9999;
   background-color: #0a0a0a;
   display: flex;
@@ -185,23 +190,25 @@ body {
   cursor: pointer;
 }
 
+.splash-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0) 25%,
+    rgba(0, 0, 0, 0) 75%,
+    rgba(0, 0, 0, 0.45) 100%
+  );
+  z-index: 10;
+}
+
 .splash-gif {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-@media (min-width: 481px) {
-  .splash-screen {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .splash-gif {
-    max-width: 480px;
-    height: auto;
-    object-fit: contain;
-  }
 }
 
 /* ==========================================================================
@@ -1202,6 +1209,36 @@ body {
 .first-place-card {
   height: 255px; /* Taller card container since image fills the card */
   background-color: #0e0a09;
+  animation: subtleFloatGold 4.5s ease-in-out infinite;
+}
+
+.first-place-card:hover {
+  animation-play-state: paused;
+  transform: translateY(-6px);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(245, 179, 0, 0.4);
+}
+
+@keyframes subtleFloatGold {
+  0% {
+    transform: translateY(0);
+    box-shadow: 
+      0 15px 35px rgba(0, 0, 0, 0.6),
+      0 0 15px rgba(245, 179, 0, 0.12);
+  }
+  50% {
+    transform: translateY(-5px);
+    box-shadow: 
+      0 20px 40px rgba(0, 0, 0, 0.65),
+      0 0 25px rgba(245, 179, 0, 0.22);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 
+      0 15px 35px rgba(0, 0, 0, 0.6),
+      0 0 15px rgba(245, 179, 0, 0.12);
+  }
 }
 
 /* Edge-to-edge card background image */
@@ -1385,7 +1422,7 @@ body {
 
 .podium-player-name {
   font-family: 'Granika', var(--font-family-condensed);
-  font-size: 1.55rem;
+  font-size: 1.35rem; /* Reduzido de 1.55rem para evitar truncamento de nomes de tamanho médio como Rodrigo */
   font-weight: normal;
   color: #ffffff;
   z-index: 2;
@@ -3487,10 +3524,10 @@ body {
 /* Só reserva espaço para o expoente de fogo quando ele realmente existe,
    liberando mais largura para o nome de quem não tem medalha. */
 .podium-name-with-rank:has(.fire-medal-badge) {
-  margin-right: 1.4rem;
+  margin-right: 1.1rem; /* Reduzido para liberar espaço lateral */
 }
 .podium-name-with-rank {
-  max-width: 82%;
+  max-width: 85%; /* Aumentado de 82% para dar mais espaço para o nome do jogador */
 }
 .podium-name-with-rank .podium-player-name {
   max-width: 100% !important;

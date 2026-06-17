@@ -157,9 +157,8 @@ function App() {
   // 1. Estados de Autenticação e Telas
   const [currentUser, setCurrentUser] = useState<Participant | null>(() => readCachedUser());
 
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'splash' | 'app'>(() =>
-    readCachedUser() ? 'app' : 'login'
-  );
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'splash' | 'app'>('splash');
+  const [splashVideo, setSplashVideo] = useState<'intro' | 'reload'>('reload');
 
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -206,6 +205,19 @@ function App() {
   useEffect(() => {
     const tick = setInterval(() => setNowTs(Date.now()), 30000);
     return () => clearInterval(tick);
+  }, []);
+
+  // Timer de fallback para a splash screen inicial ao carregar a página
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentScreen((prev) => {
+        if (prev === 'splash') {
+          return readCachedUser() ? 'app' : 'login';
+        }
+        return prev;
+      });
+    }, 2000); // 2 segundos de fallback (reload.mp4 tem 1 segundo)
+    return () => clearTimeout(timer);
   }, []);
 
   // Toast de notificação (substitui os alert() nativos)
@@ -629,10 +641,11 @@ function App() {
     setCurrentUser(participant);
 
     // Iniciar fluxo da intro splash
+    setSplashVideo('intro');
     setCurrentScreen('splash');
     setTimeout(() => {
       setCurrentScreen('app');
-    }, 3500); // 3.5 segundos de intro.webp
+    }, 4500); // 4.5 segundos de intro.mp4 como fallback de tempo
   };
 
   // Handler de Logout
@@ -859,15 +872,18 @@ function App() {
   }
 
   // ----------------------------------------------------
-  // RENDERIZAÇÃO DA TELA DE SPLASH (INTRO.GIF)
+  // RENDERIZAÇÃO DA TELA DE SPLASH (INTRO.MP4)
   // ----------------------------------------------------
   if (currentScreen === 'splash') {
     return (
-      <div className="splash-screen" onClick={() => setCurrentScreen('app')}>
-        <img
-          src="/imagens/intro.webp"
-          alt="Carregando..."
+      <div className="splash-screen" onClick={() => setCurrentScreen(currentUser ? 'app' : 'login')}>
+        <video
+          src={splashVideo === 'intro' ? '/imagens/intro.mp4' : '/imagens/reload.mp4'}
+          autoPlay
+          muted
+          playsInline
           className="splash-gif"
+          onEnded={() => setCurrentScreen(currentUser ? 'app' : 'login')}
         />
       </div>
     );
@@ -976,9 +992,9 @@ function App() {
                     const finishedTitles = isFinished && match.homeScore !== null && match.awayScore !== null;
                     const bettorTypes = finishedTitles
                       ? participants
-                          .map((p) => betByMatchUser.get(`${match.id}|${p.id}`))
-                          .filter((b): b is Bet => !!b)
-                          .map((b) => ({ id: b.participantId, type: analyzeBet(b, match).type }))
+                        .map((p) => betByMatchUser.get(`${match.id}|${p.id}`))
+                        .filter((b): b is Bet => !!b)
+                        .map((b) => ({ id: b.participantId, type: analyzeBet(b, match).type }))
                       : [];
                     const wrongBettors = bettorTypes.filter((x) => x.type === 'wrong');
                     const peFrioId = bettorTypes.length >= 2 && wrongBettors.length === 1 ? wrongBettors[0].id : null;
@@ -1108,97 +1124,97 @@ function App() {
                         <div className={`inline-guesses-list-wrapper-p16 ${expandedMatches[match.id] ? 'expanded' : ''}`}>
                           <div className="inline-guesses-list-inner-p16">
                             {participants.map((p) => {
-                            const bet = betByMatchUser.get(`${match.id}|${p.id}`);
-                            const analysis = analyzeBet(bet, match);
+                              const bet = betByMatchUser.get(`${match.id}|${p.id}`);
+                              const analysis = analyzeBet(bet, match);
 
-                            // Mini-títulos do jogo
-                            const isProfeta = finishedTitles && analysis.type === 'exact';
-                            const isPeFrio = p.id === peFrioId;
+                              // Mini-títulos do jogo
+                              const isProfeta = finishedTitles && analysis.type === 'exact';
+                              const isPeFrio = p.id === peFrioId;
 
-                            // Lógica do Badge de Pontos
-                            let pointsBadgeClass = 'wrong';
-                            let pointsText = '0 pts';
-                            if (analysis.type === 'exact') {
-                              pointsBadgeClass = 'exact';
-                              pointsText = '+3 pts';
-                            } else if (analysis.type === 'draw') {
-                              pointsBadgeClass = 'draw';
-                              pointsText = '+2 pts';
-                            } else if (analysis.type === 'winner') {
-                              pointsBadgeClass = 'winner';
-                              pointsText = '+1 pt';
-                            } else if (analysis.type === 'pending') {
-                              pointsBadgeClass = 'pending';
-                              pointsText = 'Pendente';
-                            }
-
-                            // Lógica da bandeira de quem o participante achou que ia vencer
-                            let predictedWinnerFlag: string | null = null;
-                            if (bet) {
-                              if (bet.homeScore > bet.awayScore) {
-                                predictedWinnerFlag = match.homeFlag;
-                              } else if (bet.awayScore > bet.homeScore) {
-                                predictedWinnerFlag = match.awayFlag;
+                              // Lógica do Badge de Pontos
+                              let pointsBadgeClass = 'wrong';
+                              let pointsText = '0 pts';
+                              if (analysis.type === 'exact') {
+                                pointsBadgeClass = 'exact';
+                                pointsText = '+3 pts';
+                              } else if (analysis.type === 'draw') {
+                                pointsBadgeClass = 'draw';
+                                pointsText = '+2 pts';
+                              } else if (analysis.type === 'winner') {
+                                pointsBadgeClass = 'winner';
+                                pointsText = '+1 pt';
+                              } else if (analysis.type === 'pending') {
+                                pointsBadgeClass = 'pending';
+                                pointsText = 'Pendente';
                               }
-                            }
 
-                            return (
-                              <div key={p.id} className="inline-guess-row-p16">
-                                <div className="inline-guess-user-info-p16">
-                                  <div className="inline-guess-avatar-border-p16">
-                                    <img
-                                      src={`/imagens/ranking ${p.id}.webp`}
-                                      alt={p.name}
-                                      className="inline-guess-avatar-img-p16"
-                                      onError={(e) => {
-                                        e.currentTarget.src = p.avatarUrl;
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="inline-guess-name-col-p16">
-                                    {isProfeta && (
-                                      <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
-                                    )}
-                                    {isPeFrio && (
-                                      <span className="inline-guess-title-p16 pe-frio">
-                                        <img 
-                                          src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75" 
-                                          alt="Pé Frio" 
-                                          className="pe-frio-icon-img" 
-                                        />
-                                        Pé Frio
-                                      </span>
-                                    )}
-                                    <span className="inline-guess-username-p16">{p.name}</span>
-                                  </div>
-                                </div>
+                              // Lógica da bandeira de quem o participante achou que ia vencer
+                              let predictedWinnerFlag: string | null = null;
+                              if (bet) {
+                                if (bet.homeScore > bet.awayScore) {
+                                  predictedWinnerFlag = match.homeFlag;
+                                } else if (bet.awayScore > bet.homeScore) {
+                                  predictedWinnerFlag = match.awayFlag;
+                                }
+                              }
 
-                                <div className="inline-guess-result-info-p16">
-                                  {bet ? (
-                                    <div className="inline-guess-scores-container-p16">
-                                      <span className="inline-guess-score-text-p16">
-                                        {bet.homeScore} x {bet.awayScore}
-                                      </span>
-                                      {predictedWinnerFlag && (
-                                        <img
-                                          src={flagSrc(predictedWinnerFlag, 40)}
-                                          alt="Palpite Vencedor"
-                                          className="inline-guess-winner-flag-p16"
-                                        />
-                                      )}
+                              return (
+                                <div key={p.id} className="inline-guess-row-p16">
+                                  <div className="inline-guess-user-info-p16">
+                                    <div className="inline-guess-avatar-border-p16">
+                                      <img
+                                        src={`/imagens/ranking ${p.id}.webp`}
+                                        alt={p.name}
+                                        className="inline-guess-avatar-img-p16"
+                                        onError={(e) => {
+                                          e.currentTarget.src = p.avatarUrl;
+                                        }}
+                                      />
                                     </div>
-                                  ) : (
-                                    <span className="inline-guess-none-text-p16">Sem Palpite</span>
-                                  )}
+                                    <div className="inline-guess-name-col-p16">
+                                      {isProfeta && (
+                                        <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
+                                      )}
+                                      {isPeFrio && (
+                                        <span className="inline-guess-title-p16 pe-frio">
+                                          <img
+                                            src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75"
+                                            alt="Pé Frio"
+                                            className="pe-frio-icon-img"
+                                          />
+                                          Pé Frio
+                                        </span>
+                                      )}
+                                      <span className="inline-guess-username-p16">{p.name}</span>
+                                    </div>
+                                  </div>
 
-                                  <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
-                                    {pointsText}
+                                  <div className="inline-guess-result-info-p16">
+                                    {bet ? (
+                                      <div className="inline-guess-scores-container-p16">
+                                        <span className="inline-guess-score-text-p16">
+                                          {bet.homeScore} x {bet.awayScore}
+                                        </span>
+                                        {predictedWinnerFlag && (
+                                          <img
+                                            src={flagSrc(predictedWinnerFlag, 40)}
+                                            alt="Palpite Vencedor"
+                                            className="inline-guess-winner-flag-p16"
+                                          />
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="inline-guess-none-text-p16">Sem Palpite</span>
+                                    )}
+
+                                    <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
+                                      {pointsText}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     );
