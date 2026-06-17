@@ -878,17 +878,12 @@ function App() {
     return (
       <div className="splash-screen" onClick={() => setCurrentScreen(currentUser ? 'app' : 'login')}>
         <video
-          // ?v=2 = cache-bust: força o navegador a baixar o vídeo recomprimido
-          // (sem isso ele pode servir a versão antiga em cache na mesma URL).
-          src={splashVideo === 'intro' ? '/imagens/intro.mp4?v=2' : '/imagens/reload.mp4?v=2'}
+          src={splashVideo === 'intro' ? '/imagens/intro.mp4' : '/imagens/reload.mp4'}
           autoPlay
           muted
           playsInline
-          preload="auto"
           className="splash-gif"
           onEnded={() => setCurrentScreen(currentUser ? 'app' : 'login')}
-          // Se o vídeo falhar (rede/codec), não trava na tela preta — segue o fluxo.
-          onError={() => setCurrentScreen(currentUser ? 'app' : 'login')}
         />
       </div>
     );
