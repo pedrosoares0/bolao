@@ -1280,42 +1280,46 @@ function App() {
         )}
       </main>
 
-      {/* BARRA DE NAVEGAÇÃO INFERIOR */}
       <nav className="bottom-nav">
         <button
           className={`nav-item ${activeTab === 'jogos' ? 'active' : ''}`}
           onClick={() => setActiveTab('jogos')}
+          title="Partidas"
+          aria-label="Partidas"
         >
-          <Calendar size={20} />
-          <span>Partidas</span>
+          <Calendar size={24} />
         </button>
         <button
           className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}
           onClick={() => setActiveTab('palpites')}
+          title="Palpites"
+          aria-label="Palpites"
         >
-          <ListChecks size={20} />
-          <span>Palpites</span>
+          <ListChecks size={24} />
         </button>
         <button
           className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
           onClick={() => setActiveTab('ranking')}
+          title="Ranking"
+          aria-label="Ranking"
         >
-          <Trophy size={20} />
-          <span>Ranking</span>
+          <Trophy size={24} />
         </button>
         <button
           className={`nav-item ${activeTab === 'pix' ? 'active' : ''}`}
           onClick={() => setActiveTab('pix')}
+          title="Pagamento"
+          aria-label="Pagamento"
         >
-          <Wallet size={20} />
-          <span>Pagamento</span>
+          <Wallet size={24} />
         </button>
         <button
           className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
           onClick={() => setActiveTab('perfil')}
+          title="Perfil"
+          aria-label="Perfil"
         >
-          <User size={20} />
-          <span>Perfil</span>
+          <User size={24} />
         </button>
       </nav>
 

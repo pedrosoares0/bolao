@@ -64,6 +64,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
       {/* CARD PRINCIPAL DE IDENTIFICAÇÃO DO PARTICIPANTE */}
       <div className="profile-header-card">
+        <Aurora
+          colorStops={["#009c3b", "#f5b300", "#15110E"]}
+          blend={0.7}
+          amplitude={0.8}
+          speed={0.3}
+        />
         <div className="profile-header-bg-glow"></div>
         <div className="profile-header-content">
           <div className="profile-header-avatar-wrap">
@@ -77,9 +83,9 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
 
           <div className="profile-header-text">
-            <h2 className="profile-header-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <User size={18} style={{ color: '#f5b300' }} />
-              {selectedUser.name.toUpperCase()}
+            <h2 className="profile-header-name">
+              <User size={18} className="profile-name-icon" />
+              <span className="profile-name-text">{selectedUser.name.toUpperCase()}</span>
             </h2>
             <div className="profile-header-stats-row">
               <span className="profile-header-stat-pts">
@@ -92,8 +98,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             </div>
           </div>
         </div>
-
-        {/* ESTATÍSTICAS SECUNDÁRIAS (GRID DE PONTOS) */}
         <div className="profile-stats-grid">
           <div className="profile-stat-box animate-scale">
             <span className="profile-stat-val val-exact">{exacts}</span>

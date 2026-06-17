@@ -3666,24 +3666,28 @@ body {
 /* 2. CARD DO CABEÇALHO DO PERFIL */
 .profile-header-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(28, 22, 18, 0.75) 0%, rgba(13, 10, 8, 0.85) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--border-radius-lg);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   overflow: hidden;
-  box-shadow: var(--shadow-soft);
+  box-shadow: 
+    0 15px 35px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .profile-header-bg-glow {
   position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 250px;
-  height: 250px;
-  background: radial-gradient(circle, rgba(0, 156, 59, 0.15) 0%, transparent 70%);
+  top: -30%;
+  right: -10%;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(245, 179, 0, 0.12) 0%, rgba(0, 156, 59, 0.06) 50%, transparent 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -3699,67 +3703,93 @@ body {
 .profile-header-avatar-wrap {
   position: relative;
   flex-shrink: 0;
+  background: linear-gradient(135deg, #f5b300 0%, #009c3b 50%, #002776 100%);
+  padding: 3px;
+  border-radius: 50%;
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 0 15px rgba(245, 179, 0, 0.2);
 }
 
 .profile-header-avatar {
-  width: 96px;
-  height: 96px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
-  border: 3px solid #f5b300; /* Gold premium border */
+  border: 2px solid #15110E;
   object-fit: cover;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  display: block;
 }
 
 .profile-header-rank-badge {
   position: absolute;
-  bottom: 0px;
-  right: 0px;
-  background: #f5b300;
+  bottom: -2px;
+  right: -2px;
+  background: linear-gradient(135deg, #ffd700 0%, #f5b300 50%, #b8860b 100%);
   color: #15110E;
   font-family: var(--font-family-condensed);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 900;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px solid #15110E;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 
+    0 3px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .profile-header-text {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .profile-header-name {
   font-family: var(--font-family-condensed);
-  font-size: 1.35rem;
+  font-size: 1.65rem;
   font-weight: 900;
-  color: #ffffff;
-  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-name-icon {
+  color: #f5b300;
+  filter: drop-shadow(0 0 8px rgba(245, 179, 0, 0.45));
+}
+
+.profile-name-text {
+  background: linear-gradient(135deg, #ffffff 65%, #ffd700 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .profile-header-stats-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-  color: rgba(255, 255, 255, 0.6);
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
 }
 
-.profile-header-stat-pts b,
+.profile-header-stat-pts b {
+  color: #f5b300;
+  font-weight: 900;
+  font-size: 0.95rem;
+}
+
 .profile-header-stat-bets b {
   color: #ffffff;
   font-weight: 800;
+  font-size: 0.9rem;
 }
 
 .profile-header-stat-divider {
-  opacity: 0.4;
+  opacity: 0.45;
 }
 
 /* GRID DE DETALHES DE PONTOS */
@@ -3772,40 +3802,61 @@ body {
 }
 
 .profile-stat-box {
-  background: rgba(255, 255, 255, 0.03);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0.75rem;
-  padding: 0.6rem 0.25rem;
+  border-radius: 1rem;
+  padding: 0.8rem 0.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  transition: var(--transition-smooth);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .profile-stat-box:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
 .profile-stat-val {
   font-family: var(--font-family-condensed);
-  font-size: 1.15rem;
+  font-size: 1.4rem;
   font-weight: 900;
+  line-height: 1;
 }
 
-.profile-stat-val.val-exact { color: #4ade80 !important; }
-.profile-stat-val.val-draw { color: #38bdf8 !important; }
-.profile-stat-val.val-winner { color: #f5b300 !important; }
-.profile-stat-val.val-wrong { color: #ef4444 !important; }
+.profile-stat-val.val-exact {
+  color: #4ade80 !important;
+  text-shadow: 0 0 12px rgba(74, 222, 128, 0.35);
+}
+.profile-stat-val.val-draw {
+  color: #38bdf8 !important;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+}
+.profile-stat-val.val-winner {
+  color: #f5b300 !important;
+  text-shadow: 0 0 12px rgba(245, 179, 0, 0.35);
+}
+.profile-stat-val.val-wrong {
+  color: #ef4444 !important;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+}
 
 .profile-stat-label {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   text-transform: uppercase;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.45);
-  margin-top: 0.15rem;
-  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 0.25rem;
+  letter-spacing: 0.06em;
 }
 
 /* 3. SEPARADORES DE SEÇÃO */
@@ -4170,36 +4221,49 @@ body {
 
 /* 6. CAIXA DE PALPITES ESPECIAIS NO PERFIL */
 .profile-specials-box {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 0.88rem;
-  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 1.25rem;
+  padding: 1rem 1.2rem;
   margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .profile-specials-title {
   font-family: var(--font-family-condensed);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 900;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.1rem;
+  text-align: center;
 }
 
 .profile-specials-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .profile-special-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 0.88rem;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.profile-special-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: scale(1.02);
 }
 
 .profile-special-emoji {
@@ -4212,15 +4276,18 @@ body {
 }
 
 .profile-special-label {
-  font-size: 0.6rem;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.4);
   font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .profile-special-value {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: #ffffff;
   font-weight: 800;
+  margin-top: 0.05rem;
 }
 
 .inline-guess-badge-p16.pe-frio-badge {
