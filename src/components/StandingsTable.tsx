@@ -6,7 +6,7 @@
 // ============================================================
 import React from 'react';
 import type { ParticipantStanding, Match, Bet } from '../types';
-import { analyzeBet } from '../utils/rules';
+import { analyzeBet, calculateFireCounts } from '../utils/rules';
 import { shareRanking } from '../utils/shareRanking';
 import LightRays from './LightRays';
 import Aurora from './Aurora';
@@ -185,42 +185,20 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
   // pois a regra agora é que o card do ON FIRE seja uma conquista permanente (tipo Steam).
 
   // Conta quantos "onfires" (medalhas de fogo) cada participante já conquistou.
-  // Regra: a cada 5 jogos consecutivos pontuando (dentre os jogos em que apostou),
-  // ganha +1 fogo PERMANENTE. Errar um jogo zera apenas a contagem rumo ao próximo
-  // grupo de 5 — os fogos já conquistados nunca são removidos.
-  const getFireCounts = (): Record<string, number> => {
+  // Usa a regra compartilhada em utils/rules (calculateFireCounts): ganha +1 fogo
+  // PERMANENTE ao pontuar em 5 jogos seguidos OU acertar o placar exato em 3 jogos
+  // seguidos. Os fogos já conquistados nunca são removidos.
+  const fireCounts = ((): Record<string, number> => {
     const counts: Record<string, number> = {};
-    if (!matches || !bets) return counts;
-
-    const finishedMatches = [...matches]
-      .filter(m => (m.status === 'finished' || m.isLive) && m.homeScore !== null && m.awayScore !== null)
-      .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff));
-
-    standings.forEach((standing) => {
-      const participantBets = bets.filter(b => b.participantId === standing.participantId);
-      let fires = 0;
-      let streak = 0;
-      finishedMatches.forEach((match) => {
-        const bet = participantBets.find(b => b.matchId === match.id);
-        if (!bet) return; // só conta jogos em que o participante apostou
-        const analysis = analyzeBet(bet, match);
-        if (analysis.points > 0) {
-          streak++;
-          if (streak === 5) {
-            fires++;
-            streak = 0;
-          }
-        } else {
-          streak = 0;
-        }
-      });
-      counts[standing.participantId] = fires;
-    });
-
+    const participants = standings.map((s) => ({
+      id: s.participantId,
+      name: s.name,
+      avatarUrl: s.avatarUrl,
+    }));
+    const raw = calculateFireCounts(matches, bets, participants);
+    Object.keys(raw).forEach((id) => { counts[id] = raw[id].fires; });
     return counts;
-  };
-
-  const fireCounts = getFireCounts();
+  })();
 
   const onFirePlayers = standings
     .filter(standing => (fireCounts[standing.participantId] || 0) > 0)
@@ -283,7 +261,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     return (
       <span
         className="fire-medal-badge"
-        title={`${count} On Fire — ${count * 5} jogos pontuando em sequência`}
+        title={`${count} On Fire — pontuou em 5 jogos seguidos ou acertou 3 placares exatos seguidos`}
       >
         <span className="fire-medal-flame">🔥</span>
         {count > 1 && <span className="fire-medal-count">{count}</span>}
@@ -679,7 +657,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     {player.standing.name.toUpperCase()} ESTÁ ON FIRE!
                   </div>
                   <p className="on-fire-desc">
-                    Fez 5 jogos consecutivos pontuando. Ninguém consegue parar o homem.
+                    Pontuou em 5 jogos seguidos ou cravou 3 placares exatos em sequência. Ninguém consegue parar o homem.
                   </p>
                   {(fireCounts[player.standing.participantId] || 0) > 0 && (
                     <div className="on-fire-count-badge">

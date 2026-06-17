@@ -133,7 +133,16 @@ export function calculateStandings(
   });
 }
 
-// Calcula os fogos permanente e a sequência atual de acertos (pontos > 0)
+// Calcula os fogos (ONFIRE) permanentes e a sequência atual de pontuação.
+// Duas regras concedem +1 fogo permanente:
+//   1. Pontuar (pontos > 0) em 5 jogos seguidos.
+//   2. Acertar o placar EXATO em 3 jogos seguidos.
+// IMPORTANTE: ao ganhar um fogo por qualquer regra, AMBAS as sequências zeram
+// (reset compartilhado). Assim os mesmos jogos nunca contam para dois fogos —
+// ex.: 3 exatos (1 fogo) + 2 jogos pontuando NÃO viram um segundo fogo, pois a
+// contagem dos 5 recomeça do zero após o fogo dos exatos. Errar o critério zera
+// a sequência rumo ao próximo fogo; os fogos já conquistados nunca somem.
+// `currentStreak` reflete a sequência de pontuação (regra 1), usada na UI.
 export function calculateFireCounts(
   matches: Match[],
   bets: Bet[],
@@ -151,22 +160,25 @@ export function calculateFireCounts(
 
   participants.forEach((p) => {
     let fires = 0;
-    let streak = 0;
+    let pointStreak = 0; // regra 1: jogos seguidos pontuando
+    let exactStreak = 0; // regra 2: placares exatos seguidos
     finishedMatches.forEach((match) => {
       const bet = betIndex.get(`${p.id}|${match.id}`);
       if (!bet) return; // só conta jogos em que apostou
       const analysis = analyzeBet(bet, match);
-      if (analysis.points > 0) {
-        streak++;
-        if (streak === 5) {
-          fires++;
-          streak = 0;
-        }
-      } else {
-        streak = 0;
+
+      // Atualiza as duas sequências
+      pointStreak = analysis.points > 0 ? pointStreak + 1 : 0; // regra 1: jogos pontuando
+      exactStreak = analysis.type === 'exact' ? exactStreak + 1 : 0; // regra 2: placares exatos
+
+      // Concede no máximo 1 fogo por jogo e zera AMBAS as sequências (reset compartilhado)
+      if (pointStreak >= 5 || exactStreak >= 3) {
+        fires++;
+        pointStreak = 0;
+        exactStreak = 0;
       }
     });
-    result[p.id] = { fires, currentStreak: streak };
+    result[p.id] = { fires, currentStreak: pointStreak };
   });
 
   return result;
@@ -294,8 +306,9 @@ export function calculateConquestTimeline(
   const betIndex = new Map<string, Bet>();
   bets.forEach((b) => betIndex.set(`${b.participantId}|${b.matchId}`, b));
 
-  // Para ON FIRE, precisamos rodar a sequência do jogador
-  let streak = 0;
+  // Para ON FIRE, precisamos rodar as sequências do jogador
+  let pointStreak = 0; // regra 1: jogos seguidos pontuando
+  let exactStreak = 0; // regra 2: placares exatos seguidos
 
   finishedMatches.forEach((match) => {
     // aposta deste jogador
@@ -339,21 +352,27 @@ export function calculateConquestTimeline(
       });
     }
 
-    // ON FIRE progress
-    if (bet && analysis.points > 0) {
-      streak++;
-      if (streak === 5) {
+    // ON FIRE — duas regras com reset compartilhado (ver calculateFireCounts):
+    //   1. pontuar em 5 jogos seguidos; 2. acertar o placar exato em 3 seguidos.
+    // Ganhar um fogo zera AMBAS as sequências, então os mesmos jogos não contam duas vezes.
+    if (bet) {
+      pointStreak = analysis.points > 0 ? pointStreak + 1 : 0;
+      exactStreak = analysis.type === 'exact' ? exactStreak + 1 : 0;
+
+      if (pointStreak >= 5 || exactStreak >= 3) {
+        const byExact = exactStreak >= 3;
         conquestTimeline.push({
           type: 'on_fire',
           date: dateLabel,
           title: '🔥 ON FIRE!',
-          description: `Alcançou 5 acertos seguidos no jogo ${match.homeTeam} ${match.homeScore} x ${match.awayScore} ${match.awayTeam}`,
+          description: byExact
+            ? `Acertou o placar exato em 3 jogos seguidos, até o jogo ${match.homeTeam} ${match.homeScore} x ${match.awayScore} ${match.awayTeam}`
+            : `Pontuou em 5 jogos seguidos, até o jogo ${match.homeTeam} ${match.homeScore} x ${match.awayScore} ${match.awayTeam}`,
           timestamp: Date.parse(match.kickoff) + 3,
         });
-        streak = 0;
+        pointStreak = 0;
+        exactStreak = 0;
       }
-    } else if (bet) {
-      streak = 0;
     }
   });
 

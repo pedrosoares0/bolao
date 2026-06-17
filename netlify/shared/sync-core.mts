@@ -54,6 +54,16 @@ interface MatchUpsertRow {
   goalsDetail?: EspnGoalDetail[];
 }
 
+// Campos transitórios usados só pelas notificações (não são colunas de `matches`).
+// Removê-los antes de qualquer upsert evita o erro de "coluna inexistente".
+function toDbRow(r: MatchUpsertRow) {
+  const dbRow = { ...r };
+  delete dbRow.homeTeamId;
+  delete dbRow.awayTeamId;
+  delete dbRow.goalsDetail;
+  return dbRow;
+}
+
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
 // e grava/atualiza na tabela `matches` do Supabase usando a service_role.
 // Throttle: se sincronizou há menos de 30 segundos, pula (limite free: 10 req/min).
@@ -119,7 +129,10 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
       ((prevRows ?? []) as PrevState[]).map((r) => [r.id, r] as const)
     );
 
-    const { error } = await supabase.from('matches').upsert(mergedRows);
+    // Remove os campos transitórios (homeTeamId/awayTeamId/goalsDetail) que NÃO
+    // são colunas da tabela — eles servem só às notificações abaixo. Sem isso, o
+    // upsert quebraria assim que a ESPN aplicasse overrides (jogo ao vivo).
+    const { error } = await supabase.from('matches').upsert(mergedRows.map(toDbRow));
     if (error) throw new Error(`Erro ao gravar partidas no Supabase: ${error.message}`);
 
     // Notificações são best-effort: nunca derrubam a sincronização.
@@ -173,4 +186,206 @@ async function mergeEspnLive(rows: MatchUpsertRow[]): Promise<MatchUpsertRow[]> 
 
   if (applied > 0) console.log(`ESPN: placar ao vivo aplicado em ${applied} jogo(s).`);
   return merged;
+}
+
+// ---- Linha de `matches` lida do banco para casar com a ESPN no caminho ao vivo ----
+interface LiveDbRow {
+  id: number;
+  utc_date: string;
+  status: string;
+  home_team: string;
+  away_team: string;
+  home_score: number | null;
+  away_score: number | null;
+  live_clock: string | null;
+}
+
+// Sincronização AO VIVO — caminho rápido e barato: bate SÓ na ESPN (grátis, sem
+// chave) e atualiza apenas placar/minuto/etapa dos jogos já existentes no banco.
+// Não chama o football-data, então pode ser acionada com frequência (polling do
+// front a cada ~10s) sem encostar no limite de 10 req/min. O `syncMatches`
+// completo (cron de 1 min) continua dono da tabela/IDs/resultados oficiais.
+// Throttle próprio de 10s (sync_state.last_live_sync) protege contra abuso.
+export async function syncLive(force = false): Promise<{ skipped: boolean; count?: number; reason?: string }> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Variáveis de ambiente faltando: SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.');
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  if (!force) {
+    const { data: state } = await supabase.from('sync_state').select('last_live_sync').eq('id', 1).single();
+    if (state?.last_live_sync && Date.now() - new Date(state.last_live_sync).getTime() < 10 * 1000) {
+      return { skipped: true, reason: 'Ao vivo sincronizado há menos de 10 segundos.' };
+    }
+  }
+
+  // ESPN primeiro; se cair, não faz nada (o cron/football-data cobre o resto).
+  let overrides;
+  try {
+    overrides = await fetchEspnOverrides();
+  } catch (err) {
+    console.warn('ESPN indisponível no syncLive (fallback no cron):', err);
+    return { skipped: true, reason: 'ESPN indisponível.' };
+  }
+
+  // Marca o tempo já aqui (mesmo sem jogos) para o throttle valer.
+  await supabase.from('sync_state').upsert({ id: 1, last_live_sync: new Date().toISOString() });
+  if (overrides.size === 0) return { skipped: false, count: 0 };
+
+  const { data: dbRows } = await supabase
+    .from('matches')
+    .select('id, utc_date, status, home_team, away_team, home_score, away_score, live_clock');
+  if (!dbRows || dbRows.length === 0) return { skipped: false, count: 0 };
+
+  const prevById = new Map<number, PrevState>();
+  const updates: MatchUpsertRow[] = [];
+
+  for (const r of dbRows as LiveDbRow[]) {
+    const ov = overrides.get(pairKey(r.home_team, r.away_team));
+    if (!ov) continue;
+    if (ov.dateIso && r.utc_date.slice(0, 10) !== ov.dateIso) continue;
+
+    const fdHomeIsEspnHome = norm(r.home_team) === ov.homeNorm;
+    const homeScore = fdHomeIsEspnHome ? ov.homeScore : ov.awayScore;
+    const awayScore = fdHomeIsEspnHome ? ov.awayScore : ov.homeScore;
+
+    // Só grava (e notifica) quando algo realmente mudou — evita recarregar o
+    // front à toa a cada 10s e reprocessar notificações.
+    const changed =
+      ov.status !== r.status ||
+      homeScore !== r.home_score ||
+      awayScore !== r.away_score ||
+      ov.liveClock !== r.live_clock;
+    if (!changed) continue;
+
+    prevById.set(r.id, { id: r.id, status: r.status, home_score: r.home_score, away_score: r.away_score });
+    updates.push({
+      // só os campos que o ao vivo altera; o upsert atualiza apenas estas colunas
+      id: r.id,
+      utc_date: r.utc_date,
+      status: ov.status,
+      stage: null,
+      group_name: null,
+      home_team: r.home_team,
+      away_team: r.away_team,
+      home_tla: '',
+      away_tla: '',
+      home_crest: '',
+      away_crest: '',
+      home_score: homeScore,
+      away_score: awayScore,
+      winner: null,
+      live_clock: ov.liveClock,
+      updated_at: new Date().toISOString(),
+      // transitórios (notificações) — removidos antes do upsert por toDbRow
+      homeTeamId: fdHomeIsEspnHome ? ov.homeTeamId : ov.awayTeamId,
+      awayTeamId: fdHomeIsEspnHome ? ov.awayTeamId : ov.homeTeamId,
+      goalsDetail: ov.goalsDetail,
+    });
+  }
+
+  if (updates.length === 0) return { skipped: false, count: 0 };
+
+  // Atualiza apenas placar/status/minuto — sem sobrescrever stage/nomes/crests
+  // (que pertencem ao football-data) graças ao merge por coluna do upsert.
+  const dbUpdates = updates.map(toDbRow).map((u) => ({
+    id: u.id,
+    status: u.status,
+    home_score: u.home_score,
+    away_score: u.away_score,
+    live_clock: u.live_clock,
+    updated_at: u.updated_at,
+  }));
+
+  const { error } = await supabase.from('matches').upsert(dbUpdates);
+  if (error) throw new Error(`Erro ao gravar ao vivo no Supabase: ${error.message}`);
+
+  try {
+    await runNotifications(supabase, prevById, updates);
+  } catch (err) {
+    console.error('Falha ao enviar notificações (syncLive):', err);
+  }
+
+  return { skipped: false, count: updates.length };
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// Loop de background que mantém o ao vivo fresquinho (~12s) mesmo sem ninguém
+// com o app aberto. É disparado pelo cron de 1 min e protegido por uma "lease"
+// (sync_state.live_loop_until): só um loop roda por vez; se este morrer, a lease
+// expira e o próximo cron reinicia em <= 1 min. Auto-encerra quando não há mais
+// jogo rolando/por começar, e tem teto de tempo por invocação.
+export async function runLiveLoop(): Promise<{ ran: boolean; iterations?: number; reason?: string }> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Variáveis de ambiente faltando: SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.');
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  const LEASE_TTL_MS = 30 * 1000;     // lease considerada morta após 30s sem refresh
+  const ITERATION_MS = 12 * 1000;     // cadência ~12s entre buscas na ESPN
+  const MAX_RUN_MS = 4 * 60 * 1000;   // teto de ~4 min por invocação (o cron reinicia)
+
+  // Há jogo rolando agora ou prestes a começar? Fora do horário de jogos o loop
+  // não roda — o cron de 1 min já cobre o tempo morto. Considera partidas com
+  // kickoff entre 3,5h atrás (ainda pode estar em campo) e 15 min à frente.
+  const hasLiveOrImminent = async (): Promise<boolean> => {
+    const now = Date.now();
+    const from = new Date(now - 3.5 * 60 * 60 * 1000).toISOString();
+    const to = new Date(now + 15 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('matches')
+      .select('id')
+      .gte('utc_date', from)
+      .lte('utc_date', to)
+      .limit(1);
+    return !!data && data.length > 0;
+  };
+
+  // Trava: se já há um loop ativo (lease no futuro), sai na hora.
+  const { data: st } = await supabase.from('sync_state').select('live_loop_until').eq('id', 1).single();
+  if (st?.live_loop_until && new Date(st.live_loop_until as string).getTime() > Date.now()) {
+    return { ran: false, reason: 'Loop já ativo.' };
+  }
+
+  // Fora do horário de jogos não faz loop — o cron de 1 min já basta.
+  if (!(await hasLiveOrImminent())) {
+    return { ran: false, reason: 'Sem jogo ao vivo ou iminente.' };
+  }
+
+  const start = Date.now();
+  let iterations = 0;
+  try {
+    while (Date.now() - start < MAX_RUN_MS) {
+      // Renova a lease ANTES de cada iteração.
+      await supabase.from('sync_state').upsert({
+        id: 1,
+        live_loop_until: new Date(Date.now() + LEASE_TTL_MS).toISOString(),
+      });
+
+      // force=true: o loop controla a cadência (12s), então ignora o throttle de 10s.
+      try {
+        await syncLive(true);
+      } catch (err) {
+        console.error('runLiveLoop syncLive:', err);
+      }
+      iterations++;
+
+      // Acabaram os jogos? Encerra cedo.
+      if (!(await hasLiveOrImminent())) break;
+
+      await sleep(ITERATION_MS);
+    }
+  } finally {
+    // Libera a lease para o próximo cron poder reiniciar quando precisar.
+    await supabase.from('sync_state').upsert({ id: 1, live_loop_until: null });
+  }
+
+  return { ran: true, iterations };
 }

@@ -367,28 +367,78 @@ describe('Cálculo de Conquistas e Estatísticas', () => {
   const p2 = makeParticipant('user2', 'User Two');
   const participants = [p1, p2];
 
-  it('calcula fogos (ONFIRE) permanentes e sequência atual', () => {
-    // 6 partidas consecutivas com acertos
+  it('calcula fogos (ONFIRE) por 5 jogos seguidos pontuando + sequência atual', () => {
+    // 6 partidas consecutivas terminando 1x0. Apostas de VENCEDOR (2x0): pontuam
+    // (1 ponto) sem serem placar exato, para isolar a regra de pontuação.
     const matches = Array.from({ length: 6 }, (_, i) =>
       finishedMatch(1, 0, { id: `m${i}`, kickoff: `2026-06-12T10:0${i}:00Z` })
     );
 
     const bets = [
-      // user1 acerta todas (pontos > 0): deve ganhar 1 fogo (aos 5 acertos) e ter sequência atual 1
-      ...matches.map((m) => makeBet(1, 0, 'user1', m.id)),
+      // user1 pontua em todas (vencedor): 1 fogo (aos 5 jogos) e sequência atual 1
+      ...matches.map((m) => makeBet(2, 0, 'user1', m.id)),
       // user2 erra no m3: deve ter 0 fogos e sequência atual 2
-      makeBet(1, 0, 'user2', 'm0'),
-      makeBet(1, 0, 'user2', 'm1'),
-      makeBet(1, 0, 'user2', 'm2'),
+      makeBet(2, 0, 'user2', 'm0'),
+      makeBet(2, 0, 'user2', 'm1'),
+      makeBet(2, 0, 'user2', 'm2'),
       makeBet(0, 1, 'user2', 'm3'), // errou
-      makeBet(1, 0, 'user2', 'm4'),
-      makeBet(1, 0, 'user2', 'm5'),
+      makeBet(2, 0, 'user2', 'm4'),
+      makeBet(2, 0, 'user2', 'm5'),
     ];
 
     const fireCounts = calculateFireCounts(matches, bets, participants);
 
     expect(fireCounts['user1']).toEqual({ fires: 1, currentStreak: 1 });
     expect(fireCounts['user2']).toEqual({ fires: 0, currentStreak: 2 });
+  });
+
+  it('calcula fogos (ONFIRE) por 3 placares exatos seguidos', () => {
+    // 7 partidas terminando 1x0; aposta exata (1x0) pontua exato (3 pts).
+    const matches = Array.from({ length: 7 }, (_, i) =>
+      finishedMatch(1, 0, { id: `m${i}`, kickoff: `2026-06-12T10:0${i}:00Z` })
+    );
+
+    const bets = [
+      // user1: 6 exatos seguidos. Cada 3 exatos = 1 fogo e ZERA ambas as sequências
+      // (reset compartilhado), então NÃO há fogo extra pela regra dos 5 jogos.
+      // (m0,m1,m2 = fogo 1; m3,m4,m5 = fogo 2) -> 2 fogos, sequência atual 0.
+      ...Array.from({ length: 6 }, (_, i) => makeBet(1, 0, 'user1', `m${i}`)),
+      // user2: exato m0,m1 -> ERRA m2 (zera pontuação e exatos) -> exato m3,m4 = nenhum fogo
+      makeBet(1, 0, 'user2', 'm0'),
+      makeBet(1, 0, 'user2', 'm1'),
+      makeBet(0, 1, 'user2', 'm2'), // errou (away) -> zera ambas as sequências
+      makeBet(1, 0, 'user2', 'm3'),
+      makeBet(1, 0, 'user2', 'm4'),
+    ];
+
+    const fireCounts = calculateFireCounts(matches, bets, participants);
+
+    // user1: 6 exatos = 2 fogos (3+3). O reset compartilhado impede o 3º fogo dos "5 jogos".
+    expect(fireCounts['user1']).toEqual({ fires: 2, currentStreak: 0 });
+    // user2: nunca chega a 3 exatos seguidos nem a 5 jogos pontuando -> 0 fogos. Sequência atual = 2.
+    expect(fireCounts['user2']).toEqual({ fires: 0, currentStreak: 2 });
+  });
+
+  it('reset compartilhado: 3 exatos + 2 jogos pontuando = só 1 fogo (não 2)', () => {
+    // 5 partidas terminando 1x0
+    const matches = Array.from({ length: 5 }, (_, i) =>
+      finishedMatch(1, 0, { id: `m${i}`, kickoff: `2026-06-12T10:0${i}:00Z` })
+    );
+
+    const bets = [
+      // 3 exatos seguidos -> 1 fogo (e zera a contagem dos 5 jogos)
+      makeBet(1, 0, 'user1', 'm0'),
+      makeBet(1, 0, 'user1', 'm1'),
+      makeBet(1, 0, 'user1', 'm2'),
+      // + 2 jogos pontuando (vencedor). Sem o reset, m0..m4 = 5 pontuando = fogo extra (indevido).
+      makeBet(2, 0, 'user1', 'm3'),
+      makeBet(2, 0, 'user1', 'm4'),
+    ];
+
+    const fireCounts = calculateFireCounts(matches, bets, participants);
+
+    // Apenas 1 fogo; a sequência de pontuação reiniciou após o fogo dos exatos (currentStreak = 2).
+    expect(fireCounts['user1']).toEqual({ fires: 1, currentStreak: 2 });
   });
 
   it('calcula Pé Frio corretamente (único a zerar em jogo com >=2 apostas)', () => {
@@ -478,5 +528,19 @@ describe('Cálculo de Conquistas e Estatísticas', () => {
 
     const timeline = calculateConquestTimeline('user1', matches, bets, participants);
     expect(timeline.some((c) => c.match?.id === 'm2' && c.type === 'profeta')).toBe(true);
+  });
+
+  it('gera conquista ON FIRE ao acertar 3 placares exatos seguidos', () => {
+    const matches = Array.from({ length: 3 }, (_, i) =>
+      finishedMatch(1, 0, { id: `m${i}`, kickoff: `2026-06-12T1${i}:00:00Z` })
+    );
+    const bets = matches.map((m) => makeBet(1, 0, 'user1', m.id)); // 3 exatos seguidos
+
+    const timeline = calculateConquestTimeline('user1', matches, bets, participants);
+    const onFire = timeline.filter((c) => c.type === 'on_fire');
+
+    // Só a regra dos 3 exatos dispara (a dos 5 jogos pontuando precisa de 5 jogos).
+    expect(onFire.length).toBe(1);
+    expect(onFire[0].description).toContain('placar exato em 3 jogos seguidos');
   });
 });

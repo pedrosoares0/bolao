@@ -73,6 +73,17 @@ const isBettable = (kickoff: string, now: number): boolean => {
 // Data de hoje no horário de Brasília (YYYY-MM-DD)
 const getTodayIso = (): string => isoDateFmt.format(new Date());
 
+// Traduz o relógio/etapa ao vivo vindo da ESPN para PT-BR.
+// Ex.: "HT"/"Halftime" -> "Intervalo"; demais valores ("28'", etc.) ficam como vieram.
+const formatLiveClock = (clock?: string | null): string | null => {
+  if (!clock) return null;
+  const normalized = clock.trim().toUpperCase();
+  if (normalized === 'HT' || normalized === 'HALFTIME' || normalized === 'HALF TIME') {
+    return 'Intervalo';
+  }
+  return clock;
+};
+
 // Linha crua da tabela `bets` do Supabase
 interface BetRow {
   user_id: string;
@@ -364,21 +375,23 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid]);
 
-  // Polling de sincronização periódica apenas se houver jogos ao vivo acontecendo
+  // Polling rápido do AO VIVO apenas enquanto há jogo rolando. Usa o endpoint
+  // só-ESPN (/sync-live), que não chama o football-data, então pode ir a cada
+  // 10s sem estourar limites. O Realtime entrega a mudança ao front na hora.
+  const hasLive = useMemo(() => matches.some((m) => m.isLive), [matches]);
   useEffect(() => {
-    const hasLive = matches.some((m) => m.isLive);
     if (!hasLive) return;
 
     const intervalId = setInterval(async () => {
       try {
-        await fetch('/.netlify/functions/sync-matches');
+        await fetch('/.netlify/functions/sync-live');
       } catch (err) {
         console.warn('Erro no sync de jogos ao vivo:', err);
       }
-    }, 30000); // 30 segundos
+    }, 10000); // 10 segundos
 
     return () => clearInterval(intervalId);
-  }, [matches]);
+  }, [hasLive]);
 
   // 5. Mapear apostas cruas (uuid) para o formato do app (username)
   const usernameByUid = useMemo(() => {
@@ -948,7 +961,7 @@ function App() {
                           {match.isLive ? (
                             <span className="live-badge-p16">
                               <span className="live-dot-p16"></span>
-                              AO VIVO{match.liveClock ? ` · ${match.liveClock}` : ''}
+                              AO VIVO{formatLiveClock(match.liveClock) ? ` · ${formatLiveClock(match.liveClock)}` : ''}
                             </span>
                           ) : isFinished ? (
                             <span className="finished-badge-p16">

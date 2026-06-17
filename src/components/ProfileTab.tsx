@@ -182,7 +182,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
           <div className="achievement-rect-middle">
             <span className="achievement-rect-title">ON FIRE</span>
-            <span className="achievement-rect-desc">Fez uma sequência de 5 jogos pontuando.</span>
+            <span className="achievement-rect-desc">Pontuou em 5 jogos seguidos ou acertou 3 placares exatos em sequência.</span>
           </div>
           <div className="achievement-rect-right">
             <span className="achievement-rect-count">{userFire.fires}</span>
