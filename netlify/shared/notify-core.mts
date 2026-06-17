@@ -248,6 +248,13 @@ const msgGoal = (m: MatchRow, sideTeamEn: string, goalInfo?: EspnGoalDetail): st
   return lines.join('\n');
 };
 
+const msgGoalAnnulled = (m: MatchRow, sideTeamEn: string): string =>
+  [
+    `🚫 *GOL ANULADO!* ${flagEmoji(sideTeamEn)} *${ptName(sideTeamEn).toUpperCase()}*`,
+    '',
+    scoreLine(m),
+  ].join('\n');
+
 const msgEnd = (m: MatchRow, scorers: { name: string; points: number; type: ResultType }[]): string => {
   const bloco = scorers.length
     ? ['🎯 *Pontuou nesse jogo:*', ...scorers.map((s) => `• *${s.name}*  +${s.points}  (${typeLabel[s.type] || ''})`)].join('\n')
@@ -345,15 +352,19 @@ export async function runNotifications(
       await sendOnce(supabase, `start:${m.id}`, msgStarted(m));
     }
 
-    // gol (placar subiu enquanto ao vivo)
+    // gol / gol anulado (placar mudou enquanto ao vivo)
     if (isLive(m.status) && m.home_score !== null && m.away_score !== null) {
       const ph = prev.home_score ?? 0;
       const pa = prev.away_score ?? 0;
+
+      // --- GOL: placar subiu ---
       if (m.home_score > ph) {
         const homeGoals = (m.goalsDetail || []).filter(
           (g) => (g.teamId === m.homeTeamId && !g.ownGoal) || (g.teamId === m.awayTeamId && g.ownGoal)
         );
         const goalInfo = homeGoals[m.home_score - 1];
+        // libera um eventual "anulado" desse placar (caso ESTE gol seja anulado depois)
+        await release(supabase, `goalvar:${m.id}:H:${m.home_score}`);
         await sendOnce(supabase, `goal:${m.id}:H:${m.home_score}`, msgGoal(m, m.home_team, goalInfo));
       }
       if (m.away_score > pa) {
@@ -361,7 +372,24 @@ export async function runNotifications(
           (g) => (g.teamId === m.awayTeamId && !g.ownGoal) || (g.teamId === m.homeTeamId && g.ownGoal)
         );
         const goalInfo = awayGoals[m.away_score - 1];
+        await release(supabase, `goalvar:${m.id}:A:${m.away_score}`);
         await sendOnce(supabase, `goal:${m.id}:A:${m.away_score}`, msgGoal(m, m.away_team, goalInfo));
+      }
+
+      // --- GOL ANULADO (VAR): placar caiu enquanto ao vivo ---
+      // Libera os gols desfeitos para que um gol REAL futuro no mesmo placar
+      // volte a notificar (sem o dedup engolir), e avisa a anulação uma vez.
+      if (m.home_score < ph) {
+        for (let s = m.home_score + 1; s <= ph; s++) {
+          await release(supabase, `goal:${m.id}:H:${s}`);
+        }
+        await sendOnce(supabase, `goalvar:${m.id}:H:${ph}`, msgGoalAnnulled(m, m.home_team));
+      }
+      if (m.away_score < pa) {
+        for (let s = m.away_score + 1; s <= pa; s++) {
+          await release(supabase, `goal:${m.id}:A:${s}`);
+        }
+        await sendOnce(supabase, `goalvar:${m.id}:A:${pa}`, msgGoalAnnulled(m, m.away_team));
       }
     }
 
