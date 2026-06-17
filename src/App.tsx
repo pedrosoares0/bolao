@@ -159,6 +159,7 @@ function App() {
 
   const [currentScreen, setCurrentScreen] = useState<'login' | 'splash' | 'app'>('splash');
   const [splashVideo, setSplashVideo] = useState<'intro' | 'reload'>('reload');
+  const splashVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -219,6 +220,22 @@ function App() {
     }, 2000); // 2 segundos de fallback (reload.mp4 tem 1 segundo)
     return () => clearTimeout(timer);
   }, []);
+
+  // iOS/Safari: o autoplay inline só funciona se a PROPRIEDADE `muted` estiver
+  // setada (o React às vezes só seta o atributo). Garantimos via ref e damos um
+  // play() explícito. Se o iOS bloquear mesmo assim (ex.: Modo de Baixo Consumo),
+  // o timer de fallback acima leva pra tela seguinte — ninguém fica preso.
+  useEffect(() => {
+    if (currentScreen !== 'splash') return;
+    const v = splashVideoRef.current;
+    if (!v) return;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute('muted', '');
+    v.setAttribute('playsinline', '');
+    const p = v.play();
+    if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay bloqueado — fallback cuida */ });
+  }, [currentScreen, splashVideo]);
 
   // Toast de notificação (substitui os alert() nativos)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -878,6 +895,7 @@ function App() {
     return (
       <div className="splash-screen" onClick={() => setCurrentScreen(currentUser ? 'app' : 'login')}>
         <video
+          ref={splashVideoRef}
           src={splashVideo === 'intro' ? '/imagens/intro.mp4' : '/imagens/reload.mp4'}
           autoPlay
           muted
