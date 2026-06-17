@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeBet, calculateStandings } from './rules';
+import {
+  analyzeBet,
+  calculateStandings,
+  calculateFireCounts,
+  calculatePeFrioCounts,
+  calculateMvpCounts,
+  calculateConquestTimeline
+} from './rules';
 import { computeChampion, computeBrazilStage } from './specials';
 import type { Match, Bet, Participant } from '../types';
 
@@ -144,6 +151,21 @@ describe('calculateStandings', () => {
     expect(standings[0].totalBets).toBe(1);
   });
 
+  it('inclui jogos ao vivo (isLive: true) no cálculo de pontuação', () => {
+    const matches: Match[] = [
+      finishedMatch(1, 0, { id: 'm1' }),
+      { ...baseMatch, id: 'm2', status: 'scheduled', isLive: true, homeScore: 2, awayScore: 1 }, // ao vivo com gols
+    ];
+    const bets = [
+      makeBet(1, 0, 'pedro', 'm1'), // exato: 3 pts
+      makeBet(2, 1, 'pedro', 'm2'), // exato (ao vivo): 3 pts
+    ];
+
+    const standings = calculateStandings([pedro], matches, bets);
+    expect(standings[0].points).toBe(6);
+    expect(standings[0].totalBets).toBe(2);
+  });
+
   it('calcula o total pago: R$ 2,50 por dia com jogos finalizados', () => {
     const matches = [
       finishedMatch(1, 0, { id: 'm1', date: '12/06', isoDate: '2026-06-12' }),
@@ -272,5 +294,126 @@ describe('computeBrazilStage', () => {
       awayTeamEn: 'A definir',
     };
     expect(computeBrazilStage([brazilGroup(), last32])).toBeNull();
+  });
+});
+
+// ---------- Conquistas / Achievements ----------
+
+describe('Cálculo de Conquistas e Estatísticas', () => {
+  const p1 = makeParticipant('user1', 'User One');
+  const p2 = makeParticipant('user2', 'User Two');
+  const participants = [p1, p2];
+
+  it('calcula fogos (ONFIRE) permanentes e sequência atual', () => {
+    // 6 partidas consecutivas com acertos
+    const matches = Array.from({ length: 6 }, (_, i) =>
+      finishedMatch(1, 0, { id: `m${i}`, kickoff: `2026-06-12T10:0${i}:00Z` })
+    );
+
+    const bets = [
+      // user1 acerta todas (pontos > 0): deve ganhar 1 fogo (aos 5 acertos) e ter sequência atual 1
+      ...matches.map((m) => makeBet(1, 0, 'user1', m.id)),
+      // user2 erra no m3: deve ter 0 fogos e sequência atual 2
+      makeBet(1, 0, 'user2', 'm0'),
+      makeBet(1, 0, 'user2', 'm1'),
+      makeBet(1, 0, 'user2', 'm2'),
+      makeBet(0, 1, 'user2', 'm3'), // errou
+      makeBet(1, 0, 'user2', 'm4'),
+      makeBet(1, 0, 'user2', 'm5'),
+    ];
+
+    const fireCounts = calculateFireCounts(matches, bets, participants);
+
+    expect(fireCounts['user1']).toEqual({ fires: 1, currentStreak: 1 });
+    expect(fireCounts['user2']).toEqual({ fires: 0, currentStreak: 2 });
+  });
+
+  it('calcula Pé Frio corretamente (único a zerar em jogo com >=2 apostas)', () => {
+    const matches = [
+      finishedMatch(1, 0, { id: 'm0' }),
+      finishedMatch(2, 2, { id: 'm1' }),
+    ];
+
+    const bets = [
+      // m0: user1 pontua (1x0), user2 erra (0x1) -> user2 é pé frio
+      makeBet(1, 0, 'user1', 'm0'),
+      makeBet(0, 1, 'user2', 'm0'),
+      // m1: ambos erram -> ninguém é pé frio
+      makeBet(1, 0, 'user1', 'm1'),
+      makeBet(0, 1, 'user2', 'm1'),
+    ];
+
+    const peFrioCounts = calculatePeFrioCounts(matches, bets, participants);
+
+    expect(peFrioCounts['user1']).toBe(0);
+    expect(peFrioCounts['user2']).toBe(1); // foi pé frio no m0
+  });
+
+  it('calcula títulos de MVP da Rodada corretamente', () => {
+    const matches = [
+      finishedMatch(1, 0, { id: 'm0', isoDate: '2026-06-12' }),
+      finishedMatch(2, 0, { id: 'm1', isoDate: '2026-06-12' }),
+      finishedMatch(1, 1, { id: 'm2', isoDate: '2026-06-13' }),
+    ];
+
+    const bets = [
+      // Dia 12/06:
+      // user1: m0 exact (3 pts), m1 exact (3 pts) -> 6 pts, 2 exacts
+      makeBet(1, 0, 'user1', 'm0'),
+      makeBet(2, 0, 'user1', 'm1'),
+      // user2: m0 winner (1 pt), m1 draw (0 pt) -> 1 pt
+      makeBet(2, 0, 'user2', 'm0'),
+      makeBet(1, 1, 'user2', 'm1'),
+
+      // Dia 13/06:
+      // user1: m2 draw (2 pts) -> 2 pts
+      makeBet(0, 0, 'user1', 'm2'),
+      // user2: m2 draw (2 pts) -> 2 pts
+      makeBet(0, 0, 'user2', 'm2'),
+    ];
+
+    const mvpCounts = calculateMvpCounts(matches, bets, participants);
+
+    // user1 deve ser MVP no dia 12 e compartilhar o MVP com user2 no dia 13
+    expect(mvpCounts['user1']).toBe(2);
+    expect(mvpCounts['user2']).toBe(1);
+  });
+
+  it('gera linha do tempo de conquistas cronológica reversa', () => {
+    const matches = [
+      finishedMatch(1, 0, { id: 'm0', date: '12/06', kickoff: '2026-06-12T15:00:00Z', homeTeam: 'A', awayTeam: 'B' }),
+      finishedMatch(2, 0, { id: 'm1', date: '12/06', kickoff: '2026-06-12T18:00:00Z', homeTeam: 'C', awayTeam: 'D' }),
+    ];
+
+    const bets = [
+      makeBet(1, 0, 'user1', 'm0'), // Profeta (exato)
+      makeBet(2, 0, 'user1', 'm1'), // Profeta (exato)
+      makeBet(1, 1, 'user2', 'm0'),
+      makeBet(1, 1, 'user2', 'm1'),
+    ];
+
+    const timeline = calculateConquestTimeline('user1', matches, bets, participants);
+
+    // Deve ter 3 itens: MVP do dia 12/06, Profeta no m1 (18h), Profeta no m0 (15h)
+    expect(timeline.length).toBe(3);
+    expect(timeline[0].type).toBe('mvp');
+    expect(timeline[1].description).toContain('C 2 x 0 D');
+    expect(timeline[2].description).toContain('A 1 x 0 B');
+  });
+
+  it('inclui jogos AO VIVO (isLive) nas conquistas e sequências', () => {
+    const matches: Match[] = [
+      finishedMatch(1, 0, { id: 'm0', status: 'finished' }),
+      finishedMatch(2, 0, { id: 'm1', status: 'finished' }),
+      { ...baseMatch, id: 'm2', homeScore: 3, awayScore: 1, isLive: true },
+    ];
+    const bets = [
+      makeBet(1, 0, 'user1', 'm0'),
+      makeBet(2, 0, 'user1', 'm1'),
+      makeBet(3, 1, 'user1', 'm2'),
+    ];
+
+    const timeline = calculateConquestTimeline('user1', matches, bets, participants);
+    expect(timeline.some((c) => c.match?.id === 'm2' && c.type === 'profeta')).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { runNotifications } from './notify-core.mts';
 import { fetchEspnOverrides, norm, pairKey } from './espn-core.mts';
+import type { EspnGoalDetail } from './espn-core.mts';
 
 // ---- Formato cru de uma partida na football-data.org (só os campos que usamos) ----
 interface ApiTeam {
@@ -48,11 +49,14 @@ interface MatchUpsertRow {
   winner: string | null;
   live_clock: string | null;
   updated_at: string;
+  homeTeamId?: string;
+  awayTeamId?: string;
+  goalsDetail?: EspnGoalDetail[];
 }
 
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
 // e grava/atualiza na tabela `matches` do Supabase usando a service_role.
-// Throttle: se sincronizou há menos de 3 minutos, pula (limite free: 10 req/min).
+// Throttle: se sincronizou há menos de 30 segundos, pula (limite free: 10 req/min).
 export async function syncMatches(force = false): Promise<{ skipped: boolean; count?: number; reason?: string }> {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -66,8 +70,8 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
 
   if (!force) {
     const { data: state } = await supabase.from('sync_state').select('last_sync').eq('id', 1).single();
-    if (state?.last_sync && Date.now() - new Date(state.last_sync).getTime() < 3 * 60 * 1000) {
-      return { skipped: true, reason: 'Sincronizado há menos de 3 minutos.' };
+    if (state?.last_sync && Date.now() - new Date(state.last_sync).getTime() < 30 * 1000) {
+      return { skipped: true, reason: 'Sincronizado há menos de 30 segundos.' };
     }
   }
 
@@ -161,6 +165,9 @@ async function mergeEspnLive(rows: MatchUpsertRow[]): Promise<MatchUpsertRow[]> 
       home_score: fdHomeIsEspnHome ? ov.homeScore : ov.awayScore,
       away_score: fdHomeIsEspnHome ? ov.awayScore : ov.homeScore,
       live_clock: ov.liveClock,
+      homeTeamId: fdHomeIsEspnHome ? ov.homeTeamId : ov.awayTeamId,
+      awayTeamId: fdHomeIsEspnHome ? ov.awayTeamId : ov.homeTeamId,
+      goalsDetail: ov.goalsDetail,
     };
   });
 

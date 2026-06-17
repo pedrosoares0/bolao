@@ -13,7 +13,7 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trophy, Calendar, CheckSquare, PencilLine, Wallet, ListChecks, ChevronDown, ChevronUp, User } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
@@ -22,6 +22,7 @@ import { calcAccumulatedPot } from './utils/pot';
 const StandingsTable = lazy(() => import('./components/StandingsTable'));
 const PixTab = lazy(() => import('./components/PixTab'));
 const PalpitesTab = lazy(() => import('./components/PalpitesTab'));
+const ProfileTab = lazy(() => import('./components/ProfileTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
@@ -183,7 +184,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
-  const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix'>('jogos');
+  const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil'>('jogos');
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
@@ -362,6 +363,22 @@ function App() {
     // a todo momento. O efeito deve rodar só quando o usuário logado muda.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid]);
+
+  // Polling de sincronização periódica apenas se houver jogos ao vivo acontecendo
+  useEffect(() => {
+    const hasLive = matches.some((m) => m.isLive);
+    if (!hasLive) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        await fetch('/.netlify/functions/sync-matches');
+      } catch (err) {
+        console.warn('Erro no sync de jogos ao vivo:', err);
+      }
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(intervalId);
+  }, [matches]);
 
   // 5. Mapear apostas cruas (uuid) para o formato do app (username)
   const usernameByUid = useMemo(() => {
@@ -1059,13 +1076,13 @@ function App() {
                             let pointsText = '0 pts';
                             if (analysis.type === 'exact') {
                               pointsBadgeClass = 'exact';
-                              pointsText = '+3 pts (Placar)';
+                              pointsText = '+3 pts';
                             } else if (analysis.type === 'draw') {
                               pointsBadgeClass = 'draw';
-                              pointsText = '+2 pts (Empate)';
+                              pointsText = '+2 pts';
                             } else if (analysis.type === 'winner') {
                               pointsBadgeClass = 'winner';
-                              pointsText = '+1 pt (Vence)';
+                              pointsText = '+1 pt';
                             } else if (analysis.type === 'pending') {
                               pointsBadgeClass = 'pending';
                               pointsText = 'Pendente';
@@ -1099,7 +1116,14 @@ function App() {
                                       <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
                                     )}
                                     {isPeFrio && (
-                                      <span className="inline-guess-title-p16 pe-frio">🥶 Pé Frio</span>
+                                      <span className="inline-guess-title-p16 pe-frio">
+                                        <img 
+                                          src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75" 
+                                          alt="Pé Frio" 
+                                          className="pe-frio-icon-img" 
+                                        />
+                                        Pé Frio
+                                      </span>
                                     )}
                                     <span className="inline-guess-username-p16">{p.name}</span>
                                   </div>
@@ -1240,6 +1264,20 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* ABA: PERFIL */}
+        {activeTab === 'perfil' && currentUser && (
+          <Suspense fallback={tabFallback}>
+            <ProfileTab
+              currentUser={currentUser}
+              participants={participants}
+              matches={matches}
+              bets={bets}
+              specials={specials}
+              standings={standings}
+            />
+          </Suspense>
+        )}
       </main>
 
       {/* BARRA DE NAVEGAÇÃO INFERIOR */}
@@ -1271,6 +1309,13 @@ function App() {
         >
           <Wallet size={20} />
           <span>Pagamento</span>
+        </button>
+        <button
+          className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
+          onClick={() => setActiveTab('perfil')}
+        >
+          <User size={20} />
+          <span>Perfil</span>
         </button>
       </nav>
 

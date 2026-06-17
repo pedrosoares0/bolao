@@ -193,7 +193,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     if (!matches || !bets) return counts;
 
     const finishedMatches = [...matches]
-      .filter(m => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
+      .filter(m => (m.status === 'finished' || m.isLive) && m.homeScore !== null && m.awayScore !== null)
       .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff));
 
     standings.forEach((standing) => {
@@ -679,7 +679,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     {player.standing.name.toUpperCase()} ESTÁ ON FIRE!
                   </div>
                   <p className="on-fire-desc">
-                    São 5 jogos consecutivos pontuando. Ninguém consegue parar o homem.
+                    Fez 5 jogos consecutivos pontuando. Ninguém consegue parar o homem.
                   </p>
                   {(fireCounts[player.standing.participantId] || 0) > 0 && (
                     <div className="on-fire-count-badge">

@@ -487,11 +487,10 @@ body {
 }
 
 .inline-guess-avatar-border-p16 {
-  width: 44px;
-  height: 44px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid #ffdf00; /* Borda dourada */
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
@@ -542,9 +541,10 @@ body {
 }
 
 .inline-guess-title-p16.pe-frio {
-  color: #0c4a6e;
-  background: linear-gradient(135deg, #e0f2fe, #cffafe);
-  border: 1px solid #7dd3fc;
+  color: #e2e8f0;
+  background: linear-gradient(135deg, #334155, #1e293b);
+  border: 1px solid #64748b;
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.25);
 }
 
 .inline-guess-result-info-p16 {
@@ -587,10 +587,10 @@ body {
   font-family: var(--font-family);
   font-size: 0.7rem;
   font-weight: 800;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.5rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
   color: #ffffff;
-  min-width: 76px;
+  min-width: 68px;
   text-align: center;
 }
 
@@ -909,7 +909,7 @@ body {
 .participants-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   cursor: pointer;
   padding: 0.25rem 0;
   user-select: none;
@@ -926,6 +926,7 @@ body {
   text-transform: uppercase;
   opacity: 0.9;
   transition: color 0.2s ease;
+  text-align: center;
 }
 
 .participants-header:hover .participants-title {
@@ -978,7 +979,7 @@ body {
 .participants-stacked-container {
   position: relative;
   width: 100%;
-  height: 360px;
+  height: 400px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -989,8 +990,8 @@ body {
 
 .participant-stacked-card {
   position: absolute;
-  width: 240px;
-  height: 315px;
+  width: 270px;
+  height: 354px;
   border-radius: 1.5rem;
   background-color: #120e0c;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1658,15 +1659,15 @@ body {
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 32px);
-  max-width: 440px;
+  width: calc(100% - 48px);
+  max-width: 380px;
 
   /* Liquid Glass Premium */
   background: rgba(21, 17, 14, 0.55);
   backdrop-filter: blur(24px) saturate(200%) contrast(110%);
   -webkit-backdrop-filter: blur(24px) saturate(200%) contrast(110%);
 
-  border-radius: 2rem;
+  border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 
   display: flex;
@@ -1694,7 +1695,7 @@ body {
   gap: 0.2rem;
   transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* iOS-like springy transition */
   padding: 0.45rem 0;
-  border-radius: 1rem;
+  border-radius: 9999px;
   transform-origin: center;
 }
 
@@ -2203,42 +2204,115 @@ body {
 
 .history-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  padding: 0.65rem 0.85rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.history-info {
+.history-row-header {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 0.5rem;
 }
 
 .history-date {
   font-family: var(--font-family);
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.45);
   text-transform: uppercase;
 }
 
-.history-teams {
+.history-matchup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0.25rem 0;
+}
+
+.history-team {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.history-team.home {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.history-team.away {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.history-team-name {
   font-family: var(--font-family);
   font-size: 0.85rem;
   font-weight: 800;
   color: #F2ECDD;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.history-bet {
+.history-flag {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.history-score-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.25rem 0.6rem;
+  font-family: var(--font-family-condensed);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+  min-width: 54px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.history-bet-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: rgba(245, 179, 0, 0.06);
+  border: 1px solid rgba(245, 179, 0, 0.15);
+  border-radius: 10px;
+  padding: 0.35rem 0.75rem;
+  margin-top: 0.1rem;
+}
+
+.history-bet-label {
   font-family: var(--font-family);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.history-bet-value {
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--accent-gold);
 }
 
@@ -2490,40 +2564,40 @@ body {
 .live-badge-p16 {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  background-color: #ef4444; /* Vermelho vibrante */
-  color: #ffffff;
+  gap: 0.35rem;
+  background-color: #dc2626; /* Vermelho vivo sólido para contraste e destaque */
+  color: #ffffff; /* Texto branco nítido */
   font-family: var(--font-family);
-  font-size: 0.65rem;
-  font-weight: 900;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
   animation: pulse-live 2s infinite ease-in-out;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
 }
 
 .finished-badge-p16 {
   display: inline-flex;
   align-items: center;
-  background-color: #5c534c; /* Marrom acinzentado/muted do tema */
-  color: #F2ECDD; /* Bege claro */
+  background-color: #3d3530; /* Marrom-grafite escuro sofisticado */
+  color: #F2ECDD; /* Bege claro da identidade visual */
   font-family: var(--font-family);
-  font-size: 0.65rem;
-  font-weight: 900;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  letter-spacing: 0.08em;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-
 .live-dot-p16 {
-  width: 6px;
-  height: 6px;
-  background-color: #ffffff;
+  width: 5px;
+  height: 5px;
+  background-color: #ffffff; /* Dot branco brilhante pulsante */
   border-radius: 50%;
+  box-shadow: 0 0 4px #ffffff;
   display: inline-block;
   animation: pulse-dot-live 1.2s infinite ease-in-out;
 }
@@ -3447,5 +3521,938 @@ body {
 .ranking-share-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .ranking-share-btn:active { transform: translateY(1px) scale(0.98); }
 .ranking-share-btn:disabled { opacity: 0.65; cursor: default; transform: none; }
+
+
+/* ==========================================================================
+   PROFILE TAB — SEÇÃO DE PERFIL E CONQUISTAS DO BOLÃO
+   ========================================================================== */
+
+.profile-tab-container-p16 {
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* 1. SELETOR DE PARTICIPANTE */
+.profile-selector-wrapper {
+  position: relative;
+  width: 100%;
+  z-index: 80;
+}
+
+.profile-selector-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 2rem;
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+.profile-selector-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.profile-selector-current-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.profile-selector-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  object-fit: cover;
+}
+
+.profile-selector-name {
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.profile-selector-arrow {
+  color: rgba(255, 255, 255, 0.6);
+  transition: transform 0.2s ease;
+}
+
+.profile-selector-arrow.open {
+  transform: rotate(180deg);
+}
+
+.profile-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: rgba(21, 17, 14, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 90;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.profile-dropdown-list {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profile-dropdown-item {
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-smooth);
+}
+
+.profile-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.profile-dropdown-item.active {
+  background: rgba(0, 156, 59, 0.15);
+  border: 1px solid rgba(0, 156, 59, 0.3);
+}
+
+.profile-dropdown-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.profile-dropdown-name {
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-grow: 1;
+}
+
+.profile-dropdown-badge {
+  background: #009c3b;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+/* 2. CARD DO CABEÇALHO DO PERFIL */
+.profile-header-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+.profile-header-bg-glow {
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(0, 156, 59, 0.15) 0%, transparent 70%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.profile-header-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.profile-header-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-header-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 3px solid #f5b300; /* Gold premium border */
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.profile-header-rank-badge {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  background: #f5b300;
+  color: #15110E;
+  font-family: var(--font-family-condensed);
+  font-size: 0.8rem;
+  font-weight: 900;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #15110E;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.profile-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.profile-header-name {
+  font-family: var(--font-family-condensed);
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.profile-header-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.profile-header-stat-pts b,
+.profile-header-stat-bets b {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.profile-header-stat-divider {
+  opacity: 0.4;
+}
+
+/* GRID DE DETALHES DE PONTOS */
+.profile-stats-grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.profile-stat-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: var(--transition-smooth);
+}
+
+.profile-stat-box:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.profile-stat-val {
+  font-family: var(--font-family-condensed);
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.profile-stat-val.val-exact { color: #4ade80 !important; }
+.profile-stat-val.val-draw { color: #38bdf8 !important; }
+.profile-stat-val.val-winner { color: #f5b300 !important; }
+.profile-stat-val.val-wrong { color: #ef4444 !important; }
+
+.profile-stat-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 0.15rem;
+  letter-spacing: 0.05em;
+}
+
+/* 3. SEPARADORES DE SEÇÃO */
+.profile-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-section-icon {
+  color: #f5b300;
+}
+
+.profile-section-title {
+  font-family: var(--font-family-condensed);
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.08em;
+}
+
+/* 4. GRID DE CONQUISTAS (CARDS GLOW) */
+.profile-achievements-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.achievement-card {
+  position: relative;
+  background: rgba(21, 17, 14, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--border-radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.achievement-card:hover {
+  transform: translateY(-2px);
+}
+
+.achievement-card-glow {
+  position: absolute;
+  top: -60px;
+  left: -60px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  filter: blur(28px);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.15;
+}
+
+.achievement-card-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.achievement-icon-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.achievement-icon {
+  z-index: 2;
+}
+
+.achievement-counter-badge {
+  font-family: var(--font-family-condensed);
+  font-size: 1.45rem;
+  font-weight: 900;
+  z-index: 2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.achievement-title {
+  position: relative;
+  z-index: 2;
+  font-family: var(--font-family-condensed);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-top: 0.2rem;
+}
+
+.achievement-desc {
+  position: relative;
+  z-index: 2;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.3;
+}
+
+.achievement-card-footer {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.4rem;
+}
+
+/* CARDS ESPECÍFICOS */
+/* ON FIRE (Laranja) */
+.achievement-card.on-fire {
+  border-color: rgba(255, 95, 0, 0.25);
+}
+.achievement-card.on-fire .achievement-card-glow {
+  background: #ff5f00;
+  opacity: 0.22;
+}
+.achievement-card.on-fire .achievement-icon-circle {
+  background: rgba(255, 95, 0, 0.15);
+}
+.achievement-card.on-fire .achievement-icon {
+  color: #ff5f00;
+  filter: drop-shadow(0 0 6px rgba(255, 95, 0, 0.6));
+}
+.achievement-card.on-fire .achievement-counter-badge {
+  color: #ff5f00;
+}
+.achievement-card.on-fire .achievement-title {
+  color: #ffaa7f;
+}
+
+/* Progresso de sequencia */
+.achievement-progress-wrap {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.achievement-progress-labels {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.achievement-progress-labels b {
+  color: #ffaa7f;
+}
+.achievement-progress-bar-bg {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.achievement-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5f00 0%, #ffdf00 100%);
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(255, 95, 0, 0.6);
+  transition: width 0.4s ease-out;
+}
+
+/* PROFETA (Roxo) */
+.achievement-card.profeta {
+  border-color: rgba(138, 43, 226, 0.25);
+}
+.achievement-card.profeta .achievement-card-glow {
+  background: #8a2be2;
+  opacity: 0.2;
+}
+.achievement-card.profeta .achievement-icon-circle {
+  background: rgba(138, 43, 226, 0.15);
+}
+.achievement-card.profeta .achievement-icon {
+  color: #c084fc;
+  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.5));
+}
+.achievement-card.profeta .achievement-counter-badge {
+  color: #c084fc;
+}
+.achievement-card.profeta .achievement-title {
+  color: #d8b4fe;
+}
+.achievement-card.profeta .achievement-card-footer b {
+  color: #c084fc;
+}
+
+/* PÉ FRIO (Dark Red) */
+.achievement-card.pe-frio {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+.achievement-card.pe-frio .achievement-card-glow {
+  background: #ef4444;
+  opacity: 0.15;
+}
+.achievement-card.pe-frio .achievement-icon-circle {
+  background: rgba(239, 68, 68, 0.12);
+}
+.achievement-card.pe-frio .achievement-icon {
+  color: #f87171;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+}
+.achievement-card.pe-frio .achievement-counter-badge {
+  color: #f87171;
+}
+.achievement-card.pe-frio .achievement-title {
+  color: #fca5a5;
+}
+
+/* MVP (Ouro) */
+.achievement-card.mvp {
+  border-color: rgba(245, 179, 0, 0.25);
+}
+.achievement-card.mvp .achievement-card-glow {
+  background: #f5b300;
+  opacity: 0.2;
+}
+.achievement-card.mvp .achievement-icon-circle {
+  background: rgba(245, 179, 0, 0.15);
+}
+.achievement-card.mvp .achievement-icon {
+  color: #f5b300;
+  filter: drop-shadow(0 0 6px rgba(245, 179, 0, 0.5));
+}
+.achievement-card.mvp .achievement-counter-badge {
+  color: #f5b300;
+}
+.achievement-card.mvp .achievement-title {
+  color: #fde047;
+}
+.achievement-card.mvp .achievement-card-footer b {
+  color: #f5b300;
+}
+
+/* 5. LINHA DO TEMPO */
+.profile-timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-left: 0.5rem;
+  position: relative;
+}
+
+/* Linha vertical tracejada de fundo */
+.profile-timeline-container::before {
+  content: '';
+  position: absolute;
+  left: 28px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-style: dashed;
+}
+
+.profile-timeline-item {
+  display: flex;
+  gap: 1rem;
+  position: relative;
+  z-index: 2;
+  animation: slideUp 0.25s ease-out;
+}
+
+.profile-timeline-badge {
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  background: #15110E;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.profile-timeline-date {
+  font-family: var(--font-family-condensed);
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.profile-timeline-card {
+  flex-grow: 1;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0.88rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  transition: var(--transition-smooth);
+}
+
+.profile-timeline-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.profile-timeline-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.2rem;
+}
+
+.profile-timeline-title {
+  font-family: var(--font-family-condensed);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.profile-timeline-desc {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.35;
+}
+
+/* Icones e Cores específicas na timeline */
+.profile-timeline-item.profeta .profile-timeline-title { color: #d8b4fe; }
+.profile-timeline-item.profeta .profile-timeline-badge { border-color: rgba(138, 43, 226, 0.3); }
+
+.profile-timeline-item.pe_frio .profile-timeline-title { color: #94a3b8; }
+.profile-timeline-item.pe_frio .profile-timeline-badge { border-color: rgba(100, 116, 139, 0.25); }
+
+.profile-timeline-item.on_fire .profile-timeline-title { color: #ffaa7f; }
+.profile-timeline-item.on_fire .profile-timeline-badge { border-color: rgba(255, 95, 0, 0.3); }
+
+.profile-timeline-item.mvp .profile-timeline-title { color: #fde047; }
+.profile-timeline-item.mvp .profile-timeline-badge { border-color: rgba(245, 179, 0, 0.3); }
+
+.profile-timeline-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8rem;
+  font-style: italic;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 6. CAIXA DE PALPITES ESPECIAIS NO PERFIL */
+.profile-specials-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0.88rem;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-specials-title {
+  font-family: var(--font-family-condensed);
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.15rem;
+}
+
+.profile-specials-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.profile-special-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-special-emoji {
+  font-size: 1.15rem;
+}
+
+.profile-special-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-special-label {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 700;
+}
+
+.profile-special-value {
+  font-size: 0.78rem;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.inline-guess-badge-p16.pe-frio-badge {
+  color: #e2e8f0;
+  background: linear-gradient(135deg, #334155, #1e293b);
+  border: 1px solid #64748b;
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.25);
+}
+
+.pe-frio-icon-img {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+}
+
+/* ==========================================================================
+   PROFILE REDESIGN — NEW STYLES
+   ========================================================================== */
+
+/* Especial flags in Specials Box */
+.profile-special-flag-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.profile-special-flag-wrap:hover {
+  transform: scale(1.08);
+}
+
+.profile-special-flag-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Rectangular Achievements List Layout */
+.achievement-list-rect {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.achievement-card-rect {
+  position: relative;
+  background-color: rgba(13, 10, 8, 0.55); /* Dark semi-transparent base for glassmorphism */
+  border: 1px solid rgba(255, 255, 255, 0.12); /* Subtle glass border */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 1.5rem; /* Extra rounded to match header card */
+  padding: 0.95rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.05); /* Soft inner glow */
+}
+
+.achievement-card-rect:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(2px);
+}
+
+.achievement-rect-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px; /* Fixed width to align titles perfectly */
+  height: 48px;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.achievement-rect-emoji {
+  font-size: 2.6rem; /* Increased size, no circle */
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.achievement-rect-img {
+  width: 42px; /* Increased size, no circle */
+  height: 42px;
+  object-fit: contain;
+  display: block;
+}
+
+.achievement-rect-middle {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+
+.achievement-rect-title {
+  font-family: var(--font-family-condensed);
+  font-size: 1.25rem !important; /* Increased font size */
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  -webkit-text-stroke: 0px !important; /* Remove any border/stroke */
+  text-stroke: 0px !important;
+  text-shadow: none !important;
+}
+
+.achievement-rect-desc {
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 0.15rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.achievement-rect-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.achievement-rect-count {
+  font-family: var(--font-family-condensed);
+  font-size: 1.75rem; /* Increased size for visual prominence */
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Gradients and animations for icons and counts + Aurora Effect for card backgrounds */
+
+/* 1. ON FIRE (Red/Fire theme) */
+.achievement-card-rect.on-fire {
+  background-color: rgba(13, 10, 8, 0.5); /* Let Aurora canvas show through */
+}
+.achievement-card-rect.on-fire .achievement-rect-emoji {
+  display: inline-block;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 8px rgba(255, 62, 0, 0.5));
+}
+.achievement-card-rect.on-fire .achievement-rect-count {
+  color: #ff5f00;
+  text-shadow: 0 0 10px rgba(255, 95, 0, 0.45);
+}
+
+/* 2. PROFETA (Purple/Mystic theme) */
+.achievement-card-rect.profeta {
+  background-color: rgba(13, 10, 8, 0.5); /* Let Aurora canvas show through */
+}
+.achievement-card-rect.profeta .achievement-rect-emoji {
+  display: inline-block;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 8px rgba(138, 43, 226, 0.5));
+}
+.achievement-card-rect.profeta .achievement-rect-count {
+  color: #c084fc;
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.45);
+}
+
+/* 3. PÉ FRIO (Gray/Slate theme) */
+.achievement-card-rect.pe-frio {
+  background-color: rgba(13, 10, 8, 0.5); /* Let Aurora canvas show through */
+}
+.achievement-card-rect.pe-frio .achievement-rect-img {
+  filter: drop-shadow(0 2px 8px rgba(100, 116, 139, 0.45));
+}
+.achievement-card-rect.pe-frio .achievement-rect-count {
+  color: #94a3b8;
+  text-shadow: 0 0 10px rgba(148, 163, 184, 0.3);
+}
+
+/* 4. MVP (Gold/Prize theme) */
+.achievement-card-rect.mvp {
+  background-color: rgba(13, 10, 8, 0.5); /* Let Aurora canvas show through */
+}
+.achievement-card-rect.mvp .achievement-rect-img {
+  filter: drop-shadow(0 2px 8px rgba(245, 179, 0, 0.55));
+}
+.achievement-card-rect.mvp .achievement-rect-count {
+  color: #f5b300;
+  text-shadow: 0 0 10px rgba(245, 179, 0, 0.45);
+}
+
+@keyframes gold-img-pulse {
+  0% {
+    filter: drop-shadow(0 2px 6px rgba(245, 179, 0, 0.4));
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 2px 16px rgba(255, 224, 102, 0.8));
+    transform: scale(1.06);
+  }
+}
+
+/* Profile header visual fixes */
+.profile-header-avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.animate-scale {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.animate-scale:hover {
+  transform: scale(1.03);
+}
+
+
+
 
 

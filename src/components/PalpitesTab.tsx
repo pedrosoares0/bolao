@@ -225,19 +225,44 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
 
                   return (
                     <div key={m.id} className="history-row">
-                      <div className="history-info">
+                      <div className="history-row-header">
                         <span className="history-date">{m.group} · {m.time}</span>
-                        <div className="history-teams" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <img src={flagSrc(m.homeFlag, 40)} alt={m.homeTeam} style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
-                          <span>{m.homeTeam} {realScore} {m.awayTeam}</span>
-                          <img src={flagSrc(m.awayFlag, 40)} alt={m.awayTeam} style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                        <div className={`inline-guess-badge-p16 ${badgeClass}`}>
+                          {badgeText}
                         </div>
-                        <span className="history-bet">
-                          Seu palpite: {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
-                        </span>
                       </div>
-                      <div className={`inline-guess-badge-p16 ${badgeClass}`}>
-                        {badgeText}
+
+                      <div className="history-matchup">
+                        <div className="history-team home">
+                          <span className="history-team-name">{m.homeTeam}</span>
+                          <img
+                            src={flagSrc(m.homeFlag, 40)}
+                            alt={m.homeTeam}
+                            className="history-flag"
+                            onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
+                          />
+                        </div>
+
+                        <div className="history-score-badge">
+                          {realScore}
+                        </div>
+
+                        <div className="history-team away">
+                          <img
+                            src={flagSrc(m.awayFlag, 40)}
+                            alt={m.awayTeam}
+                            className="history-flag"
+                            onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
+                          />
+                          <span className="history-team-name">{m.awayTeam}</span>
+                        </div>
+                      </div>
+
+                      <div className="history-bet-row">
+                        <span className="history-bet-label">Seu palpite:</span>
+                        <span className="history-bet-value">
+                          {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
+                        </span>
                       </div>
                     </div>
                   );

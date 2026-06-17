@@ -11,6 +11,13 @@
 // ("pre" | "in" | "post"), placar e o relógio (shortDetail, ex.: "28'").
 // ============================================================
 
+export interface EspnGoalDetail {
+  teamId: string;
+  scorer: string;
+  minute: string;
+  ownGoal: boolean;
+}
+
 // ---- Override de um jogo segundo a ESPN (só ao vivo ou encerrado) ----
 export interface EspnOverride {
   status: 'IN_PLAY' | 'FINISHED';
@@ -19,13 +26,25 @@ export interface EspnOverride {
   liveClock: string | null; // minuto/etapa enquanto ao vivo; null quando encerrado
   homeNorm: string;         // nome normalizado do mandante (p/ alinhar o placar)
   dateIso: string;          // dia do jogo em UTC (YYYY-MM-DD), p/ conferência
+  homeTeamId: string;
+  awayTeamId: string;
+  goalsDetail: EspnGoalDetail[];
 }
 
 // ---- Formato (parcial) do scoreboard da ESPN ----
-interface EspnTeam { displayName?: string; name?: string; }
+interface EspnTeam { id?: string; displayName?: string; name?: string; }
 interface EspnCompetitor { homeAway?: string; score?: string; team?: EspnTeam; }
 interface EspnStatusType { state?: string; completed?: boolean; shortDetail?: string; }
-interface EspnCompetition { competitors?: EspnCompetitor[]; status?: { type?: EspnStatusType }; }
+interface EspnAthlete { displayName?: string; fullName?: string; }
+interface EspnDetail {
+  type?: { text?: string };
+  scoringPlay?: boolean;
+  team?: { id?: string };
+  athletesInvolved?: EspnAthlete[];
+  clock?: { displayValue?: string };
+  ownGoal?: boolean;
+}
+interface EspnCompetition { competitors?: EspnCompetitor[]; status?: { type?: EspnStatusType }; details?: EspnDetail[]; }
 interface EspnEvent { date?: string; competitions?: EspnCompetition[]; }
 interface EspnScoreboard { events?: EspnEvent[]; }
 
@@ -91,6 +110,19 @@ export async function fetchEspnOverrides(): Promise<Map<string, EspnOverride>> {
     const awayName = away?.team?.displayName ?? away?.team?.name ?? '';
     if (!homeName || !awayName) continue;
 
+    const goalsDetail: EspnGoalDetail[] = [];
+    if (comp?.details) {
+      for (const d of comp.details) {
+        if (d.type?.text?.toLowerCase() === 'goal' || d.scoringPlay === true) {
+          const teamId = d.team?.id ?? '';
+          const scorer = d.athletesInvolved?.[0]?.displayName || d.athletesInvolved?.[0]?.fullName || '';
+          const minute = d.clock?.displayValue || '';
+          const ownGoal = d.ownGoal === true;
+          goalsDetail.push({ teamId, scorer, minute, ownGoal });
+        }
+      }
+    }
+
     map.set(pairKey(homeName, awayName), {
       status: isLive ? 'IN_PLAY' : 'FINISHED',
       homeScore: parseInt(home?.score ?? '0', 10) || 0,
@@ -98,6 +130,9 @@ export async function fetchEspnOverrides(): Promise<Map<string, EspnOverride>> {
       liveClock: isLive ? (type?.shortDetail ?? null) : null,
       homeNorm: norm(homeName),
       dateIso: (ev.date ?? '').slice(0, 10),
+      homeTeamId: home?.team?.id ?? '',
+      awayTeamId: away?.team?.id ?? '',
+      goalsDetail,
     });
   }
 

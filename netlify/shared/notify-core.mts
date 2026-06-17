@@ -17,6 +17,7 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { EspnGoalDetail } from './espn-core.mts';
 
 // ---- Linha crua da tabela `matches` (o que sync-core monta) ----
 interface MatchRow {
@@ -29,6 +30,9 @@ interface MatchRow {
   away_team: string;
   home_score: number | null;
   away_score: number | null;
+  homeTeamId?: string;
+  awayTeamId?: string;
+  goalsDetail?: EspnGoalDetail[];
 }
 
 interface PrevState {
@@ -232,12 +236,17 @@ const msgStarted = (m: MatchRow): string =>
     'Palpites encerrados. Boa sorte! 🍀',
   ].join('\n');
 
-const msgGoal = (m: MatchRow, sideTeamEn: string): string =>
-  [
-    `⚽ *GOOOOL!* ${flagEmoji(sideTeamEn)} *${ptName(sideTeamEn).toUpperCase()}*`,
-    '',
-    scoreLine(m),
-  ].join('\n');
+const msgGoal = (m: MatchRow, sideTeamEn: string, goalInfo?: EspnGoalDetail): string => {
+  const lines = [
+    `⚽ *GOOOOL!* ${flagEmoji(sideTeamEn)} *${ptName(sideTeamEn).toUpperCase()}*`
+  ];
+  if (goalInfo) {
+    lines.push(`🥅 *${goalInfo.scorer}* (${goalInfo.minute})${goalInfo.ownGoal ? ' (Contra)' : ''}`);
+  }
+  lines.push('');
+  lines.push(scoreLine(m));
+  return lines.join('\n');
+};
 
 const msgEnd = (m: MatchRow, scorers: { name: string; points: number; type: ResultType }[]): string => {
   const bloco = scorers.length
@@ -341,10 +350,18 @@ export async function runNotifications(
       const ph = prev.home_score ?? 0;
       const pa = prev.away_score ?? 0;
       if (m.home_score > ph) {
-        await sendOnce(supabase, `goal:${m.id}:H:${m.home_score}`, msgGoal(m, m.home_team));
+        const homeGoals = (m.goalsDetail || []).filter(
+          (g) => (g.teamId === m.homeTeamId && !g.ownGoal) || (g.teamId === m.awayTeamId && g.ownGoal)
+        );
+        const goalInfo = homeGoals[m.home_score - 1];
+        await sendOnce(supabase, `goal:${m.id}:H:${m.home_score}`, msgGoal(m, m.home_team, goalInfo));
       }
       if (m.away_score > pa) {
-        await sendOnce(supabase, `goal:${m.id}:A:${m.away_score}`, msgGoal(m, m.away_team));
+        const awayGoals = (m.goalsDetail || []).filter(
+          (g) => (g.teamId === m.awayTeamId && !g.ownGoal) || (g.teamId === m.homeTeamId && g.ownGoal)
+        );
+        const goalInfo = awayGoals[m.away_score - 1];
+        await sendOnce(supabase, `goal:${m.id}:A:${m.away_score}`, msgGoal(m, m.away_team, goalInfo));
       }
     }
 
