@@ -830,7 +830,7 @@ function App() {
     return (
       <div className="login-screen-container">
         <div className="login-banner-container">
-          <img src="/imagens/login.webp" alt="Bandidos Apostados" className="login-banner-img" />
+          <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Bandidos Apostados" className="login-banner-img" />
           <div className="login-ribbon-divider"></div>
         </div>
 
@@ -898,7 +898,7 @@ function App() {
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
           <div className="app-header-card-gradient-border">
-            <img src="/imagens/login.webp" alt="Bandidos Apostados Banner" className="app-header-card-img" />
+            <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Bandidos Apostados Banner" className="app-header-card-img" />
           </div>
         </div>
       )}
@@ -1022,7 +1022,7 @@ function App() {
                           {/* Time 1 (Mandante) */}
                           <div className={homeClasses}>
                             <div className="team-flag-badge-p16">
-                              <img
+                              <img loading="lazy" decoding="async"
                                 src={flagSrc(match.homeFlag, 80)}
                                 alt={match.homeTeam}
                                 className="team-flag-img-p16"
@@ -1065,7 +1065,7 @@ function App() {
                           {/* Time 2 (Visitante) */}
                           <div className={awayClasses}>
                             <div className="team-flag-badge-p16">
-                              <img
+                              <img loading="lazy" decoding="async"
                                 src={flagSrc(match.awayFlag, 80)}
                                 alt={match.awayTeam}
                                 className="team-flag-img-p16"
@@ -1162,7 +1162,7 @@ function App() {
                                 <div key={p.id} className="inline-guess-row-p16">
                                   <div className="inline-guess-user-info-p16">
                                     <div className="inline-guess-avatar-border-p16">
-                                      <img
+                                      <img loading="lazy" decoding="async"
                                         src={`/imagens/ranking ${p.id}.webp`}
                                         alt={p.name}
                                         className="inline-guess-avatar-img-p16"
@@ -1177,7 +1177,7 @@ function App() {
                                       )}
                                       {isPeFrio && (
                                         <span className="inline-guess-title-p16 pe-frio">
-                                          <img
+                                          <img loading="lazy" decoding="async"
                                             src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75"
                                             alt="Pé Frio"
                                             className="pe-frio-icon-img"
@@ -1196,7 +1196,7 @@ function App() {
                                           {bet.homeScore} x {bet.awayScore}
                                         </span>
                                         {predictedWinnerFlag && (
-                                          <img
+                                          <img loading="lazy" decoding="async"
                                             src={flagSrc(predictedWinnerFlag, 40)}
                                             alt="Palpite Vencedor"
                                             className="inline-guess-winner-flag-p16"

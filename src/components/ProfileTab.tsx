@@ -73,7 +73,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         <div className="profile-header-bg-glow"></div>
         <div className="profile-header-content">
           <div className="profile-header-avatar-wrap">
-            <img
+            <img loading="lazy" decoding="async"
               src={getAvatarUrl(selectedUser.id)}
               alt={selectedUser.name}
               className="profile-header-avatar"
@@ -124,7 +124,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             <div className="profile-special-item">
               <div className="profile-special-flag-wrap">
                 {userSpecial ? (
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={flagSrc(flagOf(userSpecial.championTeam, ''), 40)}
                     alt={userSpecial.championTeam}
                     className="profile-special-flag-img"
@@ -143,7 +143,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             </div>
             <div className="profile-special-item">
               <div className="profile-special-flag-wrap">
-                <img
+                <img loading="lazy" decoding="async"
                   src={flagSrc('br', 40)}
                   alt="Brasil"
                   className="profile-special-flag-img"
@@ -245,7 +245,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             speed={0.45}
           />
           <div className="achievement-rect-left">
-            <img
+            <img loading="lazy" decoding="async"
               src={PE_FRIO_IMG}
               alt="Pé Frio"
               className="achievement-rect-img"
@@ -269,7 +269,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             speed={0.45}
           />
           <div className="achievement-rect-left">
-            <img
+            <img loading="lazy" decoding="async"
               src="/imagens/coroa-mvp.png"
               alt="MVP"
               className="achievement-rect-img"
@@ -312,7 +312,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                     <span className="history-date">{m.group} · {c.date}</span>
                     <div className={`inline-guess-badge-p16 ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       {!isProfeta && (
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={PE_FRIO_IMG}
                           alt="Pé Frio"
                           style={{ width: '12px', height: '12px', objectFit: 'contain' }}
@@ -325,7 +325,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                   <div className="history-matchup">
                     <div className="history-team home">
                       <span className="history-team-name">{m.homeTeam}</span>
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={flagSrc(m.homeFlag, 40)}
                         alt={m.homeTeam}
                         className="history-flag"
@@ -338,7 +338,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                     </div>
 
                     <div className="history-team away">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={flagSrc(m.awayFlag, 40)}
                         alt={m.awayTeam}
                         className="history-flag"
@@ -367,7 +367,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                   <div className="history-row-header">
                     <span className="history-date">Rodada · {c.date}</span>
                     <div className="inline-guess-badge-p16 mvp-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <img
+                      <img loading="lazy" decoding="async"
                         src="/imagens/coroa-mvp.png"
                         alt="MVP"
                         style={{ width: '12px', height: '12px', objectFit: 'contain' }}

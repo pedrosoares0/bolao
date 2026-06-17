@@ -129,7 +129,7 @@ const Slideshow: React.FC = () => {
                 onTouchEnd={handleDragEnd}
               >
                 <div className="participant-card-image-wrapper">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={slide.img}
                     alt={slide.name}
                     className="participant-stacked-img"
@@ -188,7 +188,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
   // Usa a regra compartilhada em utils/rules (calculateFireCounts): ganha +1 fogo
   // PERMANENTE ao pontuar em 5 jogos seguidos OU acertar o placar exato em 3 jogos
   // seguidos. Os fogos já conquistados nunca são removidos.
-  const fireCounts = ((): Record<string, number> => {
+  const fireCounts = React.useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
     const participants = standings.map((s) => ({
       id: s.participantId,
@@ -198,7 +198,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
     const raw = calculateFireCounts(matches, bets, participants);
     Object.keys(raw).forEach((id) => { counts[id] = raw[id].fires; });
     return counts;
-  })();
+  }, [standings, matches, bets]);
 
   const onFirePlayers = standings
     .filter(standing => (fireCounts[standing.participantId] || 0) > 0)
@@ -321,7 +321,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
               speed={0.5}
             />
             <div className="round-mvp-avatar-wrap">
-              <img
+              <img loading="lazy" decoding="async"
                 src={getRankingAvatar(roundMvp.standing.participantId)}
                 alt={roundMvp.standing.name}
                 className="round-mvp-avatar"
@@ -333,7 +333,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
 
             <div className="round-mvp-content">
               <div className="round-mvp-meta">
-                <img
+                <img loading="lazy" decoding="async"
                   src="/imagens/coroa-mvp.png"
                   alt="Coroa MVP"
                   className="round-mvp-crown-img"
@@ -374,7 +374,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
             <div className={`podium-card second-place-card ${imageErrors[secondPlace.participantId] ? 'has-error' : ''}`}>
               {!imageErrors[secondPlace.participantId] ? (
                 <>
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={getPodiumImage(secondPlace.participantId)}
                     alt={secondPlace.name}
                     className="podium-card-img-bg"
@@ -385,7 +385,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   <div className="podium-card-overlay"></div>
                   <div className="podium-bg-number">2</div>
                   <div className="podium-medal-wrapper">
-                    <img src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
+                    <img loading="lazy" decoding="async" src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-player-info-row">
@@ -404,11 +404,11 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 <>
                   <div className="podium-bg-number">2</div>
                   <div className="podium-medal-wrapper">
-                    <img src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
+                    <img loading="lazy" decoding="async" src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-fallback-avatar-container">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={getRankingAvatar(secondPlace.participantId)}
                       alt={secondPlace.name}
                       className="podium-fallback-avatar"
@@ -438,7 +438,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
             <div className={`podium-card first-place-card ${imageErrors[firstPlace.participantId] ? 'has-error' : ''}`}>
               {!imageErrors[firstPlace.participantId] ? (
                 <>
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={getPodiumImage(firstPlace.participantId)}
                     alt={firstPlace.name}
                     className="podium-card-img-bg"
@@ -449,7 +449,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   <div className="podium-card-overlay"></div>
                   <div className="podium-bg-number">1</div>
                   <div className="podium-medal-wrapper">
-                    <img src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
+                    <img loading="lazy" decoding="async" src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-player-info-row">
@@ -468,11 +468,11 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 <>
                   <div className="podium-bg-number">1</div>
                   <div className="podium-medal-wrapper">
-                    <img src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
+                    <img loading="lazy" decoding="async" src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-fallback-avatar-container">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={getRankingAvatar(firstPlace.participantId)}
                       alt={firstPlace.name}
                       className="podium-fallback-avatar"
@@ -517,7 +517,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                       {actualRank}º
                     </div>
                     <div className="standing-row-avatar-container">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={getRankingAvatar(standing.participantId)}
                         alt={standing.name}
                         className="standing-row-avatar"
@@ -551,7 +551,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
             '⏳ Gerando...'
           ) : (
             <>
-              <img
+              <img loading="lazy" decoding="async"
                 src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-zKoxdD3l5QDuQDFQGP45fqO0EuaKqP.png&w=320&q=75"
                 alt="Compartilhar"
                 style={{ width: '20px', height: '20px', objectFit: 'contain' }}
@@ -628,7 +628,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 {!onFireImageErrors[player.standing.participantId] ? (
                   <>
                     <div className="on-fire-portrait-container">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={getPodiumImage(player.standing.participantId)}
                         alt={player.standing.name}
                         className="on-fire-portrait-img"
@@ -641,7 +641,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                   </>
                 ) : (
                   <div className="on-fire-avatar-container">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={getRankingAvatar(player.standing.participantId)}
                       alt={player.standing.name}
                       className="on-fire-avatar"

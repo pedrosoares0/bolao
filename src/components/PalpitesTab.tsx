@@ -115,7 +115,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
       {/* CARD DOS PALPITES ESPECIAIS */}
       <div className="pix-payment-card stretch">
         <div className="pix-card-title">
-          <img src="/imagens/trofeu.webp" alt="Troféu" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
+          <img loading="lazy" decoding="async" src="/imagens/trofeu.webp" alt="Troféu" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
           PALPITES DA COPA
         </div>
         <div className="palpites-hint">
@@ -172,11 +172,11 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                 <span className="palpites-other-name">{p.name}</span>
                 {sp ? (
                   <span className="palpites-other-picks">
-                    <img src="/imagens/trofeu.webp" alt="Troféu" style={{ width: '16px', height: '16px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} />
-                    <img src={flagSrc(flagOf(sp.championTeam, ''), 40)} alt={sp.championTeam} style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', marginRight: '4px', verticalAlign: 'middle' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                    <img loading="lazy" decoding="async" src="/imagens/trofeu.webp" alt="Troféu" style={{ width: '16px', height: '16px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} />
+                    <img loading="lazy" decoding="async" src={flagSrc(flagOf(sp.championTeam, ''), 40)} alt={sp.championTeam} style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', marginRight: '4px', verticalAlign: 'middle' }} onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
                     {translateTeam(sp.championTeam)}{hitChampion ? ' (+5)' : ''}
                     {' · '}
-                    <img src={flagSrc('br', 40)} alt="Brasil" style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', marginRight: '4px', verticalAlign: 'middle' }} />
+                    <img loading="lazy" decoding="async" src={flagSrc('br', 40)} alt="Brasil" style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', marginRight: '4px', verticalAlign: 'middle' }} />
                     {BRAZIL_STAGE_LABELS[sp.brazilStage]}{hitBrazil ? ' (+5)' : ''}
                   </span>
                 ) : (
@@ -191,7 +191,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
       {/* CARD DO HISTÓRICO PESSOAL */}
       <div className="pix-payment-card stretch">
         <div className="pix-card-title">
-          <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-gqcPFadwUlUpL8ajC5Ap9ZN7a6JCTu.png&w=320&q=75" alt="Histórico" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
+          <img loading="lazy" decoding="async" src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-gqcPFadwUlUpL8ajC5Ap9ZN7a6JCTu.png&w=320&q=75" alt="Histórico" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
           MEU HISTÓRICO ({currentUser.name})
         </div>
 
@@ -204,7 +204,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
               <div key={day.iso} className="history-day-group">
                 <div className="history-day-header">
                   <span className="history-day-label">
-                    <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-Sae9tyL6cjfCtWIsMdmFt0tn7Iu2tQ.png&w=320&q=75" alt="Data" style={{ width: '18px', height: '18px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} />
+                    <img loading="lazy" decoding="async" src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-Sae9tyL6cjfCtWIsMdmFt0tn7Iu2tQ.png&w=320&q=75" alt="Data" style={{ width: '18px', height: '18px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} />
                     {day.label}
                   </span>
                   <span className="history-day-points">{day.points} pts no dia</span>
@@ -235,7 +235,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                       <div className="history-matchup">
                         <div className="history-team home">
                           <span className="history-team-name">{m.homeTeam}</span>
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={flagSrc(m.homeFlag, 40)}
                             alt={m.homeTeam}
                             className="history-flag"
@@ -248,7 +248,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                         </div>
 
                         <div className="history-team away">
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={flagSrc(m.awayFlag, 40)}
                             alt={m.awayTeam}
                             className="history-flag"

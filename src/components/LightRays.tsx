@@ -149,13 +149,20 @@ const LightRays: React.FC<LightRaysProps> = ({
 
       if (!containerRef.current) return;
 
-      const renderer = new Renderer({
-        dpr: Math.min(window.devicePixelRatio, 2),
-        alpha: true
-      });
+      // Decoração: se o WebGL não estiver disponível, sai sem quebrar o app.
+      let renderer: Renderer;
+      try {
+        renderer = new Renderer({
+          dpr: Math.min(window.devicePixelRatio, 2),
+          alpha: true
+        });
+      } catch {
+        return;
+      }
+      const gl = renderer.gl;
+      if (!gl) return;
       rendererRef.current = renderer;
 
-      const gl = renderer.gl;
       gl.canvas.style.width = '100%';
       gl.canvas.style.height = '100%';
 

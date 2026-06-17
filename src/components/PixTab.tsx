@@ -19,7 +19,7 @@ const PixPaymentCard: React.FC = () => {
   return (
     <div className="pix-payment-card">
       <div className="pix-card-title">
-        <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-n9dmFV9wD0hKFc4BFPY2Mc7nByhtNY.png&w=320&q=75" alt="Pagamento" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} /> 
+        <img loading="lazy" decoding="async" src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-n9dmFV9wD0hKFc4BFPY2Mc7nByhtNY.png&w=320&q=75" alt="Pagamento" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} /> 
         PAGAMENTO DA APOSTA DIÁRIA
       </div>
 
@@ -89,7 +89,7 @@ export const PixTab: React.FC<PixTabProps> = ({
               {trophyError ? (
                 '🏆'
               ) : (
-                <img
+                <img loading="lazy" decoding="async"
                   src="https://i.pinimg.com/originals/bd/1e/eb/bd1eeb560e0d0f983f2c820ab159e494.png?nii=t"
                   alt="🏆"
                   className="vault-trophy-img"
@@ -138,7 +138,7 @@ export const PixTab: React.FC<PixTabProps> = ({
           onClick={() => setIsDebtsExpanded(!isDebtsExpanded)}
           style={{ cursor: 'pointer' }}
         >
-          <img
+          <img loading="lazy" decoding="async"
             src="https://img.magnific.com/vetores-premium/emoticon-de-mendigo-sem-abrigo-implorando-por-dinheiro_1303870-1183.jpg?w=360"
             alt="Caderneta"
             className="debts-header-image"
@@ -188,7 +188,7 @@ export const PixTab: React.FC<PixTabProps> = ({
                     <div className={`debt-participant-row ${isSelf ? 'is-self' : ''}`}>
                       <div className="debt-user-profile">
                         <div className="debt-avatar-container">
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={`/imagens/ranking ${p.id}.webp`}
                             alt={p.name}
                             className="debt-avatar"
@@ -230,7 +230,7 @@ export const PixTab: React.FC<PixTabProps> = ({
                                 className="debt-pendurar-action-btn"
                                 onClick={() => onRegisterDebt(p.uid!, todayIso)}
                               >
-                                <img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-bo7jgF2brIAIRGLfOqfEWvsc6orR57.png&w=320&q=75" alt="Pendurar" style={{ width: '16px', height: '16px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} /> 
+                                <img loading="lazy" decoding="async" src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-bo7jgF2brIAIRGLfOqfEWvsc6orR57.png&w=320&q=75" alt="Pendurar" style={{ width: '16px', height: '16px', objectFit: 'contain', marginRight: '4px', verticalAlign: 'middle' }} /> 
                                 Pendurar
                               </button>
                             )}
