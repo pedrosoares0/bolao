@@ -27,6 +27,10 @@ import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
+// Domínio interno do esquema de auth (username -> username@DOMÍNIO). Mantido em
+// `bolao.app` para não quebrar os logins já existentes (pedro@bolao.app etc).
+const AUTH_EMAIL_DOMAIN = 'bolao.app';
+
 // Fuso horário de exibição: todos os horários dos jogos são convertidos para Brasília
 const TZ = 'America/Sao_Paulo';
 
@@ -163,6 +167,10 @@ function App() {
 
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  // Cadastro aberto: alterna login <-> cadastro na mesma tela.
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [nameInput, setNameInput] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
 
   // 2. Estados Principais do Bolão
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -627,7 +635,7 @@ function App() {
     }
 
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: `${username}@bolao.app`,
+      email: `${username}@${AUTH_EMAIL_DOMAIN}`,
       password: passwordInput,
     });
 
@@ -663,6 +671,79 @@ function App() {
     setTimeout(() => {
       setCurrentScreen('app');
     }, 4500); // 4.5 segundos de intro.mp4 como fallback de tempo
+  };
+
+  // Handler de Cadastro aberto (username + senha; e-mail interno username@bolao.app).
+  // O perfil em `participants` é criado pelo trigger handle_new_user. Depois
+  // gravamos o nome público escolhido. Requer "Confirm email" DESLIGADO no
+  // Supabase Auth para o login valer na hora (esquema sem e-mail real).
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const username = usernameInput.trim().toLowerCase();
+    const name = nameInput.trim();
+
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+      showToast('Usuário: 3 a 20 caracteres, só letras, números e _.');
+      return;
+    }
+    if (name.length < 2) {
+      showToast('Digite seu nome.');
+      return;
+    }
+    if (passwordInput.length < 6) {
+      showToast('A senha precisa ter ao menos 6 caracteres.');
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const { data, error: signErr } = await supabase.auth.signUp({
+        email: `${username}@${AUTH_EMAIL_DOMAIN}`,
+        password: passwordInput,
+        options: { data: { display_name: name } },
+      });
+
+      if (signErr || !data.user) {
+        const dup = signErr?.message?.toLowerCase().includes('registered') || signErr?.status === 422;
+        showToast(dup ? 'Esse usuário já existe. Tente entrar.' : 'Não foi possível criar a conta. Tente de novo.');
+        return;
+      }
+
+      // Garante a sessão (caso o projeto não autentique direto no signUp).
+      if (!data.session) {
+        const { error: inErr } = await supabase.auth.signInWithPassword({
+          email: `${username}@${AUTH_EMAIL_DOMAIN}`,
+          password: passwordInput,
+        });
+        if (inErr) {
+          showToast('Conta criada! Confirme o cadastro e faça login.');
+          setAuthMode('login');
+          return;
+        }
+      }
+
+      // Grava o nome público escolhido e um avatar padrão (o trigger usa o
+      // username, cujo arquivo não existe para contas novas). O avatar real
+      // entra quando o upload de perfil (Fase 1) estiver pronto.
+      await supabase
+        .from('participants')
+        .update({ name, avatar_url: '/imagens/logo.webp' })
+        .eq('id', data.user.id);
+
+      const participant: Participant = {
+        id: username,
+        uid: data.user.id,
+        name,
+        avatarUrl: '/imagens/logo.webp',
+      };
+      localStorage.setItem('bolao_current_user', JSON.stringify(participant));
+      setCurrentUser(participant);
+      setSplashVideo('intro');
+      setCurrentScreen('splash');
+      setTimeout(() => setCurrentScreen('app'), 4500);
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   // Handler de Logout
@@ -851,9 +932,9 @@ function App() {
           <div className="login-ribbon-divider"></div>
         </div>
 
-        <form onSubmit={handleLoginSubmit} className="login-form-container">
+        <form onSubmit={authMode === 'login' ? handleLoginSubmit : handleSignupSubmit} className="login-form-container">
           <div className="login-form-group">
-            <label className="login-field-label" htmlFor="login-username">Nome</label>
+            <label className="login-field-label" htmlFor="login-username">Usuário</label>
             <input
               id="login-username"
               type="text"
@@ -861,25 +942,51 @@ function App() {
               className="login-field-input"
               value={usernameInput}
               onChange={(e) => setUsernameInput(e.target.value)}
-              placeholder="Digite seu nome"
+              placeholder="Digite seu usuário"
             />
           </div>
+
+          {authMode === 'signup' && (
+            <div className="login-form-group">
+              <label className="login-field-label" htmlFor="login-name">Nome de exibição</label>
+              <input
+                id="login-name"
+                type="text"
+                autoComplete="name"
+                className="login-field-input"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Como você aparece no ranking"
+              />
+            </div>
+          )}
 
           <div className="login-form-group">
             <label className="login-field-label" htmlFor="login-password">Senha</label>
             <input
               id="login-password"
               type="password"
-              autoComplete="current-password"
+              autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
               className="login-field-input"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Digite sua senha"
+              placeholder={authMode === 'login' ? 'Digite sua senha' : 'Crie uma senha (mín. 6)'}
             />
           </div>
 
-          <button type="submit" className="login-action-btn">
-            ENTRAR
+          <button type="submit" className="login-action-btn" disabled={authBusy}>
+            {authBusy ? 'AGUARDE…' : authMode === 'login' ? 'ENTRAR' : 'CRIAR CONTA'}
+          </button>
+
+          <button
+            type="button"
+            className="login-switch-mode-btn"
+            onClick={() => {
+              setAuthMode((m) => (m === 'login' ? 'signup' : 'login'));
+              setPasswordInput('');
+            }}
+          >
+            {authMode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
           </button>
         </form>
 
