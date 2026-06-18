@@ -175,6 +175,28 @@ body {
   cursor: progress;
 }
 
+/* Wordmark da marca Cravei! (texto, sem imagem de banner) */
+.cravei-wordmark {
+  font-family: var(--font-family);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #009c3b 0%, #ffdf00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+.cravei-wordmark span { color: #ffdf00; -webkit-text-fill-color: #ffdf00; }
+.cravei-wordmark.login { font-size: 3.4rem; text-align: center; }
+.cravei-wordmark.header { font-size: 2rem; text-align: center; padding: 1.1rem 0; }
+.cravei-tagline {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0;
+}
+
 .login-switch-mode-btn {
   background: none;
   border: none;

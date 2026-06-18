@@ -16,6 +16,7 @@ const formatMoneyParts = (value: number) => {
 };
 
 import type { Participant, Debt, Group } from '../types';
+import Avatar from './Avatar';
 
 // Card de pagamento: usa o PIX do GRUPO quando definido; senão, o PIX global.
 const PixPaymentCard: React.FC<{ group: Group | null }> = ({ group }) => {
@@ -200,14 +201,7 @@ export const PixTab: React.FC<PixTabProps> = ({
                     <div className={`debt-participant-row ${isSelf ? 'is-self' : ''}`}>
                       <div className="debt-user-profile">
                         <div className="debt-avatar-container">
-                          <img loading="lazy" decoding="async"
-                            src={`/imagens/ranking ${p.id}.webp`}
-                            alt={p.name}
-                            className="debt-avatar"
-                            onError={(e) => {
-                              e.currentTarget.src = p.avatarUrl;
-                            }}
-                          />
+                          <Avatar name={p.name} src={p.avatarUrl} size={40} className="debt-avatar" />
                         </div>
                         <div className="debt-user-details">
                           <span className="debt-user-name">

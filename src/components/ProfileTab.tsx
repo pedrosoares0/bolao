@@ -12,6 +12,7 @@ import { BRAZIL_STAGE_LABELS } from '../utils/specials';
 import { supabase } from '../lib/supabase';
 import { uploadImage } from '../lib/storage';
 import { T } from '../lib/tables';
+import Avatar from './Avatar';
 import Aurora from './Aurora';
 
 interface ProfileTabProps {
@@ -151,12 +152,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
         <div className="profile-header-content">
           <div className="profile-header-avatar-wrap">
-            <img loading="lazy" decoding="async"
-              src={avatarSrc}
-              alt={selectedUser.name}
-              className="profile-header-avatar"
-              onError={(e) => { e.currentTarget.src = '/imagens/logo.webp'; }}
-            />
+            <Avatar name={selectedUser.name} src={avatarSrc} size={90} className="profile-header-avatar" />
             {rank > 0 && <span className="profile-header-rank-badge">{rank}º</span>}
             {/* Botão de editar a foto de perfil */}
             <button

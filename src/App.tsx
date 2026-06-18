@@ -25,6 +25,7 @@ const PalpitesTab = lazy(() => import('./components/PalpitesTab'));
 const ProfileTab = lazy(() => import('./components/ProfileTab'));
 const GroupsTab = lazy(() => import('./components/GroupsTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
+import Avatar from './components/Avatar';
 import { supabase } from './lib/supabase';
 import { redeemInvite, listSeasons, listMembers } from './lib/groups';
 import { T, RPC } from './lib/tables';
@@ -1079,7 +1080,8 @@ function App() {
     return (
       <div className="login-screen-container">
         <div className="login-banner-container">
-          <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Cravei!" className="login-banner-img" />
+          <div className="cravei-wordmark login">Cravei<span>!</span></div>
+          <p className="cravei-tagline">Bolão entre amigos</p>
           <div className="login-ribbon-divider"></div>
         </div>
 
@@ -1207,7 +1209,7 @@ function App() {
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
           <div className="app-header-card-gradient-border">
-            <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Cravei! Banner" className="app-header-card-img" />
+            <div className="cravei-wordmark header">Cravei<span>!</span></div>
           </div>
         </div>
       )}
@@ -1486,14 +1488,7 @@ function App() {
                                 <div key={p.id} className="inline-guess-row-p16">
                                   <div className="inline-guess-user-info-p16">
                                     <div className="inline-guess-avatar-border-p16">
-                                      <img loading="lazy" decoding="async"
-                                        src={`/imagens/ranking ${p.id}.webp`}
-                                        alt={p.name}
-                                        className="inline-guess-avatar-img-p16"
-                                        onError={(e) => {
-                                          e.currentTarget.src = p.avatarUrl;
-                                        }}
-                                      />
+                                      <Avatar name={p.name} src={p.avatarUrl} size={32} className="inline-guess-avatar-img-p16" />
                                     </div>
                                     <div className="inline-guess-name-col-p16">
                                       {isProfeta && (
@@ -1761,10 +1756,14 @@ function App() {
             <div className="pix-modal-emoji">🎉</div>
             <div className="pix-card-title">APOSTA LANÇADA!</div>
             <div className="pix-modal-text">
-              Para <b>validar</b> sua aposta do dia, faça o PIX de <b>R$ 2,50</b> para:
+              Para <b>validar</b> sua aposta, faça o PIX de{' '}
+              <b>R$ {((activeGroup?.entryFeeCents ?? 250) / 100).toFixed(2).replace('.', ',')}</b> para:
             </div>
-            <div className="pix-card-recipient">{PIX_RECIPIENT} · {PIX_BANK}</div>
-            <PixKeyRow />
+            <div className="pix-card-recipient">
+              {(activeGroup?.pixRecipient || PIX_RECIPIENT)}
+              {(activeGroup?.pixBank || PIX_BANK) ? ` · ${activeGroup?.pixBank || PIX_BANK}` : ''}
+            </div>
+            <PixKeyRow pixKey={activeGroup?.pixKey || undefined} />
             <button
               type="button"
               className="pix-modal-close-btn"
