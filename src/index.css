@@ -397,19 +397,19 @@ body {
 .games-grid-layout {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.75rem; /* Reduced gap since we added visual separator lines */
 }
 
 .game-card-item-p16 {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background-color: #ffffff; /* White card background */
-  border: 1px solid rgba(21, 17, 14, 0.12); /* Premium thin border */
-  border-radius: 32px; /* Rounded card corners increased from 24px to 32px */
+  background-color: #FAFBF7; /* Slightly lighter warm white/cream card background to differentiate from background */
+  border: 1px solid rgba(21, 17, 14, 0.10); /* Softened thin border */
+  border-radius: 16px; /* Soft rounded corners (reduced from 24px to 16px) */
   padding: 1rem 1.15rem 0.65rem 1.15rem; /* Tight inside padding to reduce emptiness */
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.03); /* Premium soft shadow */
-  margin-bottom: 1.25rem; /* Separated visually by margin instead of lines */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02); /* Premium soft shadow */
+  margin-bottom: 0; /* Let grid gap and separator handle spacing */
   position: relative;
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -417,7 +417,7 @@ body {
 
 .game-card-item-p16:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 /* Left side team colors gradient */
@@ -436,8 +436,8 @@ body {
   background-size: 100% 200%;
   animation: gradientFlowSide 15s ease-in-out infinite;
   z-index: 2;
-  border-top-left-radius: 32px;
-  border-bottom-left-radius: 32px;
+  border-top-left-radius: 16px; /* Match card border radius (16px) */
+  border-bottom-left-radius: 16px;
 }
 
 /* Right side team colors gradient */
@@ -456,8 +456,8 @@ body {
   background-size: 100% 200%;
   animation: gradientFlowSide 15s ease-in-out infinite;
   z-index: 2;
-  border-top-right-radius: 32px;
-  border-bottom-right-radius: 32px;
+  border-top-right-radius: 16px; /* Match card border radius (16px) */
+  border-bottom-right-radius: 16px;
 }
 
 @keyframes gradientFlowSide {
@@ -477,15 +477,22 @@ body {
 }
 
 .game-card-item-p16.live-card-highlight {
-  border-color: rgba(21, 17, 14, 0.12); /* Same border color as other cards */
-  background-color: #ffffff; /* Same background color as other cards */
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.03); /* Same shadow as other cards */
+  border-color: rgba(21, 17, 14, 0.10); /* Same border color as other cards */
+  background-color: #FAFBF7; /* Warm white/cream card background */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02); /* Same shadow as other cards */
+}
+
+/* Subtle separator line between matches */
+.game-card-separator-p16 {
+  height: 1px;
+  background-color: rgba(21, 17, 14, 0.05); /* Very subtle and weak color */
+  margin: 0.25rem 0.75rem; /* Margins to separate card visually */
 }
 
 .game-card-header-p16 {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1.35rem; /* Increased margin to avoid overlapping with up-arrows in stepper */
+  margin-bottom: 2.1rem; /* Increased margin to avoid overlapping with up-arrows in stepper */
   width: 100%;
 }
 
@@ -601,19 +608,20 @@ body {
 }
 
 .match-score-center.has-stepper {
-  margin-top: -19px; /* Offsets up-arrow so score box aligns with flags! */
+  margin-top: -24px; /* Pull stepper up slightly to center the raw number with flags */
 }
 
 .match-score-center.has-display {
-  margin-top: 1px; /* Aligns display box top with flag top */
+  margin-top: 1px; /* Center display number with flags */
 }
 
 .match-score-x {
   font-family: var(--font-family);
-  font-size: 0.85rem;
+  font-size: 1.1rem; /* Increased size to match big numbers */
   font-weight: 900;
   color: #8b8075;
   user-select: none;
+  margin: 0 0.15rem;
 }
 
 /* Score stepper (for editable bets) */
@@ -621,15 +629,15 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 0px;
 }
 
 .score-stepper-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 20px;
+  width: 48px; /* Slightly wider for touch target */
+  height: 24px; /* Taller touch target for mobile */
   border: none;
   background: transparent;
   cursor: pointer;
@@ -643,7 +651,7 @@ body {
 
 .score-stepper-btn:hover {
   color: #000000;
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 
 .score-stepper-btn:active {
@@ -651,53 +659,43 @@ body {
 }
 
 .score-stepper-value {
-  width: 42px;
-  height: 42px;
-  background-color: #ffffff;
-  border: 1.5px solid rgba(21, 17, 14, 0.2); /* Softer border */
-  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-family-condensed);
-  font-size: 1.85rem;
-  font-weight: normal;
+  font-size: 2.8rem; /* Large and readable score */
+  font-weight: 900; /* Extra bold text */
   font-style: normal;
   color: #15110E;
   padding-bottom: 0px;
   line-height: 1;
   user-select: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  min-width: 30px; /* Prevent text shifting */
+  text-align: center;
 }
 
 /* Score display for non-editable (started/finished) */
 .score-display-box-p16 {
-  width: 42px;
-  height: 42px;
-  background-color: #ffffff;
-  border: 1.5px solid rgba(21, 17, 14, 0.2); /* Softer border */
-  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-family-condensed);
-  font-size: 1.85rem;
-  font-weight: normal;
+  font-size: 2.8rem; /* Large and readable score */
+  font-weight: 900; /* Extra bold text */
   font-style: normal;
   color: #15110E;
   padding-bottom: 0px;
   line-height: 1;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  min-width: 30px; /* Prevent text shifting */
+  text-align: center;
 }
 
 /* Winner/loser/draw highlights for the horizontal layout */
 .team-col-p16.winner-highlight .score-display-box-p16,
 .team-col-p16.winner-highlight .score-stepper-value {
-  border-color: #f5b300 !important;
-  background-color: rgba(245, 179, 0, 0.1) !important;
-  font-weight: 800;
-  box-shadow: 0 0 8px rgba(245, 179, 0, 0.25);
+  color: #d97706 !important; /* Premium golden text color directly on the number */
+  font-weight: 900;
 }
 
 .team-col-p16.winner-highlight .team-flag-badge-p16 {
@@ -712,10 +710,8 @@ body {
 
 .team-col-p16.draw-highlight .score-display-box-p16,
 .team-col-p16.draw-highlight .score-stepper-value {
-  border-color: #94a3b8 !important;
-  background-color: rgba(148, 163, 184, 0.08) !important;
+  color: #475569 !important; /* Muted slate color for draw score text */
   font-weight: 800;
-  box-shadow: 0 0 6px rgba(148, 163, 184, 0.2);
 }
 
 .team-col-p16.draw-highlight .team-flag-badge-p16 {
@@ -724,9 +720,7 @@ body {
 
 /* Live winner/loser during match (ao vivo) */
 .team-col-p16.live-winner .score-display-box-p16 {
-  border-color: #ef4444 !important;
-  background-color: rgba(239, 68, 68, 0.06) !important;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+  color: #dc2626 !important; /* Live red score text color directly on the number */
 }
 
 .team-col-p16.live-loser-fade {
@@ -3071,8 +3065,8 @@ body {
   align-items: center;
   align-self: flex-start;
   gap: 0.3rem;
-  background: none;
-  border: 1px solid rgba(21, 17, 14, 0.12);
+  background-color: #ffffff; /* White background */
+  border: 1px solid rgba(21, 17, 14, 0.07); /* Very sutil and weak border */
   color: #8b8075;
   font-family: var(--font-family);
   font-size: 0.7rem;
@@ -3084,12 +3078,13 @@ body {
   letter-spacing: 0.06em;
   border-radius: 1.5rem;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); /* Soft shadow */
 }
 
 .toggle-guesses-btn-p16:hover {
   color: #15110E;
-  background-color: rgba(21, 17, 14, 0.04);
-  border-color: rgba(21, 17, 14, 0.25);
+  background-color: #FAF9F6;
+  border-color: rgba(21, 17, 14, 0.15);
 }
 
 .toggle-guesses-btn-p16 svg {
@@ -3117,7 +3112,8 @@ body {
   flex-direction: column;
   gap: 0.45rem;
   padding: 0.5rem;
-  background-color: rgba(21, 17, 14, 0.03);
+  background-color: #ffffff; /* Almost white guesses list */
+  border: 1px solid rgba(21, 17, 14, 0.08); /* Subtle line boundary */
   border-radius: 1rem;
   margin-top: 0.85rem;
 }
@@ -3126,8 +3122,8 @@ body {
    ORÁCULO PREDICTION PANEL
    ========================================================================== */
 .oracle-card-container-p16 {
-  background-color: #faf8f5; /* Warm off-white background */
-  border: 1.5px solid rgba(21, 17, 14, 0.08); /* 1.5px premium lines */
+  background-color: #ffffff; /* Almost white prediction panel */
+  border: 1px solid rgba(21, 17, 14, 0.07); /* Very sutil and weak border */
   border-radius: 16px;
   padding: 0.75rem 1rem;
   margin-top: 0.75rem;
@@ -3135,11 +3131,12 @@ body {
   flex-direction: column;
   box-sizing: border-box;
   transition: background-color 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); /* Soft shadow */
 }
 
 .oracle-card-container-p16:hover {
-  background-color: #f5f2eb;
-  border-color: rgba(21, 17, 14, 0.12);
+  background-color: #FAF9F6;
+  border-color: rgba(21, 17, 14, 0.15);
 }
 
 .oracle-card-header-p16 {
@@ -5413,43 +5410,4 @@ body {
   .aurora-css, .lightrays-css::before, .lightrays-css::after { animation: none; }
 }
 
-/* VIEW TRANSITIONS FOR TABS SWITCHING */
-main {
-  view-transition-name: tab-content;
-}
-
-.bottom-nav {
-  view-transition-name: bottom-nav;
-}
-
-/* Custom view transition animations */
-::view-transition-old(tab-content) {
-  animation: tab-fade-out 0.12s cubic-bezier(0.4, 0, 1, 1) both;
-}
-
-::view-transition-new(tab-content) {
-  animation: tab-fade-in-up 0.25s cubic-bezier(0, 0, 0.2, 1) both;
-}
-
-@keyframes tab-fade-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.985);
-  }
-}
-
-@keyframes tab-fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 

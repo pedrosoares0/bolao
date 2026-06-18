@@ -12,7 +12,7 @@
 // A validação que vale dinheiro (lockout das apostas) é refeita no servidor
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
-import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Fragment } from 'react';
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
@@ -395,13 +395,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil'>('jogos');
 
   const switchTab = (tab: 'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil') => {
-    if ((document as any).startViewTransition) {
-      (document as any).startViewTransition(() => {
-        setActiveTab(tab);
-      });
-    } else {
-      setActiveTab(tab);
-    }
+    setActiveTab(tab);
   };
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
@@ -467,9 +461,10 @@ function App() {
   // Nomes dos meses em português para o carrossel de datas
   const MONTH_NAMES_FULL = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
-  // Touch swipe refs para o carrossel de datas
+  // Touch swipe refs e state para o carrossel de datas (efeito roleta)
   const touchStartX = useRef<number>(0);
   const touchDelta = useRef<number>(0);
+  const [dragOffset, setDragOffset] = useState<number>(0);
 
   const showToast = (message: string, type: 'success' | 'error' = 'error') => {
     window.clearTimeout(toastTimerRef.current);
@@ -756,14 +751,19 @@ function App() {
     if (selectedDateIndex < dates.length - 1) setSelectedDateState(dates[selectedDateIndex + 1].iso);
   }, [selectedDateIndex, dates]);
 
-  // Touch handlers para swipe no carrossel de datas
+  // Touch handlers para swipe no carrossel de datas com efeito físico de mola
   const handleDateTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchDelta.current = 0;
+    setDragOffset(0);
   }, []);
 
   const handleDateTouchMove = useCallback((e: React.TouchEvent) => {
-    touchDelta.current = e.touches[0].clientX - touchStartX.current;
+    const delta = e.touches[0].clientX - touchStartX.current;
+    touchDelta.current = delta;
+    // Efeito de mola limitando o arrasto máximo em 120px
+    const dampenedDelta = Math.sign(delta) * Math.min(Math.abs(delta), 120);
+    setDragOffset(dampenedDelta);
   }, []);
 
   const handleDateTouchEnd = useCallback(() => {
@@ -772,6 +772,7 @@ function App() {
       if (delta > 0) goToPrevDate();
       else goToNextDate();
     }
+    setDragOffset(0);
     touchDelta.current = 0;
   }, [goToPrevDate, goToNextDate]);
 
@@ -1205,62 +1206,88 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
             {/* DATE CAROUSEL (3 datas visíveis, swipeable) */}
-            {dates.length > 0 && (
-              <div
-                className="date-carousel-container"
-                onTouchStart={handleDateTouchStart}
-                onTouchMove={handleDateTouchMove}
-                onTouchEnd={handleDateTouchEnd}
-              >
-                <div className="date-carousel-track">
-                  {/* Data anterior (esquerda) */}
-                  {selectedDateIndex > 0 ? (() => {
-                    const prev = dates[selectedDateIndex - 1];
-                    const [, pm, pd] = prev.iso.split('-');
-                    return (
-                      <button className="date-carousel-item side" onClick={goToPrevDate}>
-                        <span className="date-carousel-day">{parseInt(pd)}</span>
-                        <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(pm) - 1]}</span>
-                      </button>
-                    );
-                  })() : (
-                    <div className="date-carousel-item side" />
-                  )}
+            {dates.length > 0 && (() => {
+              const progress = Math.min(Math.max(dragOffset / 120, -1), 1); // -1 to 1
 
-                  {/* Data central (ativa) */}
-                  {(() => {
-                    const cur = dates[selectedDateIndex];
-                    if (!cur) return null;
-                    const [, cm, cd] = cur.iso.split('-');
-                    const isToday = cur.iso === getTodayIso();
-                    // Sub-label: pega o grupo/fase do primeiro jogo do dia
-                    const dayMatches = groupedMatches[cur.iso] || [];
-                    const subLabel = dayMatches.length > 0 ? dayMatches[0].group : '';
-                    return (
-                      <div className="date-carousel-item center">
-                        <span className="date-carousel-day">{parseInt(cd)}</span>
-                        <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(cm) - 1]}</span>
-                        {subLabel && <span className="date-carousel-sub">{isToday ? `Hoje · ${subLabel}` : subLabel}</span>}
-                      </div>
-                    );
-                  })()}
+              const trackStyle = {
+                transform: `translateX(${dragOffset * 0.3}px)`,
+                transition: dragOffset === 0 ? 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
+              };
 
-                  {/* Data seguinte (direita) */}
-                  {selectedDateIndex < dates.length - 1 ? (() => {
-                    const next = dates[selectedDateIndex + 1];
-                    const [, nm, nd] = next.iso.split('-');
-                    return (
-                      <button className="date-carousel-item side" onClick={goToNextDate}>
-                        <span className="date-carousel-day">{parseInt(nd)}</span>
-                        <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(nm) - 1]}</span>
-                      </button>
-                    );
-                  })() : (
-                    <div className="date-carousel-item side" />
-                  )}
+              const leftItemStyle = {
+                transform: `scale(${0.85 + Math.max(0, progress) * 0.25}) rotateY(${-35 + Math.max(0, progress) * 35}deg) translateZ(${-100 + Math.max(0, progress) * 100}px) translateX(${progress * 10}px)`,
+                opacity: 0.4 + Math.max(0, progress) * 0.6,
+                transition: dragOffset === 0 ? 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease' : 'none',
+              };
+
+              const centerItemStyle = {
+                transform: `scale(${1.1 - Math.abs(progress) * 0.25}) rotateY(${progress * 35}deg) translateZ(${-Math.abs(progress) * 100}px) translateX(${progress * 10}px)`,
+                opacity: 1.0 - Math.abs(progress) * 0.6,
+                transition: dragOffset === 0 ? 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease' : 'none',
+              };
+
+              const rightItemStyle = {
+                transform: `scale(${0.85 + Math.max(0, -progress) * 0.25}) rotateY(${35 + Math.min(0, progress) * 35}deg) translateZ(${-100 + Math.max(0, -progress) * 100}px) translateX(${progress * 10}px)`,
+                opacity: 0.4 + Math.max(0, -progress) * 0.6,
+                transition: dragOffset === 0 ? 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease' : 'none',
+              };
+
+              return (
+                <div
+                  className="date-carousel-container"
+                  onTouchStart={handleDateTouchStart}
+                  onTouchMove={handleDateTouchMove}
+                  onTouchEnd={handleDateTouchEnd}
+                >
+                  <div className="date-carousel-track" style={trackStyle}>
+                    {/* Data anterior (esquerda) */}
+                    {selectedDateIndex > 0 ? (() => {
+                      const prev = dates[selectedDateIndex - 1];
+                      const [, pm, pd] = prev.iso.split('-');
+                      return (
+                        <button className="date-carousel-item side" onClick={goToPrevDate} style={leftItemStyle}>
+                          <span className="date-carousel-day">{parseInt(pd)}</span>
+                          <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(pm) - 1]}</span>
+                        </button>
+                      );
+                    })() : (
+                      <div className="date-carousel-item side" style={leftItemStyle} />
+                    )}
+
+                    {/* Data central (ativa) */}
+                    {(() => {
+                      const cur = dates[selectedDateIndex];
+                      if (!cur) return null;
+                      const [, cm, cd] = cur.iso.split('-');
+                      const isToday = cur.iso === getTodayIso();
+                      const dayMatches = groupedMatches[cur.iso] || [];
+                      const subLabel = dayMatches.length > 0 ? dayMatches[0].group : '';
+                      return (
+                        <div className="date-carousel-item center" style={centerItemStyle}>
+                          <span className="date-carousel-day">{parseInt(cd)}</span>
+                          <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(cm) - 1]}</span>
+                          {subLabel && <span className="date-carousel-sub">{isToday ? `Hoje · ${subLabel}` : subLabel}</span>}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Data seguinte (direita) */}
+                    {selectedDateIndex < dates.length - 1 ? (() => {
+                      const next = dates[selectedDateIndex + 1];
+                      const [, nm, nd] = next.iso.split('-');
+                      return (
+                        <button className="date-carousel-item side" onClick={goToNextDate} style={rightItemStyle}>
+                          <span className="date-carousel-day">{parseInt(nd)}</span>
+                          <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(nm) - 1]}</span>
+                        </button>
+                      );
+                    })() : (
+                      <div className="date-carousel-item side" style={rightItemStyle} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* CARD CREME DAS PARTIDAS */}
             <div className="games-beige-card-container">
@@ -1279,7 +1306,7 @@ function App() {
                 </div>
               ) : activeDateMatches.length > 0 ? (
                 <div className="games-grid-layout">
-                  {activeDateMatches.map((match) => {
+                  {activeDateMatches.map((match, idx) => {
                     // Determinar se o jogo já começou ou terminou
                     const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff, nowTs);
 
@@ -1349,11 +1376,11 @@ function App() {
                     } as React.CSSProperties;
 
                     return (
-                      <div
-                        key={match.id}
-                        className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}
-                        style={cardStyle}
-                      >
+                      <Fragment key={match.id}>
+                        <div
+                          className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}
+                          style={cardStyle}
+                        >
 
                         {/* Cabeçalho do Jogo (Grupo, Horário e Status alinhados em uma única linha) */}
                         <div className="game-card-header-p16">
@@ -1406,7 +1433,7 @@ function App() {
                                   onClick={() => stepScore(match.id, 'homeScore', 1)}
                                   aria-label={`Aumentar gols de ${match.homeTeam}`}
                                 >
-                                  <ArrowUp size={18} />
+                                  <ArrowUp size={26} />
                                 </button>
                                 <div className="score-stepper-value">
                                   {displayDrafts[match.id]?.homeScore || '0'}
@@ -1417,7 +1444,7 @@ function App() {
                                   onClick={() => stepScore(match.id, 'homeScore', -1)}
                                   aria-label={`Diminuir gols de ${match.homeTeam}`}
                                 >
-                                  <ArrowDown size={18} />
+                                  <ArrowDown size={26} />
                                 </button>
                               </div>
                             ) : (
@@ -1437,7 +1464,7 @@ function App() {
                                   onClick={() => stepScore(match.id, 'awayScore', 1)}
                                   aria-label={`Aumentar gols de ${match.awayTeam}`}
                                 >
-                                  <ArrowUp size={18} />
+                                  <ArrowUp size={26} />
                                 </button>
                                 <div className="score-stepper-value">
                                   {displayDrafts[match.id]?.awayScore || '0'}
@@ -1448,7 +1475,7 @@ function App() {
                                   onClick={() => stepScore(match.id, 'awayScore', -1)}
                                   aria-label={`Diminuir gols de ${match.awayTeam}`}
                                 >
-                                  <ArrowDown size={18} />
+                                  <ArrowDown size={26} />
                                 </button>
                               </div>
                             ) : (
@@ -1642,8 +1669,12 @@ function App() {
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+                      {idx < activeDateMatches.length - 1 && (
+                        <div className="game-card-separator-p16" />
+                      )}
+                    </Fragment>
+                  );
+                })}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#15110E', fontWeight: 600 }}>
