@@ -18,6 +18,9 @@ interface GroupsTabProps {
   bets: Bet[];
   specials: SpecialPrediction[];
   onToast: (message: string, type?: 'success' | 'error') => void;
+  activeGroup: Group | null;            // grupo em que o usuário "entrou" (group-centric)
+  onEnterGroup: (g: Group) => void;     // abrir um grupo (vira contexto do app)
+  onExitGroup: () => void;              // sair do grupo (volta pro lobby)
 }
 
 const reais = (cents: number) =>
@@ -27,6 +30,7 @@ const ROLE_LABEL: Record<GroupRole, string> = { owner: 'Dono', admin: 'Admin', m
 
 export const GroupsTab: React.FC<GroupsTabProps> = ({
   currentUser, participants, matches, bets, specials, onToast,
+  activeGroup, onEnterGroup, onExitGroup,
 }) => {
   const uid = currentUser.uid!;
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
@@ -46,18 +50,21 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
   // Form de criação
   const [form, setForm] = useState({
     name: '', description: '', seasonId: 0, visibility: 'private' as 'private' | 'public',
-    fee: '', imageUrl: '' as string | null, cardUrl: '' as string | null,
+    fee: '', imageUrl: '' as string | null, cardUrl: '' as string | null, pixKey: '',
   });
   const groupImgRef = useRef<HTMLInputElement>(null);
   const groupCardRef = useRef<HTMLInputElement>(null);
   const [imgUploading, setImgUploading] = useState<null | 'img' | 'card'>(null);
 
-  const loadGroups = useCallback(async () => {
+  const loadGroups = useCallback(async (): Promise<Group[]> => {
     setLoading(true);
     try {
-      setGroups(await listMyGroups(uid));
+      const gs = await listMyGroups(uid);
+      setGroups(gs);
+      return gs;
     } catch (err) {
       onToast(err instanceof Error ? err.message : 'Erro ao carregar grupos.');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -68,12 +75,25 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
     listSeasons().then(setSeasons).catch(() => onToast('Erro ao carregar campeonatos.'));
   }, [loadGroups, onToast]);
 
+  // Em modo "gerenciar" (entrou num grupo), o grupo ativo é o foco; cai no
+  // activeGroup enquanto a lista ainda carrega para não piscar tela vazia.
   const selectedGroup = useMemo(
-    () => groups.find((g) => g.id === selectedId) ?? null,
-    [groups, selectedId]
+    () => groups.find((g) => g.id === selectedId) ?? (activeGroup && activeGroup.id === selectedId ? activeGroup : null),
+    [groups, selectedId, activeGroup]
   );
   const myRole = selectedGroup?.myRole;
   const isAdmin = myRole === 'owner' || myRole === 'admin';
+
+  // Group-centric: entrou num grupo => abre o detalhe dele; saiu => volta à lista.
+  useEffect(() => {
+    if (activeGroup) {
+      openDetail(activeGroup.id);
+    } else {
+      setView('list');
+      setSelectedId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroup?.id]);
 
   const openDetail = async (id: string) => {
     setSelectedId(id);
@@ -133,11 +153,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
         name: form.name.trim(), description: form.description.trim(),
         seasonId: form.seasonId, visibility: form.visibility, entryFeeCents: feeCents,
         imageUrl: form.imageUrl || null, cardUrl: form.cardUrl || null,
+        pixKey: form.pixKey.trim() || null,
+        pixRecipient: form.pixKey.trim() ? currentUser.name : null,
       });
       onToast('Grupo criado!', 'success');
-      setForm({ name: '', description: '', seasonId: 0, visibility: 'private', fee: '', imageUrl: '', cardUrl: '' });
-      await loadGroups();
-      await openDetail(id);
+      setForm({ name: '', description: '', seasonId: 0, visibility: 'private', fee: '', imageUrl: '', cardUrl: '', pixKey: '' });
+      const gs = await loadGroups();
+      const created = gs.find((g) => g.id === id);
+      if (created) onEnterGroup(created); // já entra no grupo recém-criado
     } catch (err) {
       onToast(err instanceof Error ? err.message : 'Não foi possível criar o grupo.');
     } finally {
@@ -153,8 +176,9 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
       const gid = await redeemInvite(joinCode);
       onToast('Você entrou no grupo!', 'success');
       setJoinCode('');
-      await loadGroups();
-      await openDetail(gid);
+      const gs = await loadGroups();
+      const joined = gs.find((g) => g.id === gid);
+      if (joined) onEnterGroup(joined);
     } catch {
       onToast('Convite inválido ou expirado.');
     } finally {
@@ -290,6 +314,11 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
             </div>
           </div>
 
+          <label className="groups-label">Chave PIX (você recebe os pagamentos)</label>
+          <input className="groups-input" value={form.pixKey}
+            onChange={(e) => setForm({ ...form, pixKey: e.target.value })}
+            placeholder="CPF, e-mail, telefone ou chave aleatória" />
+
           <button type="submit" className="groups-primary-btn" disabled={busy || imgUploading !== null}>
             {busy ? 'Criando…' : 'Criar grupo'}
           </button>
@@ -302,8 +331,8 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
     const g = selectedGroup;
     return (
       <div className="groups-container">
-        <button className="groups-back-btn" onClick={() => { setView('list'); setSelectedId(null); }}>
-          <ArrowLeft size={16} /> Meus grupos
+        <button className="groups-back-btn" onClick={onExitGroup}>
+          <ArrowLeft size={16} /> Trocar de grupo
         </button>
 
         <div className="group-detail-header" style={g.cardUrl ? { backgroundImage: `url(${g.cardUrl})` } : undefined}>
@@ -423,7 +452,7 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
       ) : (
         <div className="groups-cards">
           {groups.map((g) => (
-            <button key={g.id} className="group-card" onClick={() => openDetail(g.id)}
+            <button key={g.id} className="group-card" onClick={() => onEnterGroup(g)}
               style={g.cardUrl ? { backgroundImage: `linear-gradient(rgba(13,10,8,0.7),rgba(13,10,8,0.85)), url(${g.cardUrl})` } : undefined}>
               <div className="group-card-avatar">
                 {g.imageUrl ? <img src={g.imageUrl} alt={g.name} /> : <Users size={22} />}

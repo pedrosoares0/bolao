@@ -6,7 +6,7 @@
 // ============================================================
 import React from 'react';
 import { POT_PER_DAY, POT_PER_PERSON_DAY } from '../utils/pot';
-import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './PixKeyCopy';
+import { PixKeyRow, PIX_KEY as PIX_KEY_FALLBACK, PIX_RECIPIENT, PIX_BANK } from './PixKeyCopy';
 
 // Separa um valor monetário em parte inteira e centavos (ex.: 12.5 -> "12","50")
 const formatMoneyParts = (value: number) => {
@@ -15,40 +15,48 @@ const formatMoneyParts = (value: number) => {
   return { integerPart, decimalPart };
 };
 
-const PixPaymentCard: React.FC = () => {
+import type { Participant, Debt, Group } from '../types';
+
+// Card de pagamento: usa o PIX do GRUPO quando definido; senão, o PIX global.
+const PixPaymentCard: React.FC<{ group: Group | null }> = ({ group }) => {
+  const key = group?.pixKey || PIX_KEY_FALLBACK;
+  const recipient = group?.pixRecipient || PIX_RECIPIENT;
+  const bank = group?.pixBank || PIX_BANK;
+  const feeReais = group && group.entryFeeCents > 0 ? group.entryFeeCents / 100 : 2.5;
+  const [intPart, centPart] = feeReais.toFixed(2).split('.');
   return (
     <div className="pix-payment-card">
       <div className="pix-card-title">
-        <img loading="lazy" decoding="async" src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-n9dmFV9wD0hKFc4BFPY2Mc7nByhtNY.png&w=320&q=75" alt="Pagamento" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} /> 
-        PAGAMENTO DA APOSTA DIÁRIA
+        <img loading="lazy" decoding="async" src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-n9dmFV9wD0hKFc4BFPY2Mc7nByhtNY.png&w=320&q=75" alt="Pagamento" style={{ width: '28px', height: '28px', objectFit: 'contain', marginRight: '8px', verticalAlign: 'middle' }} />
+        PAGAMENTO DA APOSTA
       </div>
 
       <div className="pix-card-value-row">
         <span className="pix-card-currency">R$</span>
-        <span className="pix-card-amount">2</span>
-        <span className="pix-card-cents">,50</span>
-        <span className="pix-card-per-day">por dia</span>
+        <span className="pix-card-amount">{intPart}</span>
+        <span className="pix-card-cents">,{centPart}</span>
+        <span className="pix-card-per-day">por rodada</span>
       </div>
 
       <div className="pix-card-recipient">
-        {PIX_RECIPIENT} · {PIX_BANK}
+        {recipient}{bank ? ` · ${bank}` : ''}
       </div>
 
-      <PixKeyRow />
+      <PixKeyRow pixKey={key} />
     </div>
   );
 };
 
-import type { Participant, Debt } from '../types';
-
 interface PixTabProps {
   accumulated: number; // pote acumulado em R$ (calculado em utils/pot.ts)
   currentUser: Participant | null; // usuário logado (define quem pode pendurar/quitar)
-  participants: Participant[]; // todos os participantes (a caderneta lista todos)
+  participants: Participant[]; // membros do grupo (a caderneta lista todos)
   debts: Debt[]; // fiados de todos (filtrados por usuário na renderização)
   onRegisterDebt: (userId: string, date: string) => Promise<void>; // pendurar a taxa do dia
   onRemoveDebt: (debtId: number) => Promise<void>; // dar baixa em UM fiado
   onRemoveAllDebts: (userId: string) => Promise<void>; // quitar todos os fiados do usuário
+  group: Group | null; // grupo ativo (PIX/valor próprios)
+  showPot: boolean;    // mostra o pote acumulado (só faz sentido na Copa)
 }
 
 // "2026-06-17" -> "17/06" (rótulo curto do dia do fiado)
@@ -68,6 +76,8 @@ export const PixTab: React.FC<PixTabProps> = ({
   onRegisterDebt,
   onRemoveDebt,
   onRemoveAllDebts,
+  group,
+  showPot,
 }) => {
   const [trophyError, setTrophyError] = React.useState(false);
   const [isDebtsExpanded, setIsDebtsExpanded] = React.useState(false);
@@ -81,7 +91,8 @@ export const PixTab: React.FC<PixTabProps> = ({
 
   return (
     <div className="standings-container-modern">
-      {/* CARD DO POTE ACUMULADO (aumenta R$ 10 por dia até o fim da Copa) */}
+      {/* CARD DO POTE ACUMULADO (aumenta R$ 10 por dia até o fim da Copa) — só na Copa */}
+      {showPot && (
       <div className="premium-vault-card-modern">
         <div className="vault-main-display-panel">
           <div className="vault-title-accumulated">
@@ -127,9 +138,10 @@ export const PixTab: React.FC<PixTabProps> = ({
           </div>
         </div>
       </div>
+      )}
 
-      {/* CARD DE PAGAMENTO VIA PIX */}
-      <PixPaymentCard />
+      {/* CARD DE PAGAMENTO VIA PIX (do grupo) */}
+      <PixPaymentCard group={group} />
 
       {/* CARD DA CADERNETA DE PENDURADOS (FIADOS) */}
       <div className={`debts-premium-card ${isDebtsExpanded ? 'is-expanded' : 'is-collapsed'}`}>

@@ -5202,6 +5202,30 @@ textarea.groups-input { resize: vertical; }
   padding: 0.3rem 0.6rem; color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer;
 }
 
+/* Barra de contexto do grupo ativo (topo, group-centric) */
+.active-group-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.6rem; padding: 0.6rem 1rem;
+  background: rgba(28,22,18,0.85); border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky; top: 0; z-index: 20; backdrop-filter: blur(8px);
+}
+.active-group-identity { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.active-group-avatar {
+  width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #009c3b, #f5b300); color: #fff;
+}
+.active-group-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.active-group-name {
+  font-weight: 800; font-size: 0.95rem; color: #F2ECDD;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.active-group-manage-btn {
+  flex-shrink: 0; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0.6rem; width: 34px; height: 34px; color: rgba(255,255,255,0.8);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
 /* Seletor de campeonato na aba Jogos (multi-competição) */
 .competition-selector-bar {
   display: flex; gap: 0.5rem; overflow-x: auto; padding: 0 1rem;

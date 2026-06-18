@@ -13,8 +13,8 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Users } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, Season } from './types';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Users, Settings } from 'lucide-react';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, Season, Group } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
@@ -26,7 +26,7 @@ const ProfileTab = lazy(() => import('./components/ProfileTab'));
 const GroupsTab = lazy(() => import('./components/GroupsTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
-import { redeemInvite, listSeasons } from './lib/groups';
+import { redeemInvite, listSeasons, listMembers } from './lib/groups';
 import { T, RPC } from './lib/tables';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
@@ -192,6 +192,19 @@ function App() {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
 
+  // Group-centric: nenhum grupo ativo => app mostra só Grupos + Perfil.
+  // Ao entrar num grupo, tudo (palpites/ranking/carteira) passa a ser DELE.
+  const [activeGroup, setActiveGroup] = useState<Group | null>(() => {
+    try {
+      const s = localStorage.getItem('cravei_active_group');
+      return s ? (JSON.parse(s) as Group) : null;
+    } catch {
+      return null;
+    }
+  });
+  // Usernames dos membros ativos do grupo (filtra ranking/carteira ao grupo).
+  const [groupMemberUsernames, setGroupMemberUsernames] = useState<Set<string> | null>(null);
+
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
   const [showPixModal, setShowPixModal] = useState(false);
 
@@ -335,6 +348,42 @@ function App() {
     if (!currentUser?.uid) return;
     listSeasons().then(setSeasons).catch(() => { /* catálogo opcional; sem ele cai no comportamento Copa */ });
   }, [currentUser?.uid]);
+
+  // 3d. Grupo ativo: persiste, fixa a competição do grupo e carrega os membros.
+  useEffect(() => {
+    if (activeGroup) {
+      localStorage.setItem('cravei_active_group', JSON.stringify(activeGroup));
+      setSelectedSeasonId(activeGroup.seasonId ?? null);
+      listMembers(activeGroup.id)
+        .then((ms) =>
+          setGroupMemberUsernames(
+            new Set(ms.filter((m) => m.status === 'active' && m.username).map((m) => m.username as string))
+          )
+        )
+        .catch(() => setGroupMemberUsernames(null));
+    } else {
+      localStorage.removeItem('cravei_active_group');
+      setGroupMemberUsernames(null);
+    }
+  }, [activeGroup]);
+
+  // Entrar/sair de um grupo (troca o contexto do app inteiro).
+  const handleEnterGroup = (g: Group) => {
+    setActiveGroup(g);
+    setActiveTab('jogos');
+  };
+  const handleExitGroup = () => {
+    setActiveGroup(null);
+    setActiveTab('grupos');
+  };
+
+  // Sem grupo ativo, o app só permite as abas Grupos e Perfil.
+  useEffect(() => {
+    if (currentScreen !== 'app') return;
+    if (!activeGroup && activeTab !== 'grupos' && activeTab !== 'perfil') {
+      setActiveTab('grupos');
+    }
+  }, [activeGroup, currentScreen, activeTab]);
 
   // 4. Carregamento de dados do Supabase
   const loadAll = async (uid: string, withSpinner: boolean) => {
@@ -566,15 +615,27 @@ function App() {
     );
   }, [availableSeasons]);
 
-  // Jogos da temporada selecionada (null = todas, fallback quando nada vinculado).
+  // Competição em foco: a do grupo ativo (group-centric) ou a selecionada.
+  const viewSeasonId = activeGroup ? (activeGroup.seasonId ?? null) : selectedSeasonId;
+
+  // Jogos da competição em foco (null = todas, fallback quando nada vinculado).
   const visibleMatches = useMemo(
-    () => (selectedSeasonId == null ? matches : matches.filter((m) => m.seasonId === selectedSeasonId)),
-    [matches, selectedSeasonId]
+    () => (viewSeasonId == null ? matches : matches.filter((m) => m.seasonId === viewSeasonId)),
+    [matches, viewSeasonId]
   );
 
   // Palpites especiais (campeão/Brasil) só valem na Copa.
-  const isCopaView = copaSeasonId == null || selectedSeasonId == null || selectedSeasonId === copaSeasonId;
+  const isCopaView = copaSeasonId == null || viewSeasonId == null || viewSeasonId === copaSeasonId;
   const effectiveSpecials = useMemo(() => (isCopaView ? specials : []), [isCopaView, specials]);
+
+  // Participantes considerados no ranking/carteira: os membros do grupo ativo.
+  const scopedParticipants = useMemo(
+    () =>
+      activeGroup && groupMemberUsernames
+        ? participants.filter((p) => groupMemberUsernames.has(p.id))
+        : participants,
+    [activeGroup, groupMemberUsernames, participants]
+  );
 
   // 6. Datas disponíveis (chave ISO + rótulo DD/MM) — da competição selecionada
   const dates = useMemo(() => {
@@ -978,8 +1039,8 @@ function App() {
   // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais).
   // Escopo: a competição selecionada (visibleMatches); specials só contam na Copa.
   const standings = useMemo<ParticipantStanding[]>(() => {
-    return calculateStandings(participants, visibleMatches, bets, effectiveSpecials);
-  }, [participants, visibleMatches, bets, effectiveSpecials]);
+    return calculateStandings(scopedParticipants, visibleMatches, bets, effectiveSpecials);
+  }, [scopedParticipants, visibleMatches, bets, effectiveSpecials]);
 
   // Evolução no ranking: compara a posição atual com a posição ANTES da última
   // rodada finalizada. Valor positivo = subiu; negativo = caiu; 0 = manteve.
@@ -993,7 +1054,7 @@ function App() {
     // Remove apenas o ÚLTIMO jogo finalizado para saber como estava o ranking exatamente antes dele
     const lastMatch = finishedMatches[finishedMatches.length - 1];
     const prevMatches = visibleMatches.filter((m) => m.id !== lastMatch.id);
-    const prev = calculateStandings(participants, prevMatches, bets, effectiveSpecials);
+    const prev = calculateStandings(scopedParticipants, prevMatches, bets, effectiveSpecials);
 
     const prevRank: Record<string, number> = {};
     prev.forEach((s, i) => {
@@ -1006,7 +1067,7 @@ function App() {
       changes[s.participantId] = pr == null ? 0 : pr - i;
     });
     return changes;
-  }, [participants, visibleMatches, bets, effectiveSpecials, standings]);
+  }, [scopedParticipants, visibleMatches, bets, effectiveSpecials, standings]);
 
   // Prêmio acumulado: R$ 10 por dia desde 12/06 até o fim da Copa (19/07)
   const accumulatedPot = useMemo(() => calcAccumulatedPot(getTodayIso()), [nowTs]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1118,6 +1179,30 @@ function App() {
   // ----------------------------------------------------
   return (
     <div className="app-container">
+      {/* BARRA DE CONTEXTO DO GRUPO ATIVO (some na tela de gerenciar) */}
+      {activeGroup && activeTab !== 'grupos' && (
+        <div className="active-group-bar">
+          <div className="active-group-identity">
+            <div className="active-group-avatar">
+              {activeGroup.imageUrl ? (
+                <img src={activeGroup.imageUrl} alt={activeGroup.name} />
+              ) : (
+                <Users size={18} />
+              )}
+            </div>
+            <span className="active-group-name">{activeGroup.name}</span>
+          </div>
+          <button
+            type="button"
+            className="active-group-manage-btn"
+            onClick={() => setActiveTab('grupos')}
+            aria-label="Gerenciar grupo"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
+      )}
+
       {/* HEADER BANNER CARD (Apenas na aba de partidas) */}
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
@@ -1133,8 +1218,8 @@ function App() {
         {activeTab === 'jogos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-            {/* SELETOR DE CAMPEONATO (só aparece com mais de uma competição) */}
-            {availableSeasons.length > 1 && (
+            {/* SELETOR DE CAMPEONATO — só fora de um grupo (no grupo, a competição é fixa) */}
+            {!activeGroup && availableSeasons.length > 1 && (
               <div className="competition-selector-bar">
                 {availableSeasons.map((s) => (
                   <button
@@ -1531,11 +1616,13 @@ function App() {
             <PixTab
               accumulated={accumulatedPot}
               currentUser={currentUser}
-              participants={participants}
+              participants={scopedParticipants}
               debts={debts}
               onRegisterDebt={handleRegisterDebt}
               onRemoveDebt={handleRemoveDebt}
               onRemoveAllDebts={handleRemoveAllDebts}
+              group={activeGroup}
+              showPot={isCopaView}
             />
           </Suspense>
         )}
@@ -1591,60 +1678,80 @@ function App() {
               bets={bets}
               specials={specials}
               onToast={showToast}
+              activeGroup={activeGroup}
+              onEnterGroup={handleEnterGroup}
+              onExitGroup={handleExitGroup}
             />
           </Suspense>
         )}
       </main>
 
       <nav className="bottom-nav">
-        <button
-          className={`nav-item ${activeTab === 'jogos' ? 'active' : ''}`}
-          onClick={() => setActiveTab('jogos')}
-          title="Partidas"
-          aria-label="Partidas"
-        >
-          <Calendar size={24} />
-        </button>
-        <button
-          className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}
-          onClick={() => setActiveTab('palpites')}
-          title="Palpites"
-          aria-label="Palpites"
-        >
-          <ListChecks size={24} />
-        </button>
-        <button
-          className={`nav-item ${activeTab === 'grupos' ? 'active' : ''}`}
-          onClick={() => setActiveTab('grupos')}
-          title="Grupos"
-          aria-label="Grupos"
-        >
-          <Users size={24} />
-        </button>
-        <button
-          className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ranking')}
-          title="Ranking"
-          aria-label="Ranking"
-        >
-          <Trophy size={24} />
-        </button>
-        <button
-          className={`nav-item ${activeTab === 'pix' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pix')}
-          title="Pagamento"
-          aria-label="Pagamento"
-        >
-          <Wallet size={24} />
-        </button>
-        <button
-          className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
-          onClick={() => setActiveTab('perfil')}
-          title="Perfil"
-          aria-label="Perfil"
-        >
-          <User size={24} />
-        </button>
+        {activeGroup ? (
+          <>
+            {/* DENTRO DE UM GRUPO: tudo escopado ao grupo */}
+            <button
+              className={`nav-item ${activeTab === 'jogos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('jogos')}
+              title="Palpites"
+              aria-label="Palpites"
+            >
+              <Calendar size={24} />
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}
+              onClick={() => setActiveTab('palpites')}
+              title="Especiais"
+              aria-label="Especiais"
+            >
+              <ListChecks size={24} />
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ranking')}
+              title="Ranking"
+              aria-label="Ranking"
+            >
+              <Trophy size={24} />
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'pix' ? 'active' : ''}`}
+              onClick={() => setActiveTab('pix')}
+              title="Carteira"
+              aria-label="Carteira"
+            >
+              <Wallet size={24} />
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
+              onClick={() => setActiveTab('perfil')}
+              title="Perfil"
+              aria-label="Perfil"
+            >
+              <User size={24} />
+            </button>
+          </>
+        ) : (
+          <>
+            {/* SEM GRUPO ATIVO: só Grupos e Perfil */}
+            <button
+              className={`nav-item ${activeTab === 'grupos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('grupos')}
+              title="Grupos"
+              aria-label="Grupos"
+            >
+              <Users size={24} />
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
+              onClick={() => setActiveTab('perfil')}
+              title="Perfil"
+              aria-label="Perfil"
+            >
+              <User size={24} />
+            </button>
+          </>
+        )}
       </nav>
 
       {/* MODAL PIX PÓS-LANÇAMENTO (validação da aposta do dia) */}
