@@ -59,9 +59,17 @@ Convite: guardar `token_hash` (nunca o token puro), igual senha.
 - Palpites por rodada + lembretes.
 
 ### Fase 4 — Escala e operação
-- Pontuação no servidor (RPC/Edge), idempotente, por evento de resultado.
-- Rankings materializados, índices, paginação, rate limit, auditoria.
-- Observabilidade, backups, testes de carga.
+- [x] Hardening (v2-005): auditoria (criar grupo, resgatar convite, papel/ban),
+  rate limit anti-brute-force no resgate de convite, índices.
+- **Pontuação no servidor: ADIADA (decisão).** As regras (placar/empate/vencedor +
+  fogos ON FIRE com reset compartilhado + MVP + critérios de desempate) são
+  intrincadas e bem testadas no cliente ([rules.ts](src/utils/rules.ts) +
+  rules.test.ts). Reimplementar em PL/pgSQL criaria 2 fontes de verdade
+  divergentes. Na escala atual (dezenas de usuários, ~104 jogos) o cálculo no
+  cliente basta. Reavaliar quando: muitos grupos grandes, ou pagar premiação
+  exigir número auditável no servidor. Caminho: RPC idempotente que recalcula por
+  partida e materializa `group_standings`.
+- Pendente: paginação de grupos/membros, observabilidade, backups, testes de carga.
 
 ### Fase 5 — Expansão
 - Novas ligas sem tocar a lógica central, grupos públicos, social, monetização.
