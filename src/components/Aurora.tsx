@@ -24,7 +24,7 @@ export default function Aurora({ colorStops = ['#5227FF', '#7cff67', '#5227FF'],
     '--aurora-c1': c1,
     '--aurora-c2': c2,
     '--aurora-c3': c3,
-    opacity: Math.min(0.9, 0.45 + blend * 0.4),
+    opacity: Math.min(1.0, 0.65 + blend * 0.35), // Increased opacity base for richer gradients
   } as CSSProperties;
 
   return <div className="aurora-css" style={style} aria-hidden="true" />;

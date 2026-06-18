@@ -252,23 +252,73 @@ const generateAnalysisText = (home: string, away: string, homePct: number, awayP
   }
 };
 
+const TEAM_RATINGS: Record<string, number> = {
+  'Algeria': 76,
+  'Argentina': 95,
+  'Australia': 75,
+  'Austria': 82,
+  'Belgium': 89,
+  'Bosnia-Herzegovina': 68,
+  'Bosnia and Herzegovina': 68,
+  'Brazil': 94,
+  'Canada': 75,
+  'Cape Verde Islands': 67,
+  'Cape Verde': 67,
+  'Colombia': 87,
+  'Congo DR': 66,
+  'Democratic Republic of the Congo': 66,
+  'Croatia': 86,
+  'Curaçao': 54,
+  'Czechia': 78,
+  'Czech Republic': 78,
+  'Ecuador': 77,
+  'Egypt': 76,
+  'England': 92,
+  'France': 94,
+  'Germany': 86,
+  'Ghana': 70,
+  'Haiti': 55,
+  'Iran': 78,
+  'Iraq': 69,
+  'Ivory Coast': 75,
+  'Japan': 83,
+  'Jordan': 55,
+  'Mexico': 76,
+  'Morocco': 85,
+  'Netherlands': 90,
+  'New Zealand': 53,
+  'Norway': 81,
+  'Panama': 69,
+  'Paraguay': 75,
+  'Portugal': 91,
+  'Qatar': 70,
+  'Saudi Arabia': 70,
+  'Scotland': 66,
+  'Senegal': 80,
+  'South Africa': 68,
+  'South Korea': 78,
+  'Spain': 93,
+  'Sweden': 81,
+  'Switzerland': 82,
+  'Tunisia': 75,
+  'Turkey': 78,
+  'United States': 80,
+  'Uruguay': 88,
+  'Uzbekistan': 67,
+};
+
 const getFallbackOdds = (homeTeam: string, awayTeam: string): OddsData => {
-  const combined = homeTeam + awayTeam;
-  let hash = 0;
-  for (let i = 0; i < combined.length; i++) {
-    hash = (hash << 5) - hash + combined.charCodeAt(i);
-    hash |= 0;
-  }
-  const seed = Math.abs(hash);
+  const rHome = TEAM_RATINGS[homeTeam] ?? 70;
+  const rAway = TEAM_RATINGS[awayTeam] ?? 70;
 
-  const homeRaw = 30 + (seed % 31);
-  const awayRaw = 20 + ((seed >> 2) % 31);
-  const drawRaw = 15 + ((seed >> 4) % 21);
+  const diff = rHome - rAway;
+  const wHome = 1 / (1 + Math.pow(10, -diff / 30));
 
-  const sum = homeRaw + awayRaw + drawRaw;
-  const homePct = Math.round((homeRaw / sum) * 100);
-  const awayPct = Math.round((awayRaw / sum) * 100);
-  const drawPct = 100 - homePct - awayPct;
+  const drawPct = Math.max(10, Math.round(26 - Math.abs(diff) * 0.4));
+  const rem = 100 - drawPct;
+
+  const homePct = Math.round(rem * wHome);
+  const awayPct = rem - homePct;
 
   const homePt = translateTeam(homeTeam);
   const awayPt = translateTeam(awayTeam);
@@ -344,15 +394,15 @@ function App() {
           const homeName = home?.team?.displayName ?? home?.team?.name ?? '';
           const awayName = away?.team?.displayName ?? away?.team?.name ?? '';
           if (!homeName || !awayName) continue;
-
-          const draftKingsOdds = comp?.odds?.find((o: any) => o.provider?.name === 'DraftKings') || comp?.odds?.[0];
+          const oddsArray = Array.isArray(comp?.odds) ? comp.odds.filter(Boolean) : [];
+          const draftKingsOdds = oddsArray.find((o: any) => o?.provider?.name === 'DraftKings') || oddsArray[0];
           const moneyline = draftKingsOdds?.moneyline;
           if (!moneyline) continue;
 
           const homeOddStr = moneyline.home?.close?.odds || moneyline.home?.current?.odds;
           const awayOddStr = moneyline.away?.close?.odds || moneyline.away?.current?.odds;
           const drawOddStr = moneyline.draw?.close?.odds || moneyline.draw?.current?.odds;
-          if (!homeOddStr || !awayOddStr || !drawOddStr) continue;
+          if (homeOddStr == null || awayOddStr == null || drawOddStr == null) continue;
 
           const rawHome = parseAmericanOdd(String(homeOddStr));
           const rawAway = parseAmericanOdd(String(awayOddStr));
@@ -1260,13 +1310,11 @@ function App() {
                       if (!cur) return null;
                       const [, cm, cd] = cur.iso.split('-');
                       const isToday = cur.iso === getTodayIso();
-                      const dayMatches = groupedMatches[cur.iso] || [];
-                      const subLabel = dayMatches.length > 0 ? dayMatches[0].group : '';
                       return (
                         <div className="date-carousel-item center" style={centerItemStyle}>
                           <span className="date-carousel-day">{parseInt(cd)}</span>
                           <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(cm) - 1]}</span>
-                          {subLabel && <span className="date-carousel-sub">{isToday ? `Hoje · ${subLabel}` : subLabel}</span>}
+                          {isToday && <span className="date-carousel-sub">Hoje</span>}
                         </div>
                       );
                     })()}

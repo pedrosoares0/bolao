@@ -383,7 +383,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     }}
                   />
                   <div className="podium-card-overlay"></div>
-                  <div className="podium-bg-number">2</div>
+                  <div className="podium-rank-badge">2º</div>
                   <div className="podium-medal-wrapper">
                     <img loading="lazy" decoding="async" src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -402,7 +402,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 </>
               ) : (
                 <>
-                  <div className="podium-bg-number">2</div>
+                  <div className="podium-rank-badge">2º</div>
                   <div className="podium-medal-wrapper">
                     <img loading="lazy" decoding="async" src="/imagens/medalha-segundo.webp" alt="Medalha 2º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -447,7 +447,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     }}
                   />
                   <div className="podium-card-overlay"></div>
-                  <div className="podium-bg-number">1</div>
+                  <div className="podium-rank-badge">1º</div>
                   <div className="podium-medal-wrapper">
                     <img loading="lazy" decoding="async" src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>
@@ -466,7 +466,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                 </>
               ) : (
                 <>
-                  <div className="podium-bg-number">1</div>
+                  <div className="podium-rank-badge">1º</div>
                   <div className="podium-medal-wrapper">
                     <img loading="lazy" decoding="async" src="/imagens/medalha-primeiro.webp" alt="Medalha 1º" className="podium-medal-img" />
                     <div className="medal-shine-overlay"></div>

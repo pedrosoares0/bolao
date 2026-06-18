@@ -356,8 +356,10 @@ body {
 }
 
 .date-carousel-item.center .date-carousel-sub {
-  font-size: 0.62rem;
-  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  margin-top: 0.25rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .date-carousel-item.side .date-carousel-sub {
@@ -1506,8 +1508,8 @@ body {
   background-color: #0c0908;
   /* Golden ambient spotlight background */
   background-image: 
-    radial-gradient(ellipse at 50% -20%, rgba(245, 179, 0, 0.28) 0%, transparent 60%),
-    radial-gradient(circle at 50% 120%, rgba(245, 179, 0, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% -20%, rgba(245, 179, 0, 0.35) 0%, transparent 60%),
+    radial-gradient(circle at 50% 120%, rgba(245, 179, 0, 0.08) 0%, transparent 50%),
     linear-gradient(180deg, #120e0c 0%, #080605 100%);
   border-radius: var(--border-radius-lg);
   padding: 1.5rem 1rem;
@@ -1515,8 +1517,20 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(245, 179, 0, 0.15); /* Subtle golden border */
   box-shadow: 0 25px 55px rgba(0, 0, 0, 0.6);
+  animation: goldGlowPulseSection 6s ease-in-out infinite alternate;
+}
+
+@keyframes goldGlowPulseSection {
+  0% {
+    box-shadow: 0 25px 55px rgba(0, 0, 0, 0.6), 0 0 12px rgba(245, 179, 0, 0.06);
+    border-color: rgba(245, 179, 0, 0.1);
+  }
+  100% {
+    box-shadow: 0 25px 55px rgba(0, 0, 0, 0.6), 0 0 30px rgba(245, 179, 0, 0.25);
+    border-color: rgba(245, 179, 0, 0.35);
+  }
 }
 
 /* Golden light rays spotlight effect overlay */
@@ -1656,24 +1670,39 @@ body {
   border-bottom-right-radius: 1.25rem;
 }
 
-/* Giant background number overlay */
-.podium-bg-number {
+/* Glassmorphic Rank Badge for Podium Cards */
+.podium-rank-badge {
   position: absolute;
-  top: 5px;
-  left: 10px;
-  font-family: 'Granika', sans-serif;
-  font-size: 4.5rem;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-family: var(--font-family);
   font-weight: 900;
-  line-height: 0.8;
-  pointer-events: none;
-  z-index: 1;
+  font-size: 0.95rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   user-select: none;
 }
 
-.first-place-card .podium-bg-number,
-.second-place-card .podium-bg-number {
-  color: rgba(255, 255, 255, 0.85); /* Letras brancas (igual à imagem) */
-  text-shadow: 0 0 14px rgba(255, 255, 255, 0.3);
+.first-place-card .podium-rank-badge {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+.second-place-card .podium-rank-badge {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
 }
 
 /* Medal and Points Glow animations */
@@ -2490,10 +2519,21 @@ body {
   margin-bottom: 0.8rem;
   border-radius: 9999px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(245, 179, 0, 0.2); /* Golden border */
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
   overflow: hidden;
   height: 84px;
+  animation: goldGlowPulseMvp 5s ease-in-out infinite alternate;
+}
+@keyframes goldGlowPulseMvp {
+  0% {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 8px rgba(245, 179, 0, 0.05);
+    border-color: rgba(245, 179, 0, 0.15);
+  }
+  100% {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 20px rgba(245, 179, 0, 0.22);
+    border-color: rgba(245, 179, 0, 0.4);
+  }
 }
 .round-mvp-avatar-wrap {
   width: 64px;
@@ -3083,7 +3123,7 @@ body {
 
 .toggle-guesses-btn-p16:hover {
   color: #15110E;
-  background-color: #FAF9F6;
+  background-color: #ffffff;
   border-color: rgba(21, 17, 14, 0.15);
 }
 
@@ -3135,7 +3175,7 @@ body {
 }
 
 .oracle-card-container-p16:hover {
-  background-color: #FAF9F6;
+  background-color: #ffffff;
   border-color: rgba(21, 17, 14, 0.15);
 }
 
@@ -3217,15 +3257,15 @@ body {
 }
 
 .oracle-progress-segment.home {
-  background-color: #009c3b; /* Green */
+  background-color: var(--home-color-1, #009c3b); /* Home team primary color */
 }
 
 .oracle-progress-segment.draw {
-  background-color: #94a3b8; /* Grey */
+  background-color: #94a3b8; /* Neutral grey for Draw */
 }
 
 .oracle-progress-segment.away {
-  background-color: #ef4444; /* Red */
+  background-color: var(--away-color-1, #ef4444); /* Away team primary color */
 }
 
 /* Labels layout */
@@ -4082,7 +4122,7 @@ body {
 }
 
 /* No top 1 e 2, a seta de colocação fica ao lado do número grande (1/2) */
-.podium-bg-number .rank-change {
+.podium-rank-badge .rank-change {
   vertical-align: top;
   position: relative;
   top: 0.3em;
@@ -5349,17 +5389,18 @@ body {
   overflow: hidden;
   border-radius: inherit;
   background:
-    radial-gradient(55% 70% at 22% 0%, var(--aurora-c1, #f5b300), transparent 60%),
-    radial-gradient(55% 70% at 78% 0%, var(--aurora-c3, #c58c00), transparent 60%),
-    radial-gradient(80% 65% at 50% -8%, var(--aurora-c2, #ffe066), transparent 62%);
+    radial-gradient(65% 80% at 20% 0%, var(--aurora-c1, #f5b300), transparent 60%),
+    radial-gradient(65% 80% at 80% 0%, var(--aurora-c3, #c58c00), transparent 60%),
+    radial-gradient(90% 75% at 50% -8%, var(--aurora-c2, #ffe066), transparent 62%);
   background-repeat: no-repeat;
-  background-size: 150% 150%, 150% 150%, 170% 150%;
-  filter: blur(28px) saturate(1.15);
-  animation: auroraShift 11s ease-in-out infinite alternate;
+  background-size: 160% 160%, 160% 160%, 180% 160%;
+  filter: blur(22px) saturate(1.55); /* Reduced blur, increased saturation for vibrant gold */
+  animation: auroraShift 8s ease-in-out infinite alternate; /* Slightly faster */
 }
 @keyframes auroraShift {
   0%   { background-position: 0% 0%, 100% 0%, 50% 0%; }
-  100% { background-position: 42% 7%, 60% 3%, 56% 9%; }
+  50%  { background-position: 30% 10%, 70% 5%, 45% 15%; }
+  100% { background-position: 50% 15%, 50% 10%, 55% 20%; }
 }
 
 /* LIGHT RAYS — raios + brilho pulsante (vermelho) do card "On Fire".
