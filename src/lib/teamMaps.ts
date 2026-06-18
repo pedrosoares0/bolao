@@ -184,13 +184,15 @@ export const mapFifaCode = (teamNameEn: string, originalCode: string): string =>
 export const flagOf = (teamNameEn: string, crestUrl: string): string =>
   iso2Map[teamNameEn] || crestUrl || 'un';
 
-// "GROUP_A" -> "Grupo A"; mata-mata usa o nome da fase
+// "GROUP_A" -> "Grupo A"; mata-mata usa o nome da fase.
+// Sem fase/grupo (ex.: Brasileirão da ESPN) retorna '' — o cabeçalho do jogo
+// mostra só o horário (ver render em App).
 export const groupLabel = (stage: string | null, groupName: string | null): string => {
   if (groupName) {
     const letter = groupName.replace('GROUP_', '').replace('Group ', '');
     return `Grupo ${letter}`;
   }
-  return stageNamesPt[stage || ''] || 'Copa 2026';
+  return stageNamesPt[stage || ''] || '';
 };
 
 // Monta a URL da imagem da bandeira (aceita iso2 do flagcdn ou URL completa do crest)

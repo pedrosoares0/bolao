@@ -80,19 +80,39 @@ export const norm = (s: string): string => {
 export const pairKey = (teamA: string, teamB: string): string =>
   [norm(teamA), norm(teamB)].sort().join('|');
 
-// Busca o scoreboard da Copa na ESPN e devolve os overrides (só jogos ao vivo
-// ou encerrados), indexados pela chave do confronto. Lança erro se a ESPN
-// falhar — quem chama trata como "sem ESPN" e segue no football-data.
-export async function fetchEspnOverrides(): Promise<Map<string, EspnOverride>> {
-  const res = await fetch(
-    'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
-    { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BolaoBandidos/1.0)' } }
-  );
-  if (!res.ok) throw new Error(`ESPN respondeu ${res.status}`);
+// Ligas cujo placar AO VIVO buscamos na ESPN. Copa + Brasileirão.
+const LIVE_LEAGUES = ['fifa.world', 'bra.1'];
 
-  const data = (await res.json()) as EspnScoreboard;
+// Busca os scoreboards das ligas na ESPN e devolve os overrides (só jogos ao
+// vivo ou encerrados), indexados pela chave do confronto. Tenta cada liga; se
+// TODAS falharem, lança erro — quem chama trata como "sem ESPN" e segue.
+export async function fetchEspnOverrides(leagues: string[] = LIVE_LEAGUES): Promise<Map<string, EspnOverride>> {
   const map = new Map<string, EspnOverride>();
+  let anyOk = false;
+  let lastErr: unknown = null;
 
+  for (const slug of leagues) {
+    try {
+      const res = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`,
+        { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Cravei/1.0)' } }
+      );
+      if (!res.ok) throw new Error(`ESPN ${slug} respondeu ${res.status}`);
+      const data = (await res.json()) as EspnScoreboard;
+      parseScoreboard(data, map);
+      anyOk = true;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`ESPN scoreboard ${slug} falhou:`, err);
+    }
+  }
+
+  if (!anyOk) throw new Error(`ESPN indisponível: ${lastErr}`);
+  return map;
+}
+
+// Lê um scoreboard da ESPN e adiciona os overrides (ao vivo/encerrados) no mapa.
+function parseScoreboard(data: EspnScoreboard, map: Map<string, EspnOverride>): void {
   for (const ev of data.events ?? []) {
     const comp = ev.competitions?.[0];
     const type = comp?.status?.type;
@@ -135,6 +155,4 @@ export async function fetchEspnOverrides(): Promise<Map<string, EspnOverride>> {
       goalsDetail,
     });
   }
-
-  return map;
 }
