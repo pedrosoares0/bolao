@@ -5065,6 +5065,110 @@ body {
 }
 
 /* ==========================================================================
+   CARDS DOS PARTICIPANTES DO BOLÃO (aba Ranking)
+   ========================================================================== */
+.participant-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 0.7rem;
+}
+.participant-user-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 1.1rem 0.6rem 0.9rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.participant-user-rank {
+  position: absolute; top: 0.5rem; left: 0.6rem;
+  font-size: 0.72rem; font-weight: 900; color: var(--accent-gold);
+}
+.participant-user-avatar { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+.participant-user-name {
+  font-weight: 700; font-size: 0.85rem; color: #F2ECDD; text-align: center;
+  display: flex; align-items: center; gap: 3px;
+}
+.participant-user-fire { font-size: 0.8rem; }
+.participant-user-pts { font-size: 0.74rem; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+
+/* ==========================================================================
+   NAV: rótulos + VERSÃO PC (sidebar à esquerda)
+   ========================================================================== */
+.nav-label { font-size: 0.6rem; line-height: 1; }
+.nav-brand { display: none; }
+
+@media (min-width: 1024px) {
+  .app-container {
+    max-width: 1332px;
+    margin: 0 auto;
+    padding-left: 232px;     /* espaço da sidebar fixa */
+    padding-bottom: 2rem;
+  }
+
+  /* bottom-nav vira sidebar vertical */
+  .bottom-nav {
+    position: fixed;
+    top: 0; left: 0; bottom: auto;
+    transform: none;
+    width: 232px; max-width: 232px; height: 100vh;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 0.3rem;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1.5rem 0.9rem;
+    background: rgba(21, 17, 14, 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .nav-brand {
+    display: block;
+    font-family: var(--font-family);
+    font-weight: 900;
+    font-size: 1.9rem;
+    letter-spacing: -0.02em;
+    color: var(--accent-gold);
+    padding: 0 0.6rem 1rem;
+  }
+  .nav-brand span { color: #009c3b; }
+
+  .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.9rem;
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 0.8rem 0.9rem;
+    border-radius: 0.85rem;
+  }
+  .nav-item.active { transform: none; }
+  .nav-item .nav-label { font-size: 0.98rem; font-weight: 700; }
+
+  /* Conteúdo mais arejado no PC */
+  .games-beige-card-container { margin: 0; }
+  .games-grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .app-header-card-img { max-height: 240px; object-fit: cover; }
+  .group-cover-fallback { min-height: 160px; }
+
+  /* Grupos em grade; conteúdos de leitura centralizados e legíveis */
+  .groups-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.8rem; }
+  .groups-container, .profile-tab-container-p16 { max-width: 920px; margin: 0 auto; }
+  .standings-container-modern { max-width: 780px; margin: 0 auto; }
+  .participant-cards-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* Telas grandes: aproveita melhor o espaço dos jogos */
+@media (min-width: 1440px) {
+  .games-grid-layout { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+/* ==========================================================================
    GRUPOS (Fase 2)
    ========================================================================== */
 .groups-container {

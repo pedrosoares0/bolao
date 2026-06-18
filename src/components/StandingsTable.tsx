@@ -10,6 +10,7 @@ import { analyzeBet, calculateFireCounts } from '../utils/rules';
 import { shareRanking } from '../utils/shareRanking';
 import LightRays from './LightRays';
 import Aurora from './Aurora';
+import Avatar from './Avatar';
 
 interface StandingsTableProps {
   standings: ParticipantStanding[]; // já ordenado (ver calculateStandings)
@@ -18,141 +19,31 @@ interface StandingsTableProps {
   rankChanges?: Record<string, number>; // variação de posição desde a última rodada
 }
 
-// Deck 3D de fotos dos participantes com arraste/swipe (puramente visual)
-const Slideshow: React.FC = () => {
-  const [activeIndex, setActiveIndex] = React.useState(0);
-  const [dragX, setDragX] = React.useState(0);
-  const [isDragging, setIsDragging] = React.useState(false);
-  const startXRef = React.useRef(0);
-
-  const participantSlides = [
-    { id: 'pedro', img: '/imagens/pedro-slide.webp', name: 'Pedro' },
-    { id: 'neto', img: '/imagens/neto-slide.webp', name: 'Neto' },
-    { id: 'rodrigo', img: '/imagens/rodrigo-slide.webp', name: 'Rodrigo' },
-    { id: 'alex', img: '/imagens/alex-slide.webp', name: 'Alex' },
-  ];
-
-  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    startXRef.current = clientX;
-    setIsDragging(true);
-  };
-
-  const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const deltaX = clientX - startXRef.current;
-    setDragX(deltaX);
-  };
-
-  const handleDragEnd = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-
-    const threshold = 60;
-    if (dragX > threshold) {
-      // Swiped right -> go to previous card
-      setActiveIndex((prev) => (prev - 1 + participantSlides.length) % participantSlides.length);
-    } else if (dragX < -threshold) {
-      // Swiped left -> go to next card
-      setActiveIndex((prev) => (prev + 1) % participantSlides.length);
-    } else {
-      // Small drag is considered a click/tap -> go to next card
-      setActiveIndex((prev) => (prev + 1) % participantSlides.length);
-    }
-    setDragX(0);
-  };
-
+// Cards dos participantes REAIS do bolão (membros do grupo), com foto/inicial,
+// nome, posição e pontos. Responsivo (grade que cresce no PC).
+const ParticipantCards: React.FC<{
+  standings: ParticipantStanding[];
+  fireCounts: Record<string, number>;
+}> = ({ standings, fireCounts }) => {
+  if (standings.length === 0) return null;
   return (
     <div className="participants-section">
       <div className="participants-header">
         <h3 className="participants-title">Participantes</h3>
       </div>
 
-      <div className="participants-list-wrapper-static">
-        <div className="participants-stacked-container">
-          {participantSlides.map((slide, index) => {
-            const len = participantSlides.length;
-            const diff = (index - activeIndex + len) % len;
-
-            // Styles based on stack depth (diff)
-            let transform = '';
-            let zIndex = 1;
-            let opacity = 0;
-            let pointerEvents: 'auto' | 'none' = 'none';
-
-            if (diff === 0) {
-              // Front active card
-              transform = `translateX(${dragX}px) rotate(${dragX * 0.04}deg) scale(1)`;
-              zIndex = 10;
-              opacity = 1;
-              pointerEvents = 'auto';
-            } else if (diff === 1) {
-              // Behind to the right
-              transform = 'translateX(28px) translateY(-6px) rotate(4deg) scale(0.92)';
-              zIndex = 9;
-              opacity = 0.9;
-            } else if (diff === 2) {
-              // Behind to the left
-              transform = 'translateX(-26px) translateY(-12px) rotate(-6deg) scale(0.86)';
-              zIndex = 8;
-              opacity = 0.75;
-            } else if (diff === 3) {
-              // Bottom-most card
-              transform = 'translateX(4px) translateY(-16px) rotate(2deg) scale(0.80)';
-              zIndex = 7;
-              opacity = 0.55;
-            }
-
-            const transitionStyle = isDragging && diff === 0
-              ? 'none'
-              : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.2), opacity 0.4s ease';
-
-            return (
-              <div
-                key={slide.id}
-                className="participant-stacked-card"
-                style={{
-                  transform,
-                  zIndex,
-                  opacity,
-                  transition: transitionStyle,
-                  pointerEvents,
-                  cursor: isDragging ? 'grabbing' : 'grab',
-                }}
-                onMouseDown={handleDragStart}
-                onMouseMove={handleDragMove}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-                onTouchStart={handleDragStart}
-                onTouchMove={handleDragMove}
-                onTouchEnd={handleDragEnd}
-              >
-                <div className="participant-card-image-wrapper">
-                  <img loading="lazy" decoding="async"
-                    src={slide.img}
-                    alt={slide.name}
-                    className="participant-stacked-img"
-                    draggable="false"
-                  />
-                  <div className="participant-card-label-overlay">
-                    <span className="participant-card-name">{slide.name}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="swiper-dots-container">
-          {participantSlides.map((_, index) => (
-            <div
-              key={index}
-              className={`swiper-dot ${index === activeIndex ? 'active' : ''}`}
-              onClick={() => setActiveIndex(index)}
-            ></div>
-          ))}
-        </div>
+      <div className="participant-cards-grid">
+        {standings.map((s, i) => (
+          <div key={s.participantId} className="participant-user-card">
+            <span className="participant-user-rank">{i + 1}º</span>
+            <Avatar name={s.name} src={s.avatarUrl} size={64} className="participant-user-avatar" />
+            <span className="participant-user-name">
+              {s.name}
+              {(fireCounts[s.participantId] || 0) > 0 && <span className="participant-user-fire">🔥</span>}
+            </span>
+            <span className="participant-user-pts">{s.points} pts</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -321,14 +212,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
               speed={0.5}
             />
             <div className="round-mvp-avatar-wrap">
-              <img loading="lazy" decoding="async"
-                src={getRankingAvatar(roundMvp.standing.participantId)}
-                alt={roundMvp.standing.name}
-                className="round-mvp-avatar"
-                onError={(e) => {
-                  e.currentTarget.src = roundMvp.standing.avatarUrl;
-                }}
-              />
+              <Avatar name={roundMvp.standing.name} src={roundMvp.standing.avatarUrl} size={56} className="round-mvp-avatar" />
             </div>
 
             <div className="round-mvp-content">
@@ -408,14 +292,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-fallback-avatar-container">
-                    <img loading="lazy" decoding="async"
-                      src={getRankingAvatar(secondPlace.participantId)}
-                      alt={secondPlace.name}
-                      className="podium-fallback-avatar"
-                      onError={(e) => {
-                        e.currentTarget.src = secondPlace.avatarUrl;
-                      }}
-                    />
+                    <Avatar name={secondPlace.name} src={secondPlace.avatarUrl} size={72} className="podium-fallback-avatar" />
                   </div>
                   <div className="podium-player-info-row">
                     <span className="podium-name-with-rank" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -472,14 +349,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     <div className="medal-shine-overlay"></div>
                   </div>
                   <div className="podium-fallback-avatar-container">
-                    <img loading="lazy" decoding="async"
-                      src={getRankingAvatar(firstPlace.participantId)}
-                      alt={firstPlace.name}
-                      className="podium-fallback-avatar"
-                      onError={(e) => {
-                        e.currentTarget.src = firstPlace.avatarUrl;
-                      }}
-                    />
+                    <Avatar name={firstPlace.name} src={firstPlace.avatarUrl} size={84} className="podium-fallback-avatar" />
                   </div>
                   <div className="podium-player-info-row">
                     <span className="podium-name-with-rank" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -517,14 +387,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                       {actualRank}º
                     </div>
                     <div className="standing-row-avatar-container">
-                      <img loading="lazy" decoding="async"
-                        src={getRankingAvatar(standing.participantId)}
-                        alt={standing.name}
-                        className="standing-row-avatar"
-                        onError={(e) => {
-                          e.currentTarget.src = standing.avatarUrl;
-                        }}
-                      />
+                      <Avatar name={standing.name} src={standing.avatarUrl} size={40} className="standing-row-avatar" />
                     </div>
                     <span className="standing-name-with-rank">
                       <span className="standing-row-name">{standing.name}</span>
@@ -677,9 +540,9 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
         </div>
       )}
 
-      {/* SLIDESHOW DE IMAGENS */}
+      {/* CARDS DOS PARTICIPANTES DO BOLÃO */}
       <div style={{ marginTop: '1rem', width: '100%' }}>
-        <Slideshow />
+        <ParticipantCards standings={standings} fireCounts={fireCounts} />
       </div>
     </div>
   );

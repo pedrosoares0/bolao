@@ -1701,6 +1701,8 @@ function App() {
       </main>
 
       <nav className="bottom-nav">
+        {/* Marca (só visível na sidebar do PC) */}
+        <div className="nav-brand">Cravei<span>!</span></div>
         {activeGroup ? (
           <>
             {/* DENTRO DE UM GRUPO: tudo escopado ao grupo */}
@@ -1711,6 +1713,7 @@ function App() {
               aria-label="Palpites"
             >
               <Calendar size={24} />
+              <span className="nav-label">Palpites</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}
@@ -1719,6 +1722,7 @@ function App() {
               aria-label="Especiais"
             >
               <ListChecks size={24} />
+              <span className="nav-label">Especiais</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
@@ -1727,6 +1731,7 @@ function App() {
               aria-label="Ranking"
             >
               <Trophy size={24} />
+              <span className="nav-label">Ranking</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'pix' ? 'active' : ''}`}
@@ -1735,6 +1740,7 @@ function App() {
               aria-label="Carteira"
             >
               <Wallet size={24} />
+              <span className="nav-label">Carteira</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
@@ -1743,6 +1749,7 @@ function App() {
               aria-label="Perfil"
             >
               <User size={24} />
+              <span className="nav-label">Perfil</span>
             </button>
           </>
         ) : (
@@ -1755,6 +1762,7 @@ function App() {
               aria-label="Grupos"
             >
               <Users size={24} />
+              <span className="nav-label">Grupos</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
@@ -1763,6 +1771,7 @@ function App() {
               aria-label="Perfil"
             >
               <User size={24} />
+              <span className="nav-label">Perfil</span>
             </button>
           </>
         )}
