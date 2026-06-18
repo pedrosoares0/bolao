@@ -30,6 +30,21 @@ import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc, getTeamColors 
 // Fuso horário de exibição: todos os horários dos jogos são convertidos para Brasília
 const TZ = 'America/Sao_Paulo';
 
+// Jogadores do Brasil disponíveis para o palpite de artilheiro por jogo
+const BRAZIL_PLAYERS = [
+  { id: 'vinijr', name: 'Vini Jr', img: 'https://img.sofascore.com/api/v1/player/868812/image' },
+  { id: 'paqueta', name: 'Paquetá', img: 'https://img.sofascore.com/api/v1/player/839981/image' },
+  { id: 'raphinha', name: 'Raphinha', img: 'https://img.sofascore.com/api/v1/player/831005/image' },
+  { id: 'igorthiago', name: 'Igor Thiago', img: 'https://img.sofascore.com/api/v1/player/1016907/image' },
+  { id: 'endrick', name: 'Endrick', img: 'https://img.sofascore.com/api/v1/player/1174937/image' },
+  { id: 'matheuscunha', name: 'M. Cunha', img: 'https://img.sofascore.com/api/v1/player/886363/image' },
+  { id: 'rayan', name: 'Rayan', img: 'https://img.sofascore.com/api/v1/player/1464966/image' },
+  { id: 'luizhenrique', name: 'L. Henrique', img: 'https://img.sofascore.com/api/v1/player/1035995/image' },
+] as const;
+
+const isBrazilMatch = (m: { homeTeamEn: string; awayTeamEn: string }) =>
+  m.homeTeamEn === 'Brazil' || m.awayTeamEn === 'Brazil';
+
 const brTimeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 const isoDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const brHourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' });
@@ -90,6 +105,7 @@ interface BetRow {
   match_id: number;
   home_score: number;
   away_score: number;
+  scorer_id?: string | null;
 }
 
 // Linha crua da tabela `matches` do Supabase
@@ -313,6 +329,9 @@ function App() {
   // Estado para os rascunhos de palpites editados inline
   const [draftBets, setDraftBets] = useState<{ [matchId: string]: { homeScore: string, awayScore: string } }>({});
 
+  // Palpite de artilheiro por jogo do Brasil (matchId -> playerId)
+  const [scorerDrafts, setScorerDrafts] = useState<{ [matchId: string]: string }>({});
+
   // Estado para controlar quais palpites de jogos estão expandidos
   const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({});
 
@@ -328,6 +347,15 @@ function App() {
 
   const togglePredictionExpanded = (matchId: string) => {
     setExpandedPredictions((prev) => ({
+      ...prev,
+      [matchId]: !prev[matchId],
+    }));
+  };
+
+  const [expandedScorers, setExpandedScorers] = useState<Record<string, boolean>>({});
+
+  const toggleScorerExpanded = (matchId: string) => {
+    setExpandedScorers((prev) => ({
       ...prev,
       [matchId]: !prev[matchId],
     }));
@@ -476,7 +504,7 @@ function App() {
             'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock'
           )
           .order('utc_date'),
-        supabase.from('bets').select('user_id, match_id, home_score, away_score'),
+        supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id'),
         supabase.from('submissions').select('bet_date').eq('user_id', uid),
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
         supabase.from('debts').select('id, user_id, amount, debt_date, created_at'),
@@ -637,6 +665,7 @@ function App() {
         participantId: usernameByUid[r.user_id] || r.user_id,
         homeScore: r.home_score,
         awayScore: r.away_score,
+        scorerId: r.scorer_id || null,
       })),
     [betRows, usernameByUid]
   );
@@ -740,6 +769,19 @@ function App() {
     });
     return map;
   }, [matches, betByMatchUser, draftBets, currentUser]);
+
+  const displayScorers = useMemo(() => {
+    const map: { [matchId: string]: string | null } = {};
+    matches.forEach((match) => {
+      const own = currentUser
+        ? betByMatchUser.get(`${match.id}|${currentUser.id}`)
+        : undefined;
+      map[match.id] = scorerDrafts[match.id] !== undefined
+        ? scorerDrafts[match.id]
+        : (own?.scorerId || null);
+    });
+    return map;
+  }, [matches, betByMatchUser, scorerDrafts, currentUser]);
 
   // Incrementar / decrementar placar via stepper (▲/▼)
   const stepScore = useCallback((matchId: string, side: 'homeScore' | 'awayScore', direction: 1 | -1) => {
@@ -953,10 +995,12 @@ function App() {
 
     const payload = playableMatches.map((m) => {
       const draft = displayDrafts[m.id];
+      const scorerId = isBrazilMatch(m) ? displayScorers[m.id] || null : null;
       return {
         match_id: Number(m.id),
         home_score: parseInt(draft.homeScore, 10),
         away_score: parseInt(draft.awayScore, 10),
+        scorer_id: scorerId,
       };
     });
 
@@ -974,6 +1018,7 @@ function App() {
 
     setSubmittedDates((prev) => new Set(prev).add(selectedDate));
     setDraftBets({}); // as apostas salvas passam a alimentar os campos
+    setScorerDrafts({}); // limpar rascunho de artilheiro
     await loadAll(currentUser.uid, false);
     setShowPixModal(true); // lembra do PIX que valida a aposta do dia
   };
@@ -1303,8 +1348,6 @@ function App() {
                     // Determinar se o jogo já começou ou terminou
                     const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff, nowTs);
 
-                    // Aposta editável até 1 minuto antes do kickoff (mesmo depois de lançada),
-                    // desde que a sessão da rodada já tenha aberto (meia-noite do dia da rodada).
                     const sessionOpen = nowTs >= startOfBrDay(selectedDate);
                     const canEditBet = sessionOpen && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
 
@@ -1375,296 +1418,399 @@ function App() {
                           style={cardStyle}
                         >
 
-                        {/* Cabeçalho do Jogo (Grupo, Horário e Status alinhados em uma única linha) */}
-                        <div className="game-card-header-p16">
-                          <div className="game-card-header-top">
-                            <span className="game-card-header-info">
-                              {match.group} • {match.time}
-                            </span>
-                            {canEditBet ? (
-                              <MatchCountdown kickoff={match.kickoff} />
-                            ) : match.isLive ? (
-                              <span className="live-badge-p16">
-                                <span className="live-dot-p16"></span>
-                                AO VIVO{formatLiveClock(match.liveClock) ? ` · ${formatLiveClock(match.liveClock)}` : ''}
+                          {/* Cabeçalho do Jogo (Grupo, Horário e Status alinhados em uma única linha) */}
+                          <div className="game-card-header-p16">
+                            <div className="game-card-header-top">
+                              <span className="game-card-header-info">
+                                {match.group} • {match.time}
                               </span>
-                            ) : isFinished ? (
-                              <span className="finished-badge-p16">
-                                ENCERRADO
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Corpo do Confronto — Layout Horizontal */}
-                        <div className="game-card-body-p16">
-                          {/* Time Mandante (coluna esquerda) */}
-                          <div className={homeClasses}>
-                            <div className="team-flag-badge-p16">
-                              <img loading="lazy" decoding="async"
-                                src={flagSrc(match.homeFlag, 80)}
-                                alt={match.homeTeam}
-                                className="team-flag-img-p16"
-                                onError={(e) => {
-                                  e.currentTarget.src = 'https://flagcdn.com/w40/un.png';
-                                }}
-                              />
-                            </div>
-                            <div className="team-code-label-p16">
-                              {match.homeTeam}
+                              {canEditBet ? (
+                                <MatchCountdown kickoff={match.kickoff} />
+                              ) : match.isLive ? (
+                                <span className="live-badge-p16">
+                                  <span className="live-dot-p16"></span>
+                                  AO VIVO{formatLiveClock(match.liveClock) ? ` · ${formatLiveClock(match.liveClock)}` : ''}
+                                </span>
+                              ) : isFinished ? (
+                                <span className="finished-badge-p16">
+                                  ENCERRADO
+                                </span>
+                              ) : null}
                             </div>
                           </div>
 
-                          {/* Placar Central */}
-                          <div className={`match-score-center ${canEditBet ? 'has-stepper' : 'has-display'}`}>
-                            {canEditBet ? (
-                              /* Stepper Home */
-                              <div className="score-stepper">
-                                <button
-                                  type="button"
-                                  className="score-stepper-btn"
-                                  onClick={() => stepScore(match.id, 'homeScore', 1)}
-                                  aria-label={`Aumentar gols de ${match.homeTeam}`}
-                                >
-                                  <ArrowUp size={26} />
-                                </button>
-                                <div className="score-stepper-value">
-                                  {displayDrafts[match.id]?.homeScore || '0'}
-                                </div>
-                                <button
-                                  type="button"
-                                  className="score-stepper-btn"
-                                  onClick={() => stepScore(match.id, 'homeScore', -1)}
-                                  aria-label={`Diminuir gols de ${match.homeTeam}`}
-                                >
-                                  <ArrowDown size={26} />
-                                </button>
+                          {/* Corpo do Confronto — Layout Horizontal */}
+                          <div className="game-card-body-p16">
+                            {/* Time Mandante (coluna esquerda) */}
+                            <div className={homeClasses}>
+                              <div className="team-flag-badge-p16">
+                                <img loading="lazy" decoding="async"
+                                  src={flagSrc(match.homeFlag, 80)}
+                                  alt={match.homeTeam}
+                                  className="team-flag-img-p16"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://flagcdn.com/w40/un.png';
+                                  }}
+                                />
                               </div>
-                            ) : (
-                              <div className="score-display-box-p16">
-                                {hasGameStarted ? (match.homeScore !== null ? match.homeScore : '-') : (displayDrafts[match.id]?.homeScore || '-')}
+                              <div className="team-code-label-p16">
+                                {match.homeTeam}
                               </div>
-                            )}
-
-                            <span className="match-score-x">✕</span>
-
-                            {canEditBet ? (
-                              /* Stepper Away */
-                              <div className="score-stepper">
-                                <button
-                                  type="button"
-                                  className="score-stepper-btn"
-                                  onClick={() => stepScore(match.id, 'awayScore', 1)}
-                                  aria-label={`Aumentar gols de ${match.awayTeam}`}
-                                >
-                                  <ArrowUp size={26} />
-                                </button>
-                                <div className="score-stepper-value">
-                                  {displayDrafts[match.id]?.awayScore || '0'}
-                                </div>
-                                <button
-                                  type="button"
-                                  className="score-stepper-btn"
-                                  onClick={() => stepScore(match.id, 'awayScore', -1)}
-                                  aria-label={`Diminuir gols de ${match.awayTeam}`}
-                                >
-                                  <ArrowDown size={26} />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="score-display-box-p16">
-                                {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (displayDrafts[match.id]?.awayScore || '-')}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Time Visitante (coluna direita) */}
-                          <div className={awayClasses}>
-                            <div className="team-flag-badge-p16">
-                              <img loading="lazy" decoding="async"
-                                src={flagSrc(match.awayFlag, 80)}
-                                alt={match.awayTeam}
-                                className="team-flag-img-p16"
-                                onError={(e) => {
-                                  e.currentTarget.src = 'https://flagcdn.com/w40/un.png';
-                                }}
-                              />
                             </div>
-                            <div className="team-code-label-p16">
-                              {match.awayTeam}
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Seção de palpite baseada somente nas odds retornadas pela ESPN */}
-                        {match.status !== 'finished' && (() => {
-                          const key = makePairKey(match.homeTeamEn, match.awayTeamEn);
-                          const matchOdds = oddsMap[key];
-                          if (!matchOdds) return null;
-                          const isOracleExpanded = !!expandedPredictions[match.id];
-
-                          return (
-                            <div className="oracle-card-container-p16">
-                              <div
-                                className="oracle-card-header-p16"
-                                onClick={() => togglePredictionExpanded(match.id)}
-                              >
-                                <div className="oracle-title-left">
-                                  <span className="oracle-emoji-p16">🎯</span>
-                                  <span>PALPITE DA CASA</span>
-                                </div>
-                                {isOracleExpanded ? (
-                                  <ChevronUp size={13} className="oracle-chevron" />
-                                ) : (
-                                  <ChevronDown size={13} className="oracle-chevron" />
-                                )}
-                              </div>
-
-                              <div className={`oracle-card-content-wrapper-p16 ${isOracleExpanded ? 'expanded' : ''}`}>
-                                <div className="oracle-card-content-inner-p16">
-                                  <div className="oracle-progress-bar">
-                                    <div className="oracle-progress-segment home" style={{ width: `${matchOdds.homePct}%` }}></div>
-                                    <div className="oracle-progress-segment draw" style={{ width: `${matchOdds.drawPct}%` }}></div>
-                                    <div className="oracle-progress-segment away" style={{ width: `${matchOdds.awayPct}%` }}></div>
+                            {/* Placar Central */}
+                            <div className={`match-score-center ${canEditBet ? 'has-stepper' : 'has-display'}`}>
+                              {canEditBet ? (
+                                /* Stepper Home */
+                                <div className="score-stepper">
+                                  <button
+                                    type="button"
+                                    className="score-stepper-btn"
+                                    onClick={() => stepScore(match.id, 'homeScore', 1)}
+                                    aria-label={`Aumentar gols de ${match.homeTeam}`}
+                                  >
+                                    <ArrowUp size={26} />
+                                  </button>
+                                  <div className="score-stepper-value">
+                                    {displayDrafts[match.id]?.homeScore || '0'}
                                   </div>
+                                  <button
+                                    type="button"
+                                    className="score-stepper-btn"
+                                    onClick={() => stepScore(match.id, 'homeScore', -1)}
+                                    aria-label={`Diminuir gols de ${match.homeTeam}`}
+                                  >
+                                    <ArrowDown size={26} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="score-display-box-p16">
+                                  {hasGameStarted ? (match.homeScore !== null ? match.homeScore : '-') : (displayDrafts[match.id]?.homeScore || '-')}
+                                </div>
+                              )}
 
-                                  <div className="oracle-prob-labels">
-                                    <div className="oracle-prob-col home">
-                                      <span className="oracle-team-name">{match.homeTeam}</span>
-                                      <span className="oracle-pct-value">{matchOdds.homePct}%</span>
+                              <span className="match-score-x">✕</span>
+
+                              {canEditBet ? (
+                                /* Stepper Away */
+                                <div className="score-stepper">
+                                  <button
+                                    type="button"
+                                    className="score-stepper-btn"
+                                    onClick={() => stepScore(match.id, 'awayScore', 1)}
+                                    aria-label={`Aumentar gols de ${match.awayTeam}`}
+                                  >
+                                    <ArrowUp size={26} />
+                                  </button>
+                                  <div className="score-stepper-value">
+                                    {displayDrafts[match.id]?.awayScore || '0'}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="score-stepper-btn"
+                                    onClick={() => stepScore(match.id, 'awayScore', -1)}
+                                    aria-label={`Diminuir gols de ${match.awayTeam}`}
+                                  >
+                                    <ArrowDown size={26} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="score-display-box-p16">
+                                  {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (displayDrafts[match.id]?.awayScore || '-')}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Time Visitante (coluna direita) */}
+                            <div className={awayClasses}>
+                              <div className="team-flag-badge-p16">
+                                <img loading="lazy" decoding="async"
+                                  src={flagSrc(match.awayFlag, 80)}
+                                  alt={match.awayTeam}
+                                  className="team-flag-img-p16"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://flagcdn.com/w40/un.png';
+                                  }}
+                                />
+                              </div>
+                              <div className="team-code-label-p16">
+                                {match.awayTeam}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* PALPITE DE ARTILHEIRO — só em jogos do Brasil */}
+                          {isBrazilMatch(match) && (() => {
+                            const selectedScorer = displayScorers[match.id] || null;
+                            const pickedPlayer = selectedScorer
+                              ? BRAZIL_PLAYERS.find((pl) => pl.id === selectedScorer) ?? null
+                              : null;
+                            const isExpanded = !!expandedScorers[match.id];
+
+                            return (
+                              <div className="scorer-picker-container">
+                                <div
+                                  className="scorer-picker-header clickable"
+                                  onClick={() => toggleScorerExpanded(match.id)}
+                                >
+                                  <div className="scorer-picker-title-left">
+                                    <span className="scorer-picker-emoji">⚽</span>
+                                    <span>QUEM MARCA?</span>
+                                    {pickedPlayer && !isExpanded && (
+                                      <span className="scorer-picker-header-selection">
+                                        • {pickedPlayer.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isExpanded ? (
+                                    <ChevronUp size={13} className="scorer-chevron" />
+                                  ) : (
+                                    <ChevronDown size={13} className="scorer-chevron" />
+                                  )}
+                                </div>
+
+                                <div className={`scorer-picker-content-wrapper ${isExpanded ? 'expanded' : ''}`}>
+                                  <div className="scorer-picker-content-inner">
+                                    <div className="scorer-picker-subtitle">
+                                      Acerte o artilheiro e ganhe <b>+1 ponto extra</b>
                                     </div>
-                                    <div className="oracle-prob-col draw">
-                                      <span className="oracle-team-name">Empate</span>
-                                      <span className="oracle-pct-value">{matchOdds.drawPct}%</span>
+                                    <div className="scorer-picker-grid">
+                                      {BRAZIL_PLAYERS.map((player) => {
+                                        const isSelected = selectedScorer === player.id;
+                                        const isLocked = !canEditBet;
+                                        const isHidden = isLocked && !isSelected;
+                                        if (isHidden && selectedScorer) return null;
+                                        return (
+                                          <button
+                                            key={player.id}
+                                            type="button"
+                                            className={`scorer-player-btn ${isSelected ? 'selected' : ''} ${isLocked ? 'locked' : ''}`}
+                                            onClick={() => {
+                                              if (isLocked) return;
+                                              setScorerDrafts((prev) => ({
+                                                ...prev,
+                                                [match.id]: selectedScorer === player.id ? '' : player.id,
+                                              }));
+                                            }}
+                                            disabled={isLocked}
+                                          >
+                                            <div className={`scorer-player-img-wrapper ${isSelected ? 'selected' : ''}`}>
+                                              <img
+                                                loading="lazy"
+                                                decoding="async"
+                                                src={player.img}
+                                                alt={player.name}
+                                                className="scorer-player-img"
+                                                onError={(e) => {
+                                                  e.currentTarget.src = 'https://flagcdn.com/w40/br.png';
+                                                }}
+                                              />
+                                            </div>
+                                            <span className="scorer-player-name">{player.name}</span>
+                                          </button>
+                                        );
+                                      })}
                                     </div>
-                                    <div className="oracle-prob-col away">
-                                      <span className="oracle-team-name">{match.awayTeam}</span>
-                                      <span className="oracle-pct-value">{matchOdds.awayPct}%</span>
+                                    {!canEditBet && !selectedScorer && (
+                                      <div className="scorer-picker-none">Nenhum jogador selecionado</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Seção de palpite baseada somente nas odds retornadas pela ESPN */}
+                          {match.status !== 'finished' && (() => {
+                            const key = makePairKey(match.homeTeamEn, match.awayTeamEn);
+                            const matchOdds = oddsMap[key];
+                            if (!matchOdds) return null;
+                            const isOracleExpanded = !!expandedPredictions[match.id];
+
+                            return (
+                              <div className="oracle-card-container-p16">
+                                <div
+                                  className="oracle-card-header-p16"
+                                  onClick={() => togglePredictionExpanded(match.id)}
+                                >
+                                  <div className="oracle-title-left">
+                                    <span className="oracle-emoji-p16">🎯</span>
+                                    <span>PALPITE DA CASA</span>
+                                  </div>
+                                  {isOracleExpanded ? (
+                                    <ChevronUp size={13} className="oracle-chevron" />
+                                  ) : (
+                                    <ChevronDown size={13} className="oracle-chevron" />
+                                  )}
+                                </div>
+
+                                <div className={`oracle-card-content-wrapper-p16 ${isOracleExpanded ? 'expanded' : ''}`}>
+                                  <div className="oracle-card-content-inner-p16">
+                                    <div className="oracle-progress-bar">
+                                      <div className="oracle-progress-segment home" style={{ width: `${matchOdds.homePct}%` }}></div>
+                                      <div className="oracle-progress-segment draw" style={{ width: `${matchOdds.drawPct}%` }}></div>
+                                      <div className="oracle-progress-segment away" style={{ width: `${matchOdds.awayPct}%` }}></div>
+                                    </div>
+
+                                    <div className="oracle-prob-labels">
+                                      <div className="oracle-prob-col home">
+                                        <span className="oracle-team-name">{match.homeTeam}</span>
+                                        <span className="oracle-pct-value">{matchOdds.homePct}%</span>
+                                      </div>
+                                      <div className="oracle-prob-col draw">
+                                        <span className="oracle-team-name">Empate</span>
+                                        <span className="oracle-pct-value">{matchOdds.drawPct}%</span>
+                                      </div>
+                                      <div className="oracle-prob-col away">
+                                        <span className="oracle-team-name">{match.awayTeam}</span>
+                                        <span className="oracle-pct-value">{matchOdds.awayPct}%</span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()}
 
-                        {/* Botão para expandir/comprimir palpites */}
-                        <button
-                          type="button"
-                          className="toggle-guesses-btn-p16"
-                          onClick={() => toggleMatchExpanded(match.id)}
-                        >
-                          <span>Palpites</span>
-                          {expandedMatches[match.id] ? (
-                            <ChevronUp size={14} />
-                          ) : (
-                            <ChevronDown size={14} />
-                          )}
-                        </button>
+                          {/* Botão para expandir/comprimir palpites */}
+                          <button
+                            type="button"
+                            className="toggle-guesses-btn-p16"
+                            onClick={() => toggleMatchExpanded(match.id)}
+                          >
+                            <span>Palpites</span>
+                            {expandedMatches[match.id] ? (
+                              <ChevronUp size={14} />
+                            ) : (
+                              <ChevronDown size={14} />
+                            )}
+                          </button>
 
-                        {/* LISTA INLINE DE PALPITES DOS PARTICIPANTES */}
-                        <div className={`inline-guesses-list-wrapper-p16 ${expandedMatches[match.id] ? 'expanded' : ''}`}>
-                          <div className="inline-guesses-list-inner-p16">
-                            {participants.map((p) => {
-                              const bet = betByMatchUser.get(`${match.id}|${p.id}`);
-                              const analysis = analyzeBet(bet, match);
+                          {/* LISTA INLINE DE PALPITES DOS PARTICIPANTES */}
+                          <div className={`inline-guesses-list-wrapper-p16 ${expandedMatches[match.id] ? 'expanded' : ''}`}>
+                            <div className="inline-guesses-list-inner-p16">
+                              {participants.map((p) => {
+                                const bet = betByMatchUser.get(`${match.id}|${p.id}`);
+                                const analysis = analyzeBet(bet, match);
 
-                              // Mini-títulos do jogo
-                              const isProfeta = finishedTitles && analysis.type === 'exact';
-                              const isPeFrio = p.id === peFrioId;
+                                // Mini-títulos do jogo
+                                const isProfeta = finishedTitles && analysis.type === 'exact';
+                                const isPeFrio = p.id === peFrioId;
 
-                              // Lógica do Badge de Pontos
-                              let pointsBadgeClass = 'wrong';
-                              let pointsText = '0 pts';
-                              if (analysis.type === 'exact') {
-                                pointsBadgeClass = 'exact';
-                                pointsText = '+3 pts';
-                              } else if (analysis.type === 'draw') {
-                                pointsBadgeClass = 'draw';
-                                pointsText = '+2 pts';
-                              } else if (analysis.type === 'winner') {
-                                pointsBadgeClass = 'winner';
-                                pointsText = '+1 pt';
-                              } else if (analysis.type === 'pending') {
-                                pointsBadgeClass = 'pending';
-                                pointsText = 'Pendente';
-                              }
-
-                              // Lógica da bandeira de quem o participante achou que ia vencer
-                              let predictedWinnerFlag: string | null = null;
-                              if (bet) {
-                                if (bet.homeScore > bet.awayScore) {
-                                  predictedWinnerFlag = match.homeFlag;
-                                } else if (bet.awayScore > bet.homeScore) {
-                                  predictedWinnerFlag = match.awayFlag;
+                                // Lógica do Badge de Pontos
+                                let pointsBadgeClass = 'wrong';
+                                let pointsText = '0 pts';
+                                if (analysis.type === 'exact') {
+                                  pointsBadgeClass = 'exact';
+                                  pointsText = '+3 pts';
+                                } else if (analysis.type === 'draw') {
+                                  pointsBadgeClass = 'draw';
+                                  pointsText = '+2 pts';
+                                } else if (analysis.type === 'winner') {
+                                  pointsBadgeClass = 'winner';
+                                  pointsText = '+1 pt';
+                                } else if (analysis.type === 'pending') {
+                                  pointsBadgeClass = 'pending';
+                                  pointsText = 'Pendente';
                                 }
-                              }
 
-                              return (
-                                <div key={p.id} className="inline-guess-row-p16">
-                                  <div className="inline-guess-user-info-p16">
-                                    <div className="inline-guess-avatar-border-p16">
-                                      <img loading="lazy" decoding="async"
-                                        src={`/imagens/ranking ${p.id}.webp`}
-                                        alt={p.name}
-                                        className="inline-guess-avatar-img-p16"
-                                        onError={(e) => {
-                                          e.currentTarget.src = p.avatarUrl;
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="inline-guess-name-col-p16">
-                                      {isProfeta && (
-                                        <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
-                                      )}
-                                      {isPeFrio && (
-                                        <span className="inline-guess-title-p16 pe-frio">
-                                          <img loading="lazy" decoding="async"
-                                            src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75"
-                                            alt="Pé Frio"
-                                            className="pe-frio-icon-img"
-                                          />
-                                          Pé Frio
-                                        </span>
-                                      )}
-                                      <span className="inline-guess-username-p16">{p.name}</span>
-                                    </div>
-                                  </div>
+                                // Lógica da bandeira de quem o participante achou que ia vencer
+                                let predictedWinnerFlag: string | null = null;
+                                if (bet) {
+                                  if (bet.homeScore > bet.awayScore) {
+                                    predictedWinnerFlag = match.homeFlag;
+                                  } else if (bet.awayScore > bet.homeScore) {
+                                    predictedWinnerFlag = match.awayFlag;
+                                  }
+                                }
 
-                                  <div className="inline-guess-result-info-p16">
-                                    {bet ? (
-                                      <div className="inline-guess-scores-container-p16">
-                                        <span className="inline-guess-score-text-p16">
-                                          {bet.homeScore} x {bet.awayScore}
-                                        </span>
-                                        {predictedWinnerFlag && (
+                                // Lógica do artilheiro escolhido (só jogos do Brasil)
+                                const pickedPlayer = isBrazilMatch(match)
+                                  ? (currentUser && p.id === currentUser.id
+                                    ? (displayScorers[match.id]
+                                      ? BRAZIL_PLAYERS.find((pl) => pl.id === displayScorers[match.id]) ?? null
+                                      : null)
+                                    : (bet?.scorerId
+                                      ? BRAZIL_PLAYERS.find((pl) => pl.id === bet.scorerId) ?? null
+                                      : null))
+                                  : null;
+
+                                return (
+                                  <div key={p.id} className="inline-guess-row-p16">
+                                    <div className="inline-guess-user-info-p16">
+                                      <div className={`inline-guess-avatar-wrapper ${pickedPlayer ? 'has-scorer' : ''}`}>
+                                        <div className="inline-guess-avatar-border-p16">
                                           <img loading="lazy" decoding="async"
-                                            src={flagSrc(predictedWinnerFlag, 40)}
-                                            alt="Palpite Vencedor"
-                                            className="inline-guess-winner-flag-p16"
+                                            src={`/imagens/ranking ${p.id}.webp`}
+                                            alt={p.name}
+                                            className="inline-guess-avatar-img-p16"
+                                            onError={(e) => {
+                                              e.currentTarget.src = p.avatarUrl;
+                                            }}
                                           />
+                                        </div>
+                                        {pickedPlayer && (
+                                          <div className="inline-guess-scorer-overlay">
+                                            <img
+                                              loading="lazy" decoding="async"
+                                              src={pickedPlayer.img}
+                                              alt={pickedPlayer.name}
+                                            />
+                                          </div>
                                         )}
                                       </div>
-                                    ) : (
-                                      <span className="inline-guess-none-text-p16">Sem Palpite</span>
-                                    )}
+                                      <div className="inline-guess-name-col-p16">
+                                        {isProfeta && (
+                                          <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
+                                        )}
+                                        {isPeFrio && (
+                                          <span className="inline-guess-title-p16 pe-frio">
+                                            <img loading="lazy" decoding="async"
+                                              src="https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75"
+                                              alt="Pé Frio"
+                                              className="pe-frio-icon-img"
+                                            />
+                                            Pé Frio
+                                          </span>
+                                        )}
+                                        <span className="inline-guess-username-p16">{p.name}</span>
+                                      </div>
+                                    </div>
 
-                                    <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
-                                      {pointsText}
+                                    <div className="inline-guess-result-info-p16">
+                                      {bet ? (
+                                        <div className="inline-guess-scores-container-p16">
+                                          <span className="inline-guess-score-text-p16">
+                                            {bet.homeScore} x {bet.awayScore}
+                                          </span>
+                                          {predictedWinnerFlag && (
+                                            <img loading="lazy" decoding="async"
+                                              src={flagSrc(predictedWinnerFlag, 40)}
+                                              alt="Palpite Vencedor"
+                                              className="inline-guess-winner-flag-p16"
+                                            />
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="inline-guess-none-text-p16">Sem Palpite</span>
+                                      )}
+
+                                      <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
+                                        {pointsText}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      {idx < activeDateMatches.length - 1 && (
-                        <div className="game-card-separator-p16" />
-                      )}
-                    </Fragment>
-                  );
-                })}
+                        {idx < activeDateMatches.length - 1 && (
+                          <div className="game-card-separator-p16" />
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#15110E', fontWeight: 600 }}>

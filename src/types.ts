@@ -57,6 +57,7 @@ export interface Bet {
   participantId: string;
   homeScore: number;
   awayScore: number;
+  scorerId?: string | null;
 }
 
 export interface ParticipantStanding {

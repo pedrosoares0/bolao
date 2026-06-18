@@ -16,6 +16,17 @@ import {
 } from '../utils/specials';
 import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 
+const BRAZIL_PLAYERS = [
+  { id: 'vinijr', name: 'Vini Jr', img: 'https://img.sofascore.com/api/v1/player/868812/image' },
+  { id: 'paqueta', name: 'Paquetá', img: 'https://img.sofascore.com/api/v1/player/839981/image' },
+  { id: 'raphinha', name: 'Raphinha', img: 'https://img.sofascore.com/api/v1/player/831005/image' },
+  { id: 'igorthiago', name: 'Igor Thiago', img: 'https://img.sofascore.com/api/v1/player/1016907/image' },
+  { id: 'endrick', name: 'Endrick', img: 'https://img.sofascore.com/api/v1/player/1174937/image' },
+  { id: 'matheuscunha', name: 'M. Cunha', img: 'https://img.sofascore.com/api/v1/player/886363/image' },
+  { id: 'rayan', name: 'Rayan', img: 'https://img.sofascore.com/api/v1/player/1464966/image' },
+  { id: 'luizhenrique', name: 'L. Henrique', img: 'https://img.sofascore.com/api/v1/player/1035995/image' },
+] as const;
+
 interface PalpitesTabProps {
   matches: Match[];
   bets: Bet[];
@@ -258,11 +269,30 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                         </div>
                       </div>
 
-                      <div className="history-bet-row">
-                        <span className="history-bet-label">Seu palpite:</span>
-                        <span className="history-bet-value">
-                          {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
-                        </span>
+                      <div className="history-bet-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
+                          <span className="history-bet-label">Seu palpite:</span>
+                          <span className="history-bet-value">
+                            {bet ? `${bet.homeScore} x ${bet.awayScore}` : 'Sem palpite'}
+                          </span>
+                        </div>
+                        {bet?.scorerId && (() => {
+                          const player = BRAZIL_PLAYERS.find((pl) => pl.id === bet.scorerId);
+                          if (!player) return null;
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
+                              <span className="history-bet-label">Artilheiro:</span>
+                              <img
+                                src={player.img}
+                                alt={player.name}
+                                style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255, 255, 255, 0.2)' }}
+                              />
+                              <span className="history-bet-value" style={{ color: '#F2ECDD' }}>
+                                {player.name}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

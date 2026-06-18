@@ -901,6 +901,17 @@ body {
   gap: 0.5rem;
 }
 
+.inline-guess-avatar-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  z-index: 1;
+}
+
+.inline-guess-avatar-wrapper.has-scorer {
+  margin-left: 0;
+}
+
 .inline-guess-avatar-border-p16 {
   width: 50px;
   height: 50px;
@@ -910,6 +921,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 2;
+  background: #ffffff;
 }
 
 .inline-guess-avatar-img-p16 {
@@ -3156,6 +3170,234 @@ body {
   border: 1px solid rgba(21, 17, 14, 0.08); /* Subtle line boundary */
   border-radius: 1rem;
   margin-top: 0.85rem;
+}
+
+/* ==========================================================================
+   PALPITE DE ARTILHEIRO — SCORER PICKER (jogos do Brasil)
+   ========================================================================== */
+.scorer-picker-container {
+  background-color: #ffffff;
+  border: 1px solid rgba(21, 17, 14, 0.07);
+  border-radius: 16px;
+  padding: 0.75rem 0.8rem;
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.scorer-picker-header.clickable {
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scorer-picker-title-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #000000;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.scorer-picker-header-selection {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #009739;
+  text-transform: none;
+  letter-spacing: normal;
+  margin-left: 0.35rem;
+}
+
+.scorer-chevron {
+  color: #000000;
+  opacity: 0.8;
+  transition: transform 0.2s ease;
+}
+
+/* Collapsible wrapper using CSS Grid */
+.scorer-picker-content-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.scorer-picker-content-wrapper.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 0.5rem;
+}
+
+.scorer-picker-content-inner {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scorer-picker-emoji {
+  font-size: 1.15rem;
+  line-height: 1;
+  display: inline-block;
+}
+
+.scorer-picker-subtitle {
+  font-family: var(--font-family);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #8b8075;
+  margin-bottom: 0.5rem;
+}
+
+.scorer-picker-subtitle b {
+  color: #009739;
+  font-weight: 800;
+}
+
+.scorer-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem 0.35rem;
+  justify-items: center;
+}
+
+.scorer-player-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem 0.3rem;
+  border-radius: 14px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 56px;
+  position: relative;
+}
+
+.scorer-player-btn:hover:not(.locked) {
+  background-color: rgba(0, 151, 57, 0.06);
+  transform: translateY(-2px);
+}
+
+.scorer-player-btn:active:not(.locked) {
+  transform: translateY(0) scale(0.96);
+}
+
+.scorer-player-btn.selected {
+  background-color: rgba(0, 151, 57, 0.08);
+}
+
+.scorer-player-btn.locked {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.scorer-player-btn.locked.selected {
+  opacity: 1;
+}
+
+.scorer-player-img-wrapper {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2.5px solid rgba(21, 17, 14, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  background: #f3f0eb;
+}
+
+.scorer-player-img-wrapper.selected {
+  border-color: #009739;
+  box-shadow:
+    0 0 0 2.5px rgba(0, 151, 57, 0.25),
+    0 4px 12px rgba(0, 151, 57, 0.2);
+  animation: scorer-ring-pulse 2s infinite ease-in-out;
+}
+
+@keyframes scorer-ring-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2.5px rgba(0, 151, 57, 0.25),
+      0 4px 12px rgba(0, 151, 57, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(0, 151, 57, 0.15),
+      0 4px 16px rgba(0, 151, 57, 0.3);
+  }
+}
+
+.scorer-player-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scorer-player-name {
+  font-family: var(--font-family);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #8b8075;
+  text-align: center;
+  line-height: 1.1;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.scorer-player-btn.selected .scorer-player-name {
+  color: #009739;
+  font-weight: 800;
+}
+
+
+.scorer-picker-none {
+  font-family: var(--font-family);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #b8b0a5;
+  text-align: center;
+  padding: 0.3rem 0 0.1rem;
+  font-style: italic;
+}
+
+/* Foto do artilheiro atrás/ao lado do avatar do participante nos palpites */
+.inline-guess-scorer-overlay {
+  position: absolute;
+  bottom: -4px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 3;
+  background: #f3f0eb;
+  transition: all 0.2s ease;
+}
+
+.inline-guess-scorer-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ==========================================================================
