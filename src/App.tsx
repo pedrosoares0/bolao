@@ -13,7 +13,7 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Users, Settings } from 'lucide-react';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Users, Settings, ArrowLeft } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, Season, Group } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
@@ -1184,6 +1184,15 @@ function App() {
       {/* BARRA DE CONTEXTO DO GRUPO ATIVO (some na tela de gerenciar) */}
       {activeGroup && activeTab !== 'grupos' && (
         <div className="active-group-bar">
+          <button
+            type="button"
+            className="active-group-back-btn"
+            onClick={handleExitGroup}
+            aria-label="Trocar de grupo"
+          >
+            <ArrowLeft size={18} />
+            <span>Grupos</span>
+          </button>
           <div className="active-group-identity">
             <div className="active-group-avatar">
               {activeGroup.imageUrl ? (
@@ -1205,11 +1214,21 @@ function App() {
         </div>
       )}
 
-      {/* HEADER BANNER CARD (Apenas na aba de partidas) */}
+      {/* HEADER BANNER CARD (Apenas na aba de partidas) = CAPA DO GRUPO */}
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
           <div className="app-header-card-gradient-border">
-            <div className="cravei-wordmark header">Cravei<span>!</span></div>
+            {activeGroup?.cardUrl || activeGroup?.imageUrl ? (
+              <img
+                loading="lazy"
+                decoding="async"
+                src={(activeGroup.cardUrl || activeGroup.imageUrl) as string}
+                alt={activeGroup.name}
+                className="app-header-card-img"
+              />
+            ) : (
+              <div className="group-cover-fallback">{activeGroup?.name ?? ''}</div>
+            )}
           </div>
         </div>
       )}

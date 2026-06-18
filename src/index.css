@@ -5231,7 +5231,19 @@ textarea.groups-input { resize: vertical; }
   background: rgba(28,22,18,0.85); border-bottom: 1px solid rgba(255,255,255,0.08);
   position: sticky; top: 0; z-index: 20; backdrop-filter: blur(8px);
 }
-.active-group-identity { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.active-group-back-btn {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.25rem;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0.6rem; padding: 0.4rem 0.6rem; color: rgba(255,255,255,0.85);
+  font-family: var(--font-family); font-weight: 700; font-size: 0.8rem; cursor: pointer;
+}
+.active-group-identity { display: flex; align-items: center; gap: 0.6rem; min-width: 0; flex: 1; justify-content: center; }
+.group-cover-fallback {
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.6rem 1rem; font-family: var(--font-family); font-weight: 900;
+  font-size: 1.4rem; color: #fff; text-align: center;
+  background: linear-gradient(135deg, #009c3b 0%, #15110E 60%, #f5b300 140%);
+}
 .active-group-avatar {
   width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
