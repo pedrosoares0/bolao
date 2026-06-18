@@ -317,14 +317,14 @@ export async function shareRanking(
   rankChanges: Record<string, number> = {}
 ): Promise<'shared' | 'downloaded' | 'cancelled'> {
   const blob = await buildRankingPng(standings, fireCounts, rankChanges);
-  const file = new File([blob], 'ranking-bandidos.png', { type: 'image/png' });
+  const file = new File([blob], 'ranking-cravei.png', { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean };
 
   try {
     if (nav.canShare && nav.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: 'Ranking — Bandidos Apostados',
+        title: 'Ranking — Cravei!',
         text: 'Olha o ranking do bolão! 🏆⚽',
       });
       return 'shared';
@@ -338,7 +338,7 @@ export async function shareRanking(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'ranking-bandidos.png';
+  a.download = 'ranking-cravei.png';
   document.body.appendChild(a);
   a.click();
   a.remove();

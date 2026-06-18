@@ -847,7 +847,7 @@ function App() {
     return (
       <div className="login-screen-container">
         <div className="login-banner-container">
-          <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Bandidos Apostados" className="login-banner-img" />
+          <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Cravei!" className="login-banner-img" />
           <div className="login-ribbon-divider"></div>
         </div>
 
@@ -925,7 +925,7 @@ function App() {
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
           <div className="app-header-card-gradient-border">
-            <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Bandidos Apostados Banner" className="app-header-card-img" />
+            <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Cravei! Banner" className="app-header-card-img" />
           </div>
         </div>
       )}
