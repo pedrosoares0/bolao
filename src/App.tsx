@@ -14,7 +14,7 @@
 // ============================================================
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Users } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, Season } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
@@ -26,7 +26,7 @@ const ProfileTab = lazy(() => import('./components/ProfileTab'));
 const GroupsTab = lazy(() => import('./components/GroupsTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
-import { redeemInvite } from './lib/groups';
+import { redeemInvite, listSeasons } from './lib/groups';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
 // Domínio interno do esquema de auth (username -> username@DOMÍNIO). Mantido em
@@ -115,6 +115,7 @@ interface MatchDbRow {
   away_score: number | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
   live_clock: string | null;
+  season_id: number | null;
 }
 
 // Converte uma linha da tabela `matches` do Supabase para o formato do app
@@ -142,6 +143,7 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     homeTeamEn: r.home_team,
     awayTeamEn: r.away_team,
     stage: r.stage ?? 'GROUP_STAGE',
+    seasonId: r.season_id ?? null,
     winner: r.winner ?? null,
     isLive: ['IN_PLAY', 'PAUSED', 'LIVE', 'EXTRA_TIME', 'PENALTY_SHOOTOUT'].includes(r.status?.toUpperCase() || ''),
     liveClock: r.live_clock ?? null,
@@ -183,6 +185,11 @@ function App() {
     { user_id: string; champion_team: string; brazil_stage: BrazilStage }[]
   >([]);
   const [debts, setDebts] = useState<Debt[]>([]);
+
+  // Multi-campeonato: temporadas disponíveis + a selecionada na aba Jogos.
+  // Enquanto só a Copa tem jogos, o seletor fica oculto (comportamento idêntico).
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
 
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
   const [showPixModal, setShowPixModal] = useState(false);
@@ -322,6 +329,12 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, currentScreen]);
 
+  // 3c. Catálogo de temporadas (rótulos do seletor de campeonato + detectar a Copa).
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    listSeasons().then(setSeasons).catch(() => { /* catálogo opcional; sem ele cai no comportamento Copa */ });
+  }, [currentUser?.uid]);
+
   // 4. Carregamento de dados do Supabase
   const loadAll = async (uid: string, withSpinner: boolean) => {
     if (withSpinner) setLoading(true);
@@ -333,7 +346,7 @@ function App() {
         supabase
           .from('matches')
           .select(
-            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock'
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock, season_id'
           )
           .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score'),
@@ -521,22 +534,64 @@ function App() {
     [specialRows, usernameByUid]
   );
 
-  // 6. Datas disponíveis (chave ISO + rótulo DD/MM)
+  // ---- Multi-campeonato: filtra a aba Jogos/ranking pela temporada escolhida ----
+  // Quantos jogos cada temporada tem (a Copa domina com ~104 → vem primeiro).
+  const seasonCounts = useMemo(() => {
+    const m = new Map<number, number>();
+    matches.forEach((mt) => { if (mt.seasonId != null) m.set(mt.seasonId, (m.get(mt.seasonId) ?? 0) + 1); });
+    return m;
+  }, [matches]);
+
+  const availableSeasons = useMemo(() => {
+    const labeled = [...seasonCounts.keys()].map((id) => ({
+      id,
+      label: seasons.find((s) => s.id === id)?.competitionName ?? 'Campeonato',
+      count: seasonCounts.get(id) ?? 0,
+    }));
+    labeled.sort((a, b) => b.count - a.count);
+    return labeled;
+  }, [seasonCounts, seasons]);
+
+  const copaSeasonId = useMemo(
+    () => seasons.find((s) => s.competitionProviderId === 'fifa.world')?.id ?? null,
+    [seasons]
+  );
+
+  // Default = competição com mais jogos (Copa). Só ativa quando há vínculo.
+  useEffect(() => {
+    if (availableSeasons.length === 0) return;
+    setSelectedSeasonId((prev) =>
+      prev != null && availableSeasons.some((s) => s.id === prev) ? prev : availableSeasons[0].id
+    );
+  }, [availableSeasons]);
+
+  // Jogos da temporada selecionada (null = todas, fallback quando nada vinculado).
+  const visibleMatches = useMemo(
+    () => (selectedSeasonId == null ? matches : matches.filter((m) => m.seasonId === selectedSeasonId)),
+    [matches, selectedSeasonId]
+  );
+
+  // Palpites especiais (campeão/Brasil) só valem na Copa.
+  const isCopaView = copaSeasonId == null || selectedSeasonId == null || selectedSeasonId === copaSeasonId;
+  const effectiveSpecials = useMemo(() => (isCopaView ? specials : []), [isCopaView, specials]);
+
+  // 6. Datas disponíveis (chave ISO + rótulo DD/MM) — da competição selecionada
   const dates = useMemo(() => {
     const seen = new Map<string, string>();
-    matches.forEach((m) => {
+    visibleMatches.forEach((m) => {
       if (!seen.has(m.isoDate)) seen.set(m.isoDate, m.date);
     });
     return Array.from(seen, ([iso, label]) => ({ iso, label })).sort((a, b) =>
       a.iso.localeCompare(b.iso)
     );
-  }, [matches]);
+  }, [visibleMatches]);
 
   // Data efetivamente selecionada: a escolhida pelo usuário ou, por padrão,
   // hoje (se tiver jogos) > próxima data com jogos > última data
   const selectedDate = useMemo(() => {
-    if (selectedDateState) return selectedDateState;
     if (dates.length === 0) return '';
+    // Ignora a data escolhida se ela não existe na competição atual (troca de campeonato).
+    if (selectedDateState && dates.some((d) => d.iso === selectedDateState)) return selectedDateState;
     const todayIso = getTodayIso();
     const found =
       dates.find((d) => d.iso === todayIso) ||
@@ -576,17 +631,17 @@ function App() {
     return map;
   }, [matches, betByMatchUser, draftBets, currentUser]);
 
-  // Agrupar partidas por data para renderização eficiente
+  // Agrupar partidas por data para renderização eficiente (competição atual)
   const groupedMatches = useMemo(() => {
     const groups: { [key: string]: Match[] } = {};
-    matches.forEach((m) => {
+    visibleMatches.forEach((m) => {
       if (!groups[m.isoDate]) {
         groups[m.isoDate] = [];
       }
       groups[m.isoDate].push(m);
     });
     return groups;
-  }, [matches]);
+  }, [visibleMatches]);
 
   // Partidas do dia selecionado
   const activeDateMatches = useMemo(() => {
@@ -921,15 +976,16 @@ function App() {
     await loadAll(currentUser.uid, false);
   };
 
-  // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
+  // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais).
+  // Escopo: a competição selecionada (visibleMatches); specials só contam na Copa.
   const standings = useMemo<ParticipantStanding[]>(() => {
-    return calculateStandings(participants, matches, bets, specials);
-  }, [participants, matches, bets, specials]);
+    return calculateStandings(participants, visibleMatches, bets, effectiveSpecials);
+  }, [participants, visibleMatches, bets, effectiveSpecials]);
 
   // Evolução no ranking: compara a posição atual com a posição ANTES da última
   // rodada finalizada. Valor positivo = subiu; negativo = caiu; 0 = manteve.
   const rankChanges = useMemo<Record<string, number>>(() => {
-    const finishedMatches = matches
+    const finishedMatches = visibleMatches
       .filter((m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null)
       .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
 
@@ -937,8 +993,8 @@ function App() {
 
     // Remove apenas o ÚLTIMO jogo finalizado para saber como estava o ranking exatamente antes dele
     const lastMatch = finishedMatches[finishedMatches.length - 1];
-    const prevMatches = matches.filter((m) => m.id !== lastMatch.id);
-    const prev = calculateStandings(participants, prevMatches, bets, specials);
+    const prevMatches = visibleMatches.filter((m) => m.id !== lastMatch.id);
+    const prev = calculateStandings(participants, prevMatches, bets, effectiveSpecials);
 
     const prevRank: Record<string, number> = {};
     prev.forEach((s, i) => {
@@ -951,7 +1007,7 @@ function App() {
       changes[s.participantId] = pr == null ? 0 : pr - i;
     });
     return changes;
-  }, [participants, matches, bets, specials, standings]);
+  }, [participants, visibleMatches, bets, effectiveSpecials, standings]);
 
   // Prêmio acumulado: R$ 10 por dia desde 12/06 até o fim da Copa (19/07)
   const accumulatedPot = useMemo(() => calcAccumulatedPot(getTodayIso()), [nowTs]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1077,6 +1133,21 @@ function App() {
         {/* ABA: PARTIDAS & APOSTAS */}
         {activeTab === 'jogos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+            {/* SELETOR DE CAMPEONATO (só aparece com mais de uma competição) */}
+            {availableSeasons.length > 1 && (
+              <div className="competition-selector-bar">
+                {availableSeasons.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`competition-pill ${selectedSeasonId === s.id ? 'active' : ''}`}
+                    onClick={() => { setSelectedSeasonId(s.id); setSelectedDateState(''); }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* HORIZONTAL DATE SELECTOR BAR */}
             {dates.length > 0 && (
@@ -1474,7 +1545,7 @@ function App() {
         {activeTab === 'ranking' && (
           <div>
             <Suspense fallback={tabFallback}>
-              <StandingsTable standings={standings} matches={matches} bets={bets} rankChanges={rankChanges} />
+              <StandingsTable standings={standings} matches={visibleMatches} bets={bets} rankChanges={rankChanges} />
             </Suspense>
 
             {/* Logout em baixo do Ranking */}

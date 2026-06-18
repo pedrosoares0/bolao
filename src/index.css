@@ -5201,3 +5201,20 @@ textarea.groups-input { resize: vertical; }
   background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 1rem;
   padding: 0.3rem 0.6rem; color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer;
 }
+
+/* Seletor de campeonato na aba Jogos (multi-competição) */
+.competition-selector-bar {
+  display: flex; gap: 0.5rem; overflow-x: auto; padding: 0 1rem;
+  scrollbar-width: none;
+}
+.competition-selector-bar::-webkit-scrollbar { display: none; }
+.competition-pill {
+  flex-shrink: 0; padding: 0.45rem 1rem; border-radius: 1.5rem;
+  border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7); font-family: var(--font-family);
+  font-weight: 800; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+}
+.competition-pill.active {
+  background: linear-gradient(90deg, #009c3b 0%, #f5b300 100%);
+  color: #fff; border-color: transparent;
+}

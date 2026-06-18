@@ -8,17 +8,18 @@ import type { Group, GroupMember, GroupInvite, GroupRole, Season } from '../type
 export async function listSeasons(): Promise<Season[]> {
   const { data, error } = await supabase
     .from('seasons')
-    .select('id, competition_id, name, competitions(name)')
+    .select('id, competition_id, name, competitions(name, provider_id)')
     .order('id');
   if (error) throw new Error(error.message);
   return (data ?? []).map((s) => {
-    const comp = (s.competitions as { name?: string } | null);
+    const comp = (s.competitions as { name?: string; provider_id?: string } | null);
     const compName = comp?.name ?? 'Competição';
     return {
       id: s.id as number,
       competitionId: s.competition_id as number,
       name: s.name as string,
       competitionName: `${compName} ${s.name}`.trim(),
+      competitionProviderId: comp?.provider_id ?? null,
     };
   });
 }

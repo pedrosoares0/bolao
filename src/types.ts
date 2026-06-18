@@ -31,6 +31,7 @@ export interface Match {
   homeTeamEn: string; // Nome original em inglês (igual ao banco/API)
   awayTeamEn: string;
   stage: string; // GROUP_STAGE | LAST_32 | LAST_16 | QUARTER_FINALS | SEMI_FINALS | THIRD_PLACE | FINAL
+  seasonId?: number | null; // temporada/competição a que o jogo pertence (multi-campeonato)
   winner?: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // decide pênaltis no mata-mata
   isLive?: boolean;
   liveClock?: string | null; // minuto/etapa ao vivo vindo da ESPN (ex.: "28'", "HT")
@@ -98,6 +99,7 @@ export interface Season {
   competitionId: number;
   name: string;
   competitionName: string; // juntado da competição (ex.: "Copa do Mundo 2026")
+  competitionProviderId: string | null; // ex.: 'fifa.world' (Copa) | 'bra.1'
 }
 
 export interface Group {

@@ -90,15 +90,21 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
     }
   };
 
-  // Ranking do grupo: filtra participantes aos membros ativos.
+  // Ranking do grupo: membros ativos × jogos da competição do grupo.
+  // Specials (campeão/Brasil) só contam se a competição do grupo for a Copa.
   const groupStandings = useMemo(() => {
-    if (view !== 'detail' || members.length === 0) return [];
+    if (view !== 'detail' || members.length === 0 || !selectedGroup) return [];
     const memberUsernames = new Set(
       members.filter((m) => m.status === 'active').map((m) => m.username)
     );
     const groupParticipants = participants.filter((p) => memberUsernames.has(p.id));
-    return calculateStandings(groupParticipants, matches, bets, specials);
-  }, [view, members, participants, matches, bets, specials]);
+    const seasonMatches = selectedGroup.seasonId == null
+      ? matches
+      : matches.filter((m) => m.seasonId === selectedGroup.seasonId);
+    const season = seasons.find((s) => s.id === selectedGroup.seasonId);
+    const isCopa = !season || season.competitionProviderId === 'fifa.world';
+    return calculateStandings(groupParticipants, seasonMatches, bets, isCopa ? specials : []);
+  }, [view, members, participants, matches, bets, specials, selectedGroup, seasons]);
 
   // ---- Handlers de criação --------------------------------------------------
   const handleGroupImage = async (file: File | undefined, which: 'img' | 'card') => {
