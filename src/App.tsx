@@ -195,10 +195,6 @@ interface OddsData {
   homePct: number;
   drawPct: number;
   awayPct: number;
-  provider: string;
-  homeOdd: string;
-  drawOdd: string;
-  awayOdd: string;
 }
 
 const ALIAS: Record<string, string> = {
@@ -236,6 +232,58 @@ const parseAmericanOdd = (oddStr: string): number => {
   } else {
     return -odd / (-odd + 100);
   }
+};
+
+const pickMoneylineOdd = (side: any): string | number | null =>
+  side?.current?.odds ?? side?.close?.odds ?? side?.open?.odds ?? null;
+
+const normalizeProbabilities = (home: number, draw: number, away: number): OddsData | null => {
+  const sum = home + draw + away;
+  if (sum <= 0) return null;
+
+  const homePct = Math.round((home / sum) * 100);
+  const awayPct = Math.round((away / sum) * 100);
+  const drawPct = 100 - homePct - awayPct;
+
+  return { homePct, drawPct, awayPct };
+};
+
+const parseEspnOdds = (odds: any): OddsData | null => {
+  const moneyline = odds?.moneyline;
+  if (!moneyline) return null;
+
+  const homeOdd = pickMoneylineOdd(moneyline.home);
+  const drawOdd = pickMoneylineOdd(moneyline.draw);
+  const awayOdd = pickMoneylineOdd(moneyline.away);
+  if (homeOdd == null || drawOdd == null || awayOdd == null) return null;
+
+  return normalizeProbabilities(
+    parseAmericanOdd(String(homeOdd)),
+    parseAmericanOdd(String(drawOdd)),
+    parseAmericanOdd(String(awayOdd))
+  );
+};
+
+const collectEspnOdds = (data: any): Record<string, OddsData> => {
+  const nextOddsMap: Record<string, OddsData> = {};
+
+  for (const ev of data.events ?? []) {
+    const comp = ev.competitions?.[0];
+    const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+    const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+    const homeName = home?.team?.displayName ?? home?.team?.name ?? '';
+    const awayName = away?.team?.displayName ?? away?.team?.name ?? '';
+    if (!homeName || !awayName) continue;
+
+    const oddsArray = Array.isArray(comp?.odds) ? comp.odds.filter(Boolean) : [];
+    const espnOdds = oddsArray.find((o: any) => o?.provider?.name === 'DraftKings') || oddsArray[0];
+    const parsedOdds = parseEspnOdds(espnOdds);
+    if (!parsedOdds) continue;
+
+    nextOddsMap[makePairKey(homeName, awayName)] = parsedOdds;
+  }
+
+  return nextOddsMap;
 };
 
 function App() {
@@ -286,65 +334,6 @@ function App() {
   };
 
   const hasLiveForOdds = matches.some((m) => m.isLive);
-
-  useEffect(() => {
-    const fetchOdds = async () => {
-      try {
-        const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard');
-        if (!res.ok) return;
-        const data = await res.json();
-
-        const newOddsMap: Record<string, OddsData> = {};
-        for (const ev of data.events ?? []) {
-          const comp = ev.competitions?.[0];
-          const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
-          const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
-          const homeName = home?.team?.displayName ?? home?.team?.name ?? '';
-          const awayName = away?.team?.displayName ?? away?.team?.name ?? '';
-          if (!homeName || !awayName) continue;
-          const oddsArray = Array.isArray(comp?.odds) ? comp.odds.filter(Boolean) : [];
-          const draftKingsOdds = oddsArray.find((o: any) => o?.provider?.name === 'DraftKings') || oddsArray[0];
-          const moneyline = draftKingsOdds?.moneyline;
-          if (!moneyline) continue;
-
-          const homeOddStr = moneyline.home?.close?.odds || moneyline.home?.current?.odds;
-          const awayOddStr = moneyline.away?.close?.odds || moneyline.away?.current?.odds;
-          const drawOddStr = moneyline.draw?.close?.odds || moneyline.draw?.current?.odds;
-          if (homeOddStr == null || awayOddStr == null || drawOddStr == null) continue;
-
-          const rawHome = parseAmericanOdd(String(homeOddStr));
-          const rawAway = parseAmericanOdd(String(awayOddStr));
-          const rawDraw = parseAmericanOdd(String(drawOddStr));
-          const sum = rawHome + rawAway + rawDraw;
-          if (sum > 0) {
-            const homePct = Math.round((rawHome / sum) * 100);
-            const awayPct = Math.round((rawAway / sum) * 100);
-            const drawPct = 100 - homePct - awayPct;
-
-            const key = makePairKey(homeName, awayName);
-
-            newOddsMap[key] = {
-              homePct,
-              drawPct,
-              awayPct,
-              provider: draftKingsOdds?.provider?.name ?? 'ESPN',
-              homeOdd: String(homeOddStr),
-              drawOdd: String(drawOddStr),
-              awayOdd: String(awayOddStr)
-            };
-          }
-        }
-        setOddsMap(newOddsMap);
-      } catch (err) {
-        console.warn("Erro ao buscar odds da ESPN:", err);
-      }
-    };
-
-    fetchOdds();
-    const refreshMs = hasLiveForOdds ? 30000 : 300000;
-    const interval = setInterval(fetchOdds, refreshMs);
-    return () => clearInterval(interval);
-  }, [hasLiveForOdds]);
 
   // Começa true: evita o flash de "Nenhum jogo agendado" antes da primeira carga
   const [loading, setLoading] = useState(true);
@@ -791,6 +780,53 @@ function App() {
   const activeDateMatches = useMemo(() => {
     return groupedMatches[selectedDate] || [];
   }, [groupedMatches, selectedDate]);
+
+  const oddsDatesKey = useMemo(() => {
+    const dateKeys = new Set<string>();
+    if (selectedDate) dateKeys.add(selectedDate.replace(/-/g, ''));
+
+    matches.forEach((m) => {
+      if (m.isLive) dateKeys.add(m.isoDate.replace(/-/g, ''));
+    });
+
+    if (dateKeys.size === 0) dateKeys.add(getTodayIso().replace(/-/g, ''));
+    return Array.from(dateKeys).sort().join(',');
+  }, [matches, selectedDate]);
+
+  useEffect(() => {
+    const dateKeys = oddsDatesKey.split(',').filter(Boolean);
+    let cancelled = false;
+
+    const fetchOdds = async () => {
+      try {
+        const maps = await Promise.all(
+          dateKeys.map(async (dateKey) => {
+            const res = await fetch(
+              `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateKey}`
+            );
+            if (!res.ok) return {};
+            const data = await res.json();
+            return collectEspnOdds(data);
+          })
+        );
+
+        if (!cancelled) {
+          setOddsMap(Object.assign({}, ...maps));
+        }
+      } catch (err) {
+        console.warn("Erro ao buscar odds da ESPN:", err);
+      }
+    };
+
+    fetchOdds();
+    const refreshMs = hasLiveForOdds ? 30000 : 300000;
+    const interval = setInterval(fetchOdds, refreshMs);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [hasLiveForOdds, oddsDatesKey]);
 
   // Partidas jogáveis da rodada selecionada (editáveis até 1 min antes do kickoff).
   // A sessão de apostas de um dia abre à meia-noite (Brasília) daquele dia; jogos
