@@ -285,7 +285,7 @@ function App() {
       }
       const { data: prof } = await supabase
         .from('participants')
-        .select('id, username, name, avatar_url')
+        .select('id, username, name, avatar_url, card_url')
         .eq('id', session.user.id)
         .single();
       if (prof) {
@@ -294,6 +294,7 @@ function App() {
           uid: prof.id,
           name: prof.name,
           avatarUrl: prof.avatar_url,
+          cardUrl: prof.card_url ?? undefined,
         };
         localStorage.setItem('bolao_current_user', JSON.stringify(participant));
         setCurrentUser(participant);
@@ -307,7 +308,7 @@ function App() {
     if (withSpinner) setLoading(true);
     try {
       const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes] = await Promise.all([
-        supabase.from('participants').select('id, username, name, avatar_url').order('username'),
+        supabase.from('participants').select('id, username, name, avatar_url, card_url').order('username'),
         // Só as colunas que o app usa (ver MatchDbRow) — evita trafegar a linha
         // inteira a cada evento do Realtime, que recarrega ~104 jogos de uma vez.
         supabase
@@ -331,6 +332,7 @@ function App() {
           uid: p.id,
           name: p.name,
           avatarUrl: p.avatar_url,
+          cardUrl: p.card_url ?? undefined,
         }))
       );
       setMatches(((matchesRes.data ?? []) as MatchDbRow[]).map(mapRowToMatch));
@@ -646,7 +648,7 @@ function App() {
 
     const { data: prof } = await supabase
       .from('participants')
-      .select('id, username, name, avatar_url')
+      .select('id, username, name, avatar_url, card_url')
       .eq('id', data.user.id)
       .single();
 
@@ -660,6 +662,7 @@ function App() {
       uid: prof.id,
       name: prof.name,
       avatarUrl: prof.avatar_url,
+      cardUrl: prof.card_url ?? undefined,
     };
 
     localStorage.setItem('bolao_current_user', JSON.stringify(participant));
@@ -744,6 +747,19 @@ function App() {
     } finally {
       setAuthBusy(false);
     }
+  };
+
+  // Atualiza o perfil logado em memória + cache após editar foto/card.
+  const handleProfileUpdated = (patch: Partial<Participant>) => {
+    setCurrentUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem('bolao_current_user', JSON.stringify(next));
+      return next;
+    });
+    // Recarrega para refletir o novo avatar/card na lista de participantes/ranking.
+    const uid = currentUser?.uid;
+    if (uid) loadAll(uid, false);
   };
 
   // Handler de Logout
@@ -1471,6 +1487,7 @@ function App() {
               bets={bets}
               specials={specials}
               standings={standings}
+              onProfileUpdated={handleProfileUpdated}
             />
           </Suspense>
         )}

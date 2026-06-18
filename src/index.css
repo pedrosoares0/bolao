@@ -3858,6 +3858,70 @@ body {
   pointer-events: none;
 }
 
+/* Capa (card) personalizada do perfil — preenche o topo do header */
+.profile-header-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.55;
+}
+.profile-header-cover + * { /* garante o Aurora/conteúdo acima da capa */ }
+
+/* Botão de trocar a capa (canto superior direito do card) */
+.profile-edit-cover-btn {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.profile-edit-cover-btn:disabled { opacity: 0.6; cursor: progress; }
+
+/* Botão de trocar a foto (sobre o avatar) */
+.profile-edit-avatar-btn {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(13, 10, 8, 0.9);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #009c3b 0%, #f5b300 100%);
+  color: #fff;
+  cursor: pointer;
+}
+.profile-edit-avatar-btn:disabled { opacity: 0.6; cursor: progress; }
+
+.profile-upload-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
 .profile-header-content {
   position: relative;
   z-index: 2;

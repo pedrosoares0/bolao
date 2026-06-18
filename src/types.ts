@@ -6,7 +6,8 @@ export interface Participant {
   id: string; // username (ex: 'pedro') — usado nos caminhos de imagem e no ranking
   uid?: string; // uuid do Supabase Auth
   name: string;
-  avatarUrl: string; // Ex: '/imagens/pedro.png'
+  avatarUrl: string; // Ex: '/imagens/pedro.png' ou URL do Storage
+  cardUrl?: string; // card/capa do perfil (Storage) — opcional
 }
 
 export type MatchStatus = 'scheduled' | 'finished';

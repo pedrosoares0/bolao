@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import type { Participant, Match, Bet, ParticipantStanding, SpecialPrediction } from '../types';
 import {
   calculateFireCounts,
@@ -6,9 +6,11 @@ import {
   calculateMvpCounts,
   calculateConquestTimeline
 } from '../utils/rules';
-import { User, Calendar, Award } from 'lucide-react';
+import { User, Calendar, Award, Camera } from 'lucide-react';
 import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 import { BRAZIL_STAGE_LABELS } from '../utils/specials';
+import { supabase } from '../lib/supabase';
+import { uploadImage } from '../lib/storage';
 import Aurora from './Aurora';
 
 interface ProfileTabProps {
@@ -18,6 +20,7 @@ interface ProfileTabProps {
   bets: Bet[];
   specials: SpecialPrediction[];
   standings: ParticipantStanding[];
+  onProfileUpdated: (patch: Partial<Participant>) => void;
 }
 
 const PE_FRIO_IMG = "https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75";
@@ -29,9 +32,36 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   bets,
   specials,
   standings,
+  onProfileUpdated,
 }) => {
   const selectedUserId = currentUser.id;
   const selectedUser = currentUser;
+
+  // Edição de foto/card (só do próprio perfil — aqui sempre é o usuário logado).
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const cardInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<null | 'avatar' | 'card'>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleUpload = async (file: File | undefined, kind: 'avatar' | 'card') => {
+    if (!file || !currentUser.uid) return;
+    setUploadError(null);
+    setUploading(kind);
+    try {
+      const url = await uploadImage(file, currentUser.uid, kind);
+      const column = kind === 'avatar' ? 'avatar_url' : 'card_url';
+      const { error } = await supabase
+        .from('participants')
+        .update({ [column]: url })
+        .eq('id', currentUser.uid);
+      if (error) throw new Error(error.message);
+      onProfileUpdated(kind === 'avatar' ? { avatarUrl: url } : { cardUrl: url });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Falha no upload.');
+    } finally {
+      setUploading(null);
+    }
+  };
   const standing = standings.find((s) => s.participantId === selectedUserId);
   const rank = standings.findIndex((s) => s.participantId === selectedUserId) + 1;
   const userSpecial = specials.find((s) => s.participantId === selectedUserId);
@@ -59,11 +89,45 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     return `/imagens/ranking ${pId}.webp`;
   };
 
+  // Foto enviada pelo usuário (URL do Storage) tem prioridade; senão usa o
+  // arquivo estático por username (usuários antigos), com fallback p/ logo.
+  const isUploaded = /^https?:\/\//.test(selectedUser.avatarUrl);
+  const avatarSrc = isUploaded ? selectedUser.avatarUrl : getAvatarUrl(selectedUser.id);
+
   return (
     <div className="profile-tab-container-p16">
 
+      {/* Inputs ocultos de upload (foto e capa) */}
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => { handleUpload(e.target.files?.[0], 'avatar'); e.target.value = ''; }}
+      />
+      <input
+        ref={cardInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => { handleUpload(e.target.files?.[0], 'card'); e.target.value = ''; }}
+      />
+      {uploadError && (
+        <div className="profile-upload-error" role="alert">{uploadError}</div>
+      )}
+
       {/* CARD PRINCIPAL DE IDENTIFICAÇÃO DO PARTICIPANTE */}
       <div className="profile-header-card">
+        {/* Capa personalizada (card) por cima do Aurora, se enviada */}
+        {selectedUser.cardUrl && (
+          <img
+            src={selectedUser.cardUrl}
+            alt="Capa do perfil"
+            className="profile-header-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        )}
         <Aurora
           colorStops={["#009c3b", "#f5b300", "#15110E"]}
           blend={0.7}
@@ -71,15 +135,38 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           speed={0.3}
         />
         <div className="profile-header-bg-glow"></div>
+
+        {/* Botão de editar a capa */}
+        <button
+          type="button"
+          className="profile-edit-cover-btn"
+          onClick={() => cardInputRef.current?.click()}
+          disabled={uploading !== null}
+          aria-label="Trocar capa do perfil"
+        >
+          <Camera size={14} />
+          <span>{uploading === 'card' ? 'Enviando…' : 'Capa'}</span>
+        </button>
+
         <div className="profile-header-content">
           <div className="profile-header-avatar-wrap">
             <img loading="lazy" decoding="async"
-              src={getAvatarUrl(selectedUser.id)}
+              src={avatarSrc}
               alt={selectedUser.name}
               className="profile-header-avatar"
-              onError={(e) => { e.currentTarget.src = selectedUser.avatarUrl; }}
+              onError={(e) => { e.currentTarget.src = '/imagens/logo.webp'; }}
             />
             {rank > 0 && <span className="profile-header-rank-badge">{rank}º</span>}
+            {/* Botão de editar a foto de perfil */}
+            <button
+              type="button"
+              className="profile-edit-avatar-btn"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploading !== null}
+              aria-label="Trocar foto de perfil"
+            >
+              <Camera size={14} />
+            </button>
           </div>
 
           <div className="profile-header-text">
