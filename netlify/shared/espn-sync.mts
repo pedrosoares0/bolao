@@ -9,13 +9,14 @@
 // ============================================================
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { fetchEspnFixtures } from './espn-fixtures.mts';
+import { TABLES } from './tables.mts';
 
 interface SeasonRow {
   id: number;
   provider_id: string | null;
   starts_at: string | null;
   ends_at: string | null;
-  competitions: { provider: string; provider_id: string | null } | null;
+  competition: { provider: string; provider_id: string | null } | null;
 }
 
 // Janela de dias a cobrir nesta execução: do passado recente até ~5 semanas à
@@ -39,24 +40,24 @@ export async function syncEspnSeasons(): Promise<{ seasons: number; matches: num
   const supabase: SupabaseClient = createClient(supabaseUrl, serviceKey);
 
   const { data, error } = await supabase
-    .from('seasons')
-    .select('id, provider_id, starts_at, ends_at, competitions(provider, provider_id)')
+    .from(TABLES.seasons)
+    .select(`id, provider_id, starts_at, ends_at, competition:${TABLES.competitions}(provider, provider_id)`)
     .eq('status', 'active');
   if (error) throw new Error(error.message);
 
   const seasons = ((data ?? []) as unknown as SeasonRow[]).filter(
-    (s) => s.competitions?.provider === 'espn' && s.competitions.provider_id && s.competitions.provider_id !== 'fifa.world'
+    (s) => s.competition?.provider === 'espn' && s.competition.provider_id && s.competition.provider_id !== 'fifa.world'
   );
 
   let totalMatches = 0;
   for (const season of seasons) {
-    const slug = season.competitions!.provider_id!;
+    const slug = season.competition!.provider_id!;
     const { start, end } = windowFor(season);
     try {
       const rows = await fetchEspnFixtures(slug, season.id, start, end);
       if (rows.length > 0) {
         // Merge por coluna: não apaga vínculos nem stage existentes.
-        const { error: upErr } = await supabase.from('matches').upsert(rows);
+        const { error: upErr } = await supabase.from(TABLES.matches).upsert(rows);
         if (upErr) throw new Error(upErr.message);
         totalMatches += rows.length;
       }

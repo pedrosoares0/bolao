@@ -11,6 +11,7 @@ import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 import { BRAZIL_STAGE_LABELS } from '../utils/specials';
 import { supabase } from '../lib/supabase';
 import { uploadImage } from '../lib/storage';
+import { T } from '../lib/tables';
 import Aurora from './Aurora';
 
 interface ProfileTabProps {
@@ -51,7 +52,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
       const url = await uploadImage(file, currentUser.uid, kind);
       const column = kind === 'avatar' ? 'avatar_url' : 'card_url';
       const { error } = await supabase
-        .from('participants')
+        .from(T.participants)
         .update({ [column]: url })
         .eq('id', currentUser.uid);
       if (error) throw new Error(error.message);

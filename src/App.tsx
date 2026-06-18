@@ -27,6 +27,7 @@ const GroupsTab = lazy(() => import('./components/GroupsTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
 import { redeemInvite, listSeasons } from './lib/groups';
+import { T, RPC } from './lib/tables';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
 // Domínio interno do esquema de auth (username -> username@DOMÍNIO). Mantido em
@@ -293,7 +294,7 @@ function App() {
         return;
       }
       const { data: prof } = await supabase
-        .from('participants')
+        .from(T.participants)
         .select('id, username, name, avatar_url, card_url')
         .eq('id', session.user.id)
         .single();
@@ -340,19 +341,19 @@ function App() {
     if (withSpinner) setLoading(true);
     try {
       const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes] = await Promise.all([
-        supabase.from('participants').select('id, username, name, avatar_url, card_url').order('username'),
+        supabase.from(T.participants).select('id, username, name, avatar_url, card_url').order('username'),
         // Só as colunas que o app usa (ver MatchDbRow) — evita trafegar a linha
         // inteira a cada evento do Realtime, que recarrega ~104 jogos de uma vez.
         supabase
-          .from('matches')
+          .from(T.matches)
           .select(
             'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock, season_id'
           )
           .order('utc_date'),
-        supabase.from('bets').select('user_id, match_id, home_score, away_score'),
-        supabase.from('submissions').select('bet_date').eq('user_id', uid),
-        supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
-        supabase.from('debts').select('id, user_id, amount, debt_date, created_at'),
+        supabase.from(T.bets).select('user_id, match_id, home_score, away_score'),
+        supabase.from(T.submissions).select('bet_date').eq('user_id', uid),
+        supabase.from(T.specialPredictions).select('user_id, champion_team, brazil_stage'),
+        supabase.from(T.debts).select('id, user_id, amount, debt_date, created_at'),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
@@ -457,10 +458,10 @@ function App() {
 
     const channel = supabase
       .channel('bolao-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, onMatchChange)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, scheduleReload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: T.matches }, onMatchChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: T.bets }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: T.submissions }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: T.debts }, scheduleReload)
       .subscribe();
 
     // Fallback caso o Realtime caia
@@ -721,7 +722,7 @@ function App() {
     }
 
     const { data: prof } = await supabase
-      .from('participants')
+      .from(T.participants)
       .select('id, username, name, avatar_url, card_url')
       .eq('id', data.user.id)
       .single();
@@ -799,19 +800,17 @@ function App() {
         }
       }
 
-      // Grava o nome público escolhido e um avatar padrão (o trigger usa o
-      // username, cujo arquivo não existe para contas novas). O avatar real
-      // entra quando o upload de perfil (Fase 1) estiver pronto.
+      // No dataset _escalavel não há trigger que cria o perfil — criamos aqui.
+      // avatar_url vazio => a UI mostra a inicial do nome até o usuário enviar foto.
       await supabase
-        .from('participants')
-        .update({ name, avatar_url: '/imagens/logo.webp' })
-        .eq('id', data.user.id);
+        .from(T.participants)
+        .upsert({ id: data.user.id, username, name, avatar_url: '' });
 
       const participant: Participant = {
         id: username,
         uid: data.user.id,
         name,
-        avatarUrl: '/imagens/logo.webp',
+        avatarUrl: '', // vazio => inicial do nome até enviar foto
       };
       localStorage.setItem('bolao_current_user', JSON.stringify(participant));
       setCurrentUser(participant);
@@ -867,7 +866,7 @@ function App() {
       };
     });
 
-    const { error: rpcError } = await supabase.rpc('submit_bets', {
+    const { error: rpcError } = await supabase.rpc(RPC.submitBets, {
       p_bets: payload,
       p_bet_date: selectedDate,
     });
@@ -888,7 +887,7 @@ function App() {
   // Handler de salvar os palpites especiais (campeão + até onde o Brasil vai)
   const handleSaveSpecial = async (championTeam: string, brazilStage: BrazilStage) => {
     if (!currentUser?.uid) return;
-    const { error: spError } = await supabase.from('special_predictions').upsert({
+    const { error: spError } = await supabase.from(T.specialPredictions).upsert({
       user_id: currentUser.uid,
       champion_team: championTeam,
       brazil_stage: brazilStage,
@@ -917,7 +916,7 @@ function App() {
       return;
     }
 
-    const { error: dbError } = await supabase.from('debts').insert({
+    const { error: dbError } = await supabase.from(T.debts).insert({
       user_id: userId,
       debt_date: date,
       amount: 2.50,
@@ -939,7 +938,7 @@ function App() {
   const handleRemoveDebt = async (debtId: number) => {
     if (!currentUser?.uid) return;
     const { error: dbError } = await supabase
-      .from('debts')
+      .from(T.debts)
       .delete()
       .eq('id', debtId)
       .eq('user_id', currentUser.uid);
@@ -962,7 +961,7 @@ function App() {
       return;
     }
     const { error: dbError } = await supabase
-      .from('debts')
+      .from(T.debts)
       .delete()
       .eq('user_id', currentUser.uid);
 

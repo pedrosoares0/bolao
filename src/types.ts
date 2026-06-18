@@ -114,6 +114,9 @@ export interface Group {
   entryFeeCents: number;
   memberLimit: number | null;
   status: 'active' | 'closed' | 'archived';
+  pixKey?: string | null;
+  pixRecipient?: string | null;
+  pixBank?: string | null;
   // Preenchidos por consulta contextual:
   myRole?: GroupRole;
   memberCount?: number;

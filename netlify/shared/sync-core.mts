@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { runNotifications } from './notify-core.mts';
 import { fetchEspnOverrides, norm, pairKey } from './espn-core.mts';
 import type { EspnGoalDetail } from './espn-core.mts';
+import { TABLES, NOTIFICATIONS_ENABLED } from './tables.mts';
 
 // ---- Formato cru de uma partida na football-data.org (só os campos que usamos) ----
 interface ApiTeam {
@@ -79,7 +80,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
   const supabase = createClient(supabaseUrl, serviceKey);
 
   if (!force) {
-    const { data: state } = await supabase.from('sync_state').select('last_sync').eq('id', 1).single();
+    const { data: state } = await supabase.from(TABLES.syncState).select('last_sync').eq('id', 1).single();
     if (state?.last_sync && Date.now() - new Date(state.last_sync).getTime() < 30 * 1000) {
       return { skipped: true, reason: 'Sincronizado há menos de 30 segundos.' };
     }
@@ -122,7 +123,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     // Estado ANTERIOR (antes de sobrescrever) — usado para detectar
     // transições (começou / gol / intervalo / fim) e notificar o WhatsApp.
     const { data: prevRows } = await supabase
-      .from('matches')
+      .from(TABLES.matches)
       .select('id, status, home_score, away_score')
       .in('id', mergedRows.map((r) => r.id));
     const prevById = new Map(
@@ -132,18 +133,21 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     // Remove os campos transitórios (homeTeamId/awayTeamId/goalsDetail) que NÃO
     // são colunas da tabela — eles servem só às notificações abaixo. Sem isso, o
     // upsert quebraria assim que a ESPN aplicasse overrides (jogo ao vivo).
-    const { error } = await supabase.from('matches').upsert(mergedRows.map(toDbRow));
+    const { error } = await supabase.from(TABLES.matches).upsert(mergedRows.map(toDbRow));
     if (error) throw new Error(`Erro ao gravar partidas no Supabase: ${error.message}`);
 
     // Notificações são best-effort: nunca derrubam a sincronização.
-    try {
-      await runNotifications(supabase, prevById, mergedRows);
-    } catch (err) {
-      console.error('Falha ao enviar notificações:', err);
+    // Desligadas na branch (ver tables.mts) para não enviar WhatsApp em teste.
+    if (NOTIFICATIONS_ENABLED) {
+      try {
+        await runNotifications(supabase, prevById, mergedRows);
+      } catch (err) {
+        console.error('Falha ao enviar notificações:', err);
+      }
     }
   }
 
-  await supabase.from('sync_state').upsert({ id: 1, last_sync: new Date().toISOString() });
+  await supabase.from(TABLES.syncState).upsert({ id: 1, last_sync: new Date().toISOString() });
 
   return { skipped: false, count: mergedRows.length };
 }
@@ -216,7 +220,7 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
   const supabase = createClient(supabaseUrl, serviceKey);
 
   if (!force) {
-    const { data: state } = await supabase.from('sync_state').select('last_live_sync').eq('id', 1).single();
+    const { data: state } = await supabase.from(TABLES.syncState).select('last_live_sync').eq('id', 1).single();
     if (state?.last_live_sync && Date.now() - new Date(state.last_live_sync).getTime() < 10 * 1000) {
       return { skipped: true, reason: 'Ao vivo sincronizado há menos de 10 segundos.' };
     }
@@ -232,11 +236,11 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
   }
 
   // Marca o tempo já aqui (mesmo sem jogos) para o throttle valer.
-  await supabase.from('sync_state').upsert({ id: 1, last_live_sync: new Date().toISOString() });
+  await supabase.from(TABLES.syncState).upsert({ id: 1, last_live_sync: new Date().toISOString() });
   if (overrides.size === 0) return { skipped: false, count: 0 };
 
   const { data: dbRows } = await supabase
-    .from('matches')
+    .from(TABLES.matches)
     .select('id, utc_date, status, home_team, away_team, home_score, away_score, live_clock');
   if (!dbRows || dbRows.length === 0) return { skipped: false, count: 0 };
 
@@ -300,13 +304,15 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
     updated_at: u.updated_at,
   }));
 
-  const { error } = await supabase.from('matches').upsert(dbUpdates);
+  const { error } = await supabase.from(TABLES.matches).upsert(dbUpdates);
   if (error) throw new Error(`Erro ao gravar ao vivo no Supabase: ${error.message}`);
 
-  try {
-    await runNotifications(supabase, prevById, updates);
-  } catch (err) {
-    console.error('Falha ao enviar notificações (syncLive):', err);
+  if (NOTIFICATIONS_ENABLED) {
+    try {
+      await runNotifications(supabase, prevById, updates);
+    } catch (err) {
+      console.error('Falha ao enviar notificações (syncLive):', err);
+    }
   }
 
   return { skipped: false, count: updates.length };
@@ -340,7 +346,7 @@ export async function runLiveLoop(): Promise<{ ran: boolean; iterations?: number
     const from = new Date(now - 3.5 * 60 * 60 * 1000).toISOString();
     const to = new Date(now + 15 * 60 * 1000).toISOString();
     const { data } = await supabase
-      .from('matches')
+      .from(TABLES.matches)
       .select('id')
       .gte('utc_date', from)
       .lte('utc_date', to)
@@ -349,7 +355,7 @@ export async function runLiveLoop(): Promise<{ ran: boolean; iterations?: number
   };
 
   // Trava: se já há um loop ativo (lease no futuro), sai na hora.
-  const { data: st } = await supabase.from('sync_state').select('live_loop_until').eq('id', 1).single();
+  const { data: st } = await supabase.from(TABLES.syncState).select('live_loop_until').eq('id', 1).single();
   if (st?.live_loop_until && new Date(st.live_loop_until as string).getTime() > Date.now()) {
     return { ran: false, reason: 'Loop já ativo.' };
   }
@@ -364,7 +370,7 @@ export async function runLiveLoop(): Promise<{ ran: boolean; iterations?: number
   try {
     while (Date.now() - start < MAX_RUN_MS) {
       // Renova a lease ANTES de cada iteração.
-      await supabase.from('sync_state').upsert({
+      await supabase.from(TABLES.syncState).upsert({
         id: 1,
         live_loop_until: new Date(Date.now() + LEASE_TTL_MS).toISOString(),
       });
@@ -384,7 +390,7 @@ export async function runLiveLoop(): Promise<{ ran: boolean; iterations?: number
     }
   } finally {
     // Libera a lease para o próximo cron poder reiniciar quando precisar.
-    await supabase.from('sync_state').upsert({ id: 1, live_loop_until: null });
+    await supabase.from(TABLES.syncState).upsert({ id: 1, live_loop_until: null });
   }
 
   return { ran: true, iterations };
