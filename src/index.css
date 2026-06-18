@@ -5041,3 +5041,163 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .aurora-css, .lightrays-css::before, .lightrays-css::after { animation: none; }
 }
+
+/* ==========================================================================
+   GRUPOS (Fase 2)
+   ========================================================================== */
+.groups-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  color: #F2ECDD;
+}
+.groups-title { font-size: 1.3rem; font-weight: 900; margin: 0; }
+.groups-list-head { display: flex; align-items: center; justify-content: space-between; }
+
+.groups-back-btn {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  background: none; border: none; color: rgba(255,255,255,0.6);
+  font-family: var(--font-family); font-weight: 600; font-size: 0.85rem;
+  cursor: pointer; align-self: flex-start; padding: 0;
+}
+
+.groups-label { font-size: 0.78rem; font-weight: 700; color: rgba(255,255,255,0.6); margin-top: 0.25rem; }
+.groups-input {
+  width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 0.7rem;
+  padding: 0.7rem 0.9rem; color: #fff; font-family: var(--font-family); font-size: 0.95rem;
+}
+.groups-input:focus { outline: none; border-color: #009c3b; }
+textarea.groups-input { resize: vertical; }
+.groups-form { display: flex; flex-direction: column; gap: 0.4rem; }
+.groups-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+
+.groups-primary-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  background: linear-gradient(90deg, #009c3b 0%, #f5b300 100%);
+  border: none; border-radius: 1.5rem; padding: 0.8rem 1.2rem; margin-top: 0.6rem;
+  color: #fff; font-family: var(--font-family); font-weight: 800; font-size: 0.95rem; cursor: pointer;
+}
+.groups-primary-btn.small { padding: 0.5rem 0.9rem; margin: 0; font-size: 0.85rem; }
+.groups-primary-btn:disabled { opacity: 0.6; cursor: progress; }
+
+.groups-mini-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 1rem; padding: 0.45rem 0.8rem; color: #fff;
+  font-family: var(--font-family); font-weight: 700; font-size: 0.8rem; cursor: pointer;
+}
+.groups-join-row { display: flex; gap: 0.5rem; }
+.groups-join-row .groups-input { flex: 1; }
+
+.group-empty { color: rgba(255,255,255,0.5); font-size: 0.85rem; }
+.groups-empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  text-align: center; padding: 2.5rem 1rem; color: rgba(255,255,255,0.45);
+}
+.groups-empty-state p { font-weight: 700; margin: 0.3rem 0 0; color: rgba(255,255,255,0.7); }
+.groups-empty-state span { font-size: 0.82rem; }
+
+/* Cartões de grupo na lista */
+.groups-cards { display: flex; flex-direction: column; gap: 0.7rem; }
+.group-card {
+  display: flex; align-items: center; gap: 0.8rem; text-align: left;
+  background: rgba(28,22,18,0.75) center/cover; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 1rem; padding: 0.8rem; cursor: pointer; color: #fff;
+}
+.group-card-avatar, .group-detail-avatar, .groups-avatar-edit {
+  flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #009c3b, #f5b300); color: #fff;
+}
+.group-card-avatar img, .group-detail-avatar img, .groups-avatar-edit img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.group-card-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.group-card-name { font-weight: 800; font-size: 0.95rem; }
+.group-card-sub, .group-detail-sub { font-size: 0.75rem; color: rgba(255,255,255,0.6); }
+
+/* Badge de papel */
+.group-role-badge {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  font-size: 0.68rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 0.6rem;
+  background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); white-space: nowrap;
+}
+.group-role-badge.role-owner { background: rgba(245,179,0,0.2); color: #f5b300; }
+.group-role-badge.role-admin { background: rgba(0,156,59,0.22); color: #4ade80; }
+
+/* Detalhe do grupo */
+.group-detail-header {
+  display: flex; align-items: center; gap: 0.8rem; padding: 1rem;
+  border-radius: 1rem; background: rgba(28,22,18,0.8) center/cover;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.group-detail-headtext h2 { margin: 0; font-size: 1.15rem; font-weight: 900; }
+.group-detail-desc { font-size: 0.85rem; color: rgba(255,255,255,0.7); line-height: 1.4; margin: 0; }
+
+.group-section {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1rem; padding: 0.9rem;
+}
+.group-section h3 {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin: 0 0 0.6rem; font-size: 0.9rem; font-weight: 800; color: #f5b300;
+}
+.group-section-head { display: flex; align-items: center; justify-content: space-between; }
+.group-section-head h3 { margin: 0; }
+
+.group-invite-row, .group-rank-row, .group-member-row {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.group-invite-row:first-of-type, .group-rank-row:first-of-type, .group-member-row:first-of-type { border-top: none; }
+.group-invite-code {
+  font-family: monospace; font-size: 1rem; font-weight: 800; letter-spacing: 0.1em;
+  background: rgba(0,0,0,0.3); padding: 0.3rem 0.6rem; border-radius: 0.5rem; flex: 1;
+}
+.group-invite-actions { display: flex; align-items: center; gap: 0.5rem; }
+.group-invite-actions button {
+  background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; padding: 0.2rem;
+}
+.group-invite-revoke { font-size: 0.72rem; font-weight: 700; color: #fca5a5 !important; }
+
+.group-rank-pos { font-weight: 800; color: #f5b300; width: 2rem; }
+.group-rank-name { flex: 1; font-weight: 600; }
+.group-rank-pts { font-weight: 800; }
+
+.group-member-info { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.group-member-name { font-weight: 600; }
+.group-member-actions { display: flex; gap: 0.4rem; }
+.group-member-actions button {
+  background: rgba(255,255,255,0.08); border: none; border-radius: 0.5rem;
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.75); cursor: pointer;
+}
+.group-ban-btn { color: #fca5a5 !important; }
+
+.groups-leave-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 1rem; padding: 0.7rem; color: #fca5a5;
+  font-family: var(--font-family); font-weight: 700; cursor: pointer;
+}
+
+/* Edição de imagem/capa no form de criação */
+.groups-cover-edit {
+  position: relative; display: flex; align-items: center; gap: 0.8rem;
+  background: rgba(28,22,18,0.85) center/cover; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 1rem; padding: 1rem; min-height: 80px;
+}
+.groups-avatar-edit { position: relative; cursor: pointer; }
+.groups-avatar-cam {
+  position: absolute; bottom: -2px; right: -2px; width: 20px; height: 20px;
+  border-radius: 50%; background: #009c3b; color: #fff;
+  display: flex; align-items: center; justify-content: center; border: 2px solid #15110E;
+}
+.groups-cover-btn {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 1rem;
+  padding: 0.3rem 0.6rem; color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer;
+}

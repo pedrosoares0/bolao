@@ -81,3 +81,62 @@ export interface Debt {
   createdAt: string;
 }
 
+// ----------------------------------------------------------------
+// PLATAFORMA V2 — grupos, papéis e catálogo de competições
+// ----------------------------------------------------------------
+export type GroupRole = 'owner' | 'admin' | 'member';
+export type GroupVisibility = 'private' | 'public';
+
+export interface Competition {
+  id: number;
+  name: string;
+  country: string | null;
+}
+
+export interface Season {
+  id: number;
+  competitionId: number;
+  name: string;
+  competitionName: string; // juntado da competição (ex.: "Copa do Mundo 2026")
+}
+
+export interface Group {
+  id: string;
+  ownerId: string;
+  seasonId: number | null;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  cardUrl: string | null;
+  visibility: GroupVisibility;
+  entryFeeCents: number;
+  memberLimit: number | null;
+  status: 'active' | 'closed' | 'archived';
+  // Preenchidos por consulta contextual:
+  myRole?: GroupRole;
+  memberCount?: number;
+  seasonLabel?: string;
+}
+
+export interface GroupMember {
+  groupId: string;
+  userId: string;
+  role: GroupRole;
+  status: 'active' | 'banned' | 'left';
+  joinedAt: string;
+  // juntado de participants:
+  username?: string;
+  name?: string;
+  avatarUrl?: string;
+}
+
+export interface GroupInvite {
+  id: string;
+  groupId: string;
+  code: string;
+  expiresAt: string | null;
+  maxUses: number | null;
+  uses: number;
+  status: 'active' | 'revoked';
+}
+

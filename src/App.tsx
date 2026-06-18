@@ -13,7 +13,7 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover } from 'lucide-react';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Users } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
@@ -23,8 +23,10 @@ const StandingsTable = lazy(() => import('./components/StandingsTable'));
 const PixTab = lazy(() => import('./components/PixTab'));
 const PalpitesTab = lazy(() => import('./components/PalpitesTab'));
 const ProfileTab = lazy(() => import('./components/ProfileTab'));
+const GroupsTab = lazy(() => import('./components/GroupsTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
+import { redeemInvite } from './lib/groups';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
 
 // Domínio interno do esquema de auth (username -> username@DOMÍNIO). Mantido em
@@ -203,7 +205,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
-  const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil'>('jogos');
+  const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil' | 'grupos'>('jogos');
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
@@ -302,6 +304,23 @@ function App() {
       }
     });
   }, []);
+
+  // 3b. Auto-resgate de convite: link ?invite=CODE entra no grupo após login.
+  useEffect(() => {
+    if (!currentUser?.uid || currentScreen !== 'app') return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('invite');
+    if (!code) return;
+    redeemInvite(code)
+      .then(() => { setActiveTab('grupos'); showToast('Você entrou no grupo!', 'success'); })
+      .catch(() => showToast('Convite inválido ou expirado.'))
+      .finally(() => {
+        params.delete('invite');
+        const q = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (q ? `?${q}` : ''));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, currentScreen]);
 
   // 4. Carregamento de dados do Supabase
   const loadAll = async (uid: string, withSpinner: boolean) => {
@@ -1491,6 +1510,20 @@ function App() {
             />
           </Suspense>
         )}
+
+        {/* ABA: GRUPOS */}
+        {activeTab === 'grupos' && currentUser && (
+          <Suspense fallback={tabFallback}>
+            <GroupsTab
+              currentUser={currentUser}
+              participants={participants}
+              matches={matches}
+              bets={bets}
+              specials={specials}
+              onToast={showToast}
+            />
+          </Suspense>
+        )}
       </main>
 
       <nav className="bottom-nav">
@@ -1509,6 +1542,14 @@ function App() {
           aria-label="Palpites"
         >
           <ListChecks size={24} />
+        </button>
+        <button
+          className={`nav-item ${activeTab === 'grupos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('grupos')}
+          title="Grupos"
+          aria-label="Grupos"
+        >
+          <Users size={24} />
         </button>
         <button
           className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
