@@ -12,8 +12,8 @@
 // A validação que vale dinheiro (lockout das apostas) é refeita no servidor
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
@@ -25,7 +25,7 @@ const PalpitesTab = lazy(() => import('./components/PalpitesTab'));
 const ProfileTab = lazy(() => import('./components/ProfileTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
-import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc } from './lib/teamMaps';
+import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc, getTeamColors } from './lib/teamMaps';
 
 // Fuso horário de exibição: todos os horários dos jogos são convertidos para Brasília
 const TZ = 'America/Sao_Paulo';
@@ -153,6 +153,135 @@ const readCachedUser = (): Participant | null => {
   }
 };
 
+const MatchCountdown = ({ kickoff }: { kickoff: string }) => {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const lockoutTime = Date.parse(kickoff) - 60000; // 1 min before kickoff
+      const diff = lockoutTime - Date.now();
+      if (diff <= 0) {
+        setTimeLeft('EXPIRADO');
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const hStr = String(hours).padStart(2, '0');
+      const mStr = String(minutes).padStart(2, '0');
+      const sStr = String(seconds).padStart(2, '0');
+
+      setTimeLeft(`FECHA EM ${hStr}H.${mStr}M.${sStr}S`);
+    };
+
+    calculateTime();
+    const timer = setInterval(calculateTime, 1000);
+    return () => clearInterval(timer);
+  }, [kickoff]);
+
+  if (timeLeft === 'EXPIRADO' || !timeLeft) return null;
+
+  return (
+    <div className="match-countdown-badge">
+      <Clock size={11} className="clock-icon" />
+      <span>{timeLeft}</span>
+    </div>
+  );
+};
+
+interface OddsData {
+  homePct: number;
+  drawPct: number;
+  awayPct: number;
+  analysis: string;
+}
+
+const ALIAS: Record<string, string> = {
+  usa: 'unitedstates',
+  unitedstatesofamerica: 'unitedstates',
+  korearepublic: 'southkorea',
+  iriran: 'iran',
+  cotedivoire: 'ivorycoast',
+  drcongo: 'congodr',
+  democraticrepublicofthecongo: 'congodr',
+  capeverdeislands: 'capeverde',
+  caboverde: 'capeverde',
+  bosniaandherzegovina: 'bosniaherzegovina',
+  czechrepublic: 'czechia',
+  turkiye: 'turkey',
+};
+
+const normName = (s: string): string => {
+  const base = (s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  return ALIAS[base] ?? base;
+};
+
+const makePairKey = (teamA: string, teamB: string): string =>
+  [normName(teamA), normName(teamB)].sort().join('|');
+
+const parseAmericanOdd = (oddStr: string): number => {
+  const odd = parseInt(oddStr, 10);
+  if (isNaN(odd)) return 0;
+  if (odd > 0) {
+    return 100 / (odd + 100);
+  } else {
+    return -odd / (-odd + 100);
+  }
+};
+
+const generateAnalysisText = (home: string, away: string, homePct: number, awayPct: number): string => {
+  if (homePct > 55) {
+    return `O pedigree e o momento técnico do ${home} o tornam favorito para o confronto. O ${away} terá que adotar uma postura extremamente defensiva e explorar transições rápidas para tentar arrancar um resultado positivo.`;
+  }
+  if (awayPct > 55) {
+    return `O ${away} chega muito bem cotado para esta partida, apresentando odds superiores. Jogando fora ou dentro de casa, o ${home} precisará neutralizar a velocidade do adversário para equilibrar as ações e evitar a derrota.`;
+  }
+  if (Math.abs(homePct - awayPct) < 8) {
+    return `A proximidade das probabilidades indica um jogo de altíssimo equilíbrio tático. A expectativa é de uma partida disputada e estudada nos mínimos detalhes, onde erros individuais ou lances de bola parada devem ser decisivos para definir o vencedor.`;
+  }
+  if (homePct >= awayPct) {
+    return `O equilíbrio deve marcar o duelo, com o ${home} carregando uma ligeira vantagem. O ${away} tem velocidade no contra-ataque e promete criar dificuldades se encontrar espaços na defesa adversária.`;
+  } else {
+    return `Espera-se um jogo bastante parelho, com o ${away} ligeiramente favorito segundo as projeções. O ${home} precisará ser eficiente na marcação para conter o ímpeto ofensivo e buscar a vitória.`;
+  }
+};
+
+const getFallbackOdds = (homeTeam: string, awayTeam: string): OddsData => {
+  const combined = homeTeam + awayTeam;
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    hash = (hash << 5) - hash + combined.charCodeAt(i);
+    hash |= 0;
+  }
+  const seed = Math.abs(hash);
+
+  const homeRaw = 30 + (seed % 31);
+  const awayRaw = 20 + ((seed >> 2) % 31);
+  const drawRaw = 15 + ((seed >> 4) % 21);
+
+  const sum = homeRaw + awayRaw + drawRaw;
+  const homePct = Math.round((homeRaw / sum) * 100);
+  const awayPct = Math.round((awayRaw / sum) * 100);
+  const drawPct = 100 - homePct - awayPct;
+
+  const homePt = translateTeam(homeTeam);
+  const awayPt = translateTeam(awayTeam);
+  const analysis = generateAnalysisText(homePt, awayPt, homePct, awayPct);
+
+  return {
+    homePct,
+    drawPct,
+    awayPct,
+    analysis
+  };
+};
+
 function App() {
   // 1. Estados de Autenticação e Telas
   const [currentUser, setCurrentUser] = useState<Participant | null>(() => readCachedUser());
@@ -190,12 +319,90 @@ function App() {
     }));
   };
 
+  const [oddsMap, setOddsMap] = useState<Record<string, OddsData>>({});
+  const [expandedPredictions, setExpandedPredictions] = useState<Record<string, boolean>>({});
+
+  const togglePredictionExpanded = (matchId: string) => {
+    setExpandedPredictions((prev) => ({
+      ...prev,
+      [matchId]: !prev[matchId],
+    }));
+  };
+
+  useEffect(() => {
+    const fetchOdds = async () => {
+      try {
+        const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const newOddsMap: Record<string, OddsData> = {};
+        for (const ev of data.events ?? []) {
+          const comp = ev.competitions?.[0];
+          const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+          const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+          const homeName = home?.team?.displayName ?? home?.team?.name ?? '';
+          const awayName = away?.team?.displayName ?? away?.team?.name ?? '';
+          if (!homeName || !awayName) continue;
+
+          const draftKingsOdds = comp?.odds?.find((o: any) => o.provider?.name === 'DraftKings') || comp?.odds?.[0];
+          const moneyline = draftKingsOdds?.moneyline;
+          if (!moneyline) continue;
+
+          const homeOddStr = moneyline.home?.close?.odds || moneyline.home?.current?.odds;
+          const awayOddStr = moneyline.away?.close?.odds || moneyline.away?.current?.odds;
+          const drawOddStr = moneyline.draw?.close?.odds || moneyline.draw?.current?.odds;
+          if (!homeOddStr || !awayOddStr || !drawOddStr) continue;
+
+          const rawHome = parseAmericanOdd(String(homeOddStr));
+          const rawAway = parseAmericanOdd(String(awayOddStr));
+          const rawDraw = parseAmericanOdd(String(drawOddStr));
+          const sum = rawHome + rawAway + rawDraw;
+          if (sum > 0) {
+            const homePct = Math.round((rawHome / sum) * 100);
+            const awayPct = Math.round((rawAway / sum) * 100);
+            const drawPct = 100 - homePct - awayPct;
+
+            const key = makePairKey(homeName, awayName);
+            const homePt = translateTeam(homeName);
+            const awayPt = translateTeam(awayName);
+            const analysis = generateAnalysisText(homePt, awayPt, homePct, awayPct);
+
+            newOddsMap[key] = {
+              homePct,
+              drawPct,
+              awayPct,
+              analysis
+            };
+          }
+        }
+        setOddsMap(newOddsMap);
+      } catch (err) {
+        console.warn("Erro ao buscar odds do Oráculo da ESPN:", err);
+      }
+    };
+
+    fetchOdds();
+    const interval = setInterval(fetchOdds, 300000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Começa true: evita o flash de "Nenhum jogo agendado" antes da primeira carga
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
   const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil'>('jogos');
+
+  const switchTab = (tab: 'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil') => {
+    if ((document as any).startViewTransition) {
+      (document as any).startViewTransition(() => {
+        setActiveTab(tab);
+      });
+    } else {
+      setActiveTab(tab);
+    }
+  };
 
   // Data de partidas selecionada manualmente (YYYY-MM-DD, horário de Brasília)
   const [selectedDateState, setSelectedDateState] = useState<string>('');
@@ -206,6 +413,22 @@ function App() {
   useEffect(() => {
     const tick = setInterval(() => setNowTs(Date.now()), 30000);
     return () => clearInterval(tick);
+  }, []);
+
+  // Prefetch das abas de Ranking e Perfil em segundo plano para transição instantânea
+  useEffect(() => {
+    const prefetchTabs = async () => {
+      try {
+        await Promise.all([
+          import('./components/StandingsTable'),
+          import('./components/ProfileTab')
+        ]);
+      } catch (err) {
+        console.warn('Erro no prefetch das abas', err);
+      }
+    };
+    const timer = setTimeout(prefetchTabs, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   // Timer de fallback para a splash screen inicial ao carregar a página
@@ -241,10 +464,12 @@ function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
 
-  // Seletor de datas: rolar automaticamente para o dia selecionado (hoje, por
-  // padrão) ficar na frente, sem o usuário precisar arrastar a barra.
-  const dateScrollRef = useRef<HTMLDivElement>(null);
-  const activeDatePillRef = useRef<HTMLButtonElement>(null);
+  // Nomes dos meses em português para o carrossel de datas
+  const MONTH_NAMES_FULL = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+
+  // Touch swipe refs para o carrossel de datas
+  const touchStartX = useRef<number>(0);
+  const touchDelta = useRef<number>(0);
 
   const showToast = (message: string, type: 'success' | 'error' = 'error') => {
     window.clearTimeout(toastTimerRef.current);
@@ -516,19 +741,39 @@ function App() {
     return found.iso;
   }, [selectedDateState, dates]);
 
-  // Posiciona a barra de datas com o dia selecionado (hoje, por padrão) na
-  // frente. Mantém a ordem cronológica — dá pra rolar à esquerda p/ dias passados.
-  // Só reposiciona quando o conjunto de datas muda ou ao abrir a aba (não a cada
-  // reload do Realtime nem ao clicar num dia, p/ não "puxar" a barra do usuário).
-  const datesKey = dates.map((d) => d.iso).join(',');
-  useEffect(() => {
-    if (activeTab !== 'jogos') return;
-    const container = dateScrollRef.current;
-    const pill = activeDatePillRef.current;
-    if (!container || !pill) return;
-    const delta = pill.getBoundingClientRect().left - container.getBoundingClientRect().left;
-    container.scrollLeft += delta - 8; // 8px de respiro à esquerda
-  }, [datesKey, activeTab]);
+  // Índice da data selecionada no array de datas (para o carrossel)
+  const selectedDateIndex = useMemo(() => {
+    const idx = dates.findIndex((d) => d.iso === selectedDate);
+    return idx >= 0 ? idx : 0;
+  }, [dates, selectedDate]);
+
+  // Navegar para data anterior/próxima no carrossel
+  const goToPrevDate = useCallback(() => {
+    if (selectedDateIndex > 0) setSelectedDateState(dates[selectedDateIndex - 1].iso);
+  }, [selectedDateIndex, dates]);
+
+  const goToNextDate = useCallback(() => {
+    if (selectedDateIndex < dates.length - 1) setSelectedDateState(dates[selectedDateIndex + 1].iso);
+  }, [selectedDateIndex, dates]);
+
+  // Touch handlers para swipe no carrossel de datas
+  const handleDateTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchDelta.current = 0;
+  }, []);
+
+  const handleDateTouchMove = useCallback((e: React.TouchEvent) => {
+    touchDelta.current = e.touches[0].clientX - touchStartX.current;
+  }, []);
+
+  const handleDateTouchEnd = useCallback(() => {
+    const delta = touchDelta.current;
+    if (Math.abs(delta) > 40) {
+      if (delta > 0) goToPrevDate();
+      else goToNextDate();
+    }
+    touchDelta.current = 0;
+  }, [goToPrevDate, goToNextDate]);
 
   // 7. Palpites a exibir: o que o usuário está digitando tem prioridade;
   //    senão, a aposta já salva no banco
@@ -546,6 +791,29 @@ function App() {
     });
     return map;
   }, [matches, betByMatchUser, draftBets, currentUser]);
+
+  // Incrementar / decrementar placar via stepper (▲/▼)
+  const stepScore = useCallback((matchId: string, side: 'homeScore' | 'awayScore', direction: 1 | -1) => {
+    setDraftBets((prev) => {
+      const current = prev[matchId]?.[side] ?? displayDrafts[matchId]?.[side] ?? '';
+      const currentNum = current === '' ? 0 : parseInt(current, 10);
+      const next = Math.max(0, currentNum + direction);
+
+      // We need to keep both homeScore and awayScore in draft. If only one is specified,
+      // the other should fallback to displayDrafts or empty string.
+      const currentHome = prev[matchId]?.homeScore ?? displayDrafts[matchId]?.homeScore ?? '';
+      const currentAway = prev[matchId]?.awayScore ?? displayDrafts[matchId]?.awayScore ?? '';
+
+      return {
+        ...prev,
+        [matchId]: {
+          ...prev[matchId],
+          homeScore: side === 'homeScore' ? String(next) : currentHome,
+          awayScore: side === 'awayScore' ? String(next) : currentAway,
+        },
+      };
+    });
+  }, [displayDrafts]);
 
   // Agrupar partidas por data para renderização eficiente
   const groupedMatches = useMemo(() => {
@@ -908,7 +1176,7 @@ function App() {
           // Sem `autoPlay`: o atributo dispara cedo demais (antes do muted valer)
           // e o iOS bloqueia mostrando o botão de play. Disparamos o play() nós
           // mesmos quando o vídeo está pronto, já com muted garantido.
-          onLoadedData={(e) => { e.currentTarget.play().catch(() => {}); }}
+          onLoadedData={(e) => { e.currentTarget.play().catch(() => { }); }}
           className="splash-gif"
           onEnded={() => setCurrentScreen(currentUser ? 'app' : 'login')}
         />
@@ -936,25 +1204,61 @@ function App() {
         {activeTab === 'jogos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-            {/* HORIZONTAL DATE SELECTOR BAR */}
+            {/* DATE CAROUSEL (3 datas visíveis, swipeable) */}
             {dates.length > 0 && (
-              <div className="date-selector-scroll-container" ref={dateScrollRef}>
-                {dates.map((d) => {
-                  const isTodayLabel = d.iso === getTodayIso();
-                  const labelText = isTodayLabel ? `Hoje ${d.label}` : d.label;
-                  const isSelected = selectedDate === d.iso;
+              <div
+                className="date-carousel-container"
+                onTouchStart={handleDateTouchStart}
+                onTouchMove={handleDateTouchMove}
+                onTouchEnd={handleDateTouchEnd}
+              >
+                <div className="date-carousel-track">
+                  {/* Data anterior (esquerda) */}
+                  {selectedDateIndex > 0 ? (() => {
+                    const prev = dates[selectedDateIndex - 1];
+                    const [, pm, pd] = prev.iso.split('-');
+                    return (
+                      <button className="date-carousel-item side" onClick={goToPrevDate}>
+                        <span className="date-carousel-day">{parseInt(pd)}</span>
+                        <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(pm) - 1]}</span>
+                      </button>
+                    );
+                  })() : (
+                    <div className="date-carousel-item side" />
+                  )}
 
-                  return (
-                    <button
-                      key={d.iso}
-                      ref={isSelected ? activeDatePillRef : undefined}
-                      className={`date-pill-btn-p16 ${isSelected ? 'active' : ''}`}
-                      onClick={() => setSelectedDateState(d.iso)}
-                    >
-                      {labelText}
-                    </button>
-                  );
-                })}
+                  {/* Data central (ativa) */}
+                  {(() => {
+                    const cur = dates[selectedDateIndex];
+                    if (!cur) return null;
+                    const [, cm, cd] = cur.iso.split('-');
+                    const isToday = cur.iso === getTodayIso();
+                    // Sub-label: pega o grupo/fase do primeiro jogo do dia
+                    const dayMatches = groupedMatches[cur.iso] || [];
+                    const subLabel = dayMatches.length > 0 ? dayMatches[0].group : '';
+                    return (
+                      <div className="date-carousel-item center">
+                        <span className="date-carousel-day">{parseInt(cd)}</span>
+                        <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(cm) - 1]}</span>
+                        {subLabel && <span className="date-carousel-sub">{isToday ? `Hoje · ${subLabel}` : subLabel}</span>}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Data seguinte (direita) */}
+                  {selectedDateIndex < dates.length - 1 ? (() => {
+                    const next = dates[selectedDateIndex + 1];
+                    const [, nm, nd] = next.iso.split('-');
+                    return (
+                      <button className="date-carousel-item side" onClick={goToNextDate}>
+                        <span className="date-carousel-day">{parseInt(nd)}</span>
+                        <span className="date-carousel-month">{MONTH_NAMES_FULL[parseInt(nm) - 1]}</span>
+                      </button>
+                    );
+                  })() : (
+                    <div className="date-carousel-item side" />
+                  )}
+                </div>
               </div>
             )}
 
@@ -996,7 +1300,7 @@ function App() {
                     const awayLiveWinner = isLiveGame && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
 
                     const homeClasses = [
-                      'team-row-p16',
+                      'team-col-p16',
                       homeFinalWinner ? 'winner-highlight' : '',
                       awayFinalWinner ? 'loser-fade' : '',
                       isFinalDraw ? 'draw-highlight' : '',
@@ -1005,7 +1309,7 @@ function App() {
                     ].filter(Boolean).join(' ');
 
                     const awayClasses = [
-                      'team-row-p16',
+                      'team-col-p16',
                       awayFinalWinner ? 'winner-highlight' : '',
                       homeFinalWinner ? 'loser-fade' : '',
                       isFinalDraw ? 'draw-highlight' : '',
@@ -1026,27 +1330,55 @@ function App() {
                     const wrongBettors = bettorTypes.filter((x) => x.type === 'wrong');
                     const peFrioId = bettorTypes.length >= 2 && wrongBettors.length === 1 ? wrongBettors[0].id : null;
 
-                    return (
-                      <div key={match.id} className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}>
+                    const cleanColors = (colors: string[]) =>
+                      colors.filter(c => {
+                        const lc = c.toLowerCase().trim();
+                        return lc !== '#ffffff' && lc !== '#fff' && lc !== 'white';
+                      });
+                    const rawHomeColors = getTeamColors(match.homeTeamEn);
+                    const rawAwayColors = getTeamColors(match.awayTeamEn);
+                    const homeColors = cleanColors(rawHomeColors).length > 0 ? cleanColors(rawHomeColors) : ['#8b8075'];
+                    const awayColors = cleanColors(rawAwayColors).length > 0 ? cleanColors(rawAwayColors) : ['#8b8075'];
+                    const cardStyle = {
+                      '--home-color-1': homeColors[0] || '#8b8075',
+                      '--home-color-2': homeColors[1] || homeColors[0] || '#a8a29e',
+                      '--home-color-3': homeColors[2] || homeColors[1] || homeColors[0] || '#d6d3d1',
+                      '--away-color-1': awayColors[0] || '#8b8075',
+                      '--away-color-2': awayColors[1] || awayColors[0] || '#a8a29e',
+                      '--away-color-3': awayColors[2] || awayColors[1] || awayColors[0] || '#d6d3d1',
+                    } as React.CSSProperties;
 
-                        {/* Cabeçalho do Jogo (Grupo e Horário) */}
-                        <div className="game-card-header-p16" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span>{match.group} - {match.time}</span>
-                          {match.isLive ? (
-                            <span className="live-badge-p16">
-                              <span className="live-dot-p16"></span>
-                              AO VIVO{formatLiveClock(match.liveClock) ? ` · ${formatLiveClock(match.liveClock)}` : ''}
+                    return (
+                      <div
+                        key={match.id}
+                        className={`game-card-item-p16 ${match.isLive ? 'live-card-highlight' : ''}`}
+                        style={cardStyle}
+                      >
+
+                        {/* Cabeçalho do Jogo (Grupo, Horário e Status alinhados em uma única linha) */}
+                        <div className="game-card-header-p16">
+                          <div className="game-card-header-top">
+                            <span className="game-card-header-info">
+                              {match.group} • {match.time}
                             </span>
-                          ) : isFinished ? (
-                            <span className="finished-badge-p16">
-                              ENCERRADO
-                            </span>
-                          ) : null}
+                            {canEditBet ? (
+                              <MatchCountdown kickoff={match.kickoff} />
+                            ) : match.isLive ? (
+                              <span className="live-badge-p16">
+                                <span className="live-dot-p16"></span>
+                                AO VIVO{formatLiveClock(match.liveClock) ? ` · ${formatLiveClock(match.liveClock)}` : ''}
+                              </span>
+                            ) : isFinished ? (
+                              <span className="finished-badge-p16">
+                                ENCERRADO
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
 
-                        {/* Corpo do Confronto */}
+                        {/* Corpo do Confronto — Layout Horizontal */}
                         <div className="game-card-body-p16">
-                          {/* Time 1 (Mandante) */}
+                          {/* Time Mandante (coluna esquerda) */}
                           <div className={homeClasses}>
                             <div className="team-flag-badge-p16">
                               <img loading="lazy" decoding="async"
@@ -1058,38 +1390,75 @@ function App() {
                                 }}
                               />
                             </div>
-                            <div className="team-code-badge-p16">
+                            <div className="team-code-label-p16">
                               {match.homeTeam}
                             </div>
+                          </div>
 
-                            {/* Caixa de Score */}
+                          {/* Placar Central */}
+                          <div className={`match-score-center ${canEditBet ? 'has-stepper' : 'has-display'}`}>
                             {canEditBet ? (
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                min="0"
-                                aria-label={`Seu palpite de gols para ${match.homeTeam}`}
-                                className="score-input-field-p16"
-                                value={displayDrafts[match.id]?.homeScore || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '' || parseInt(val) >= 0) {
-                                    setDraftBets((prev) => ({
-                                      ...prev,
-                                      [match.id]: { ...prev[match.id], homeScore: val }
-                                    }));
-                                  }
-                                }}
-                              />
+                              /* Stepper Home */
+                              <div className="score-stepper">
+                                <button
+                                  type="button"
+                                  className="score-stepper-btn"
+                                  onClick={() => stepScore(match.id, 'homeScore', 1)}
+                                  aria-label={`Aumentar gols de ${match.homeTeam}`}
+                                >
+                                  <ArrowUp size={18} />
+                                </button>
+                                <div className="score-stepper-value">
+                                  {displayDrafts[match.id]?.homeScore || '0'}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="score-stepper-btn"
+                                  onClick={() => stepScore(match.id, 'homeScore', -1)}
+                                  aria-label={`Diminuir gols de ${match.homeTeam}`}
+                                >
+                                  <ArrowDown size={18} />
+                                </button>
+                              </div>
                             ) : (
                               <div className="score-display-box-p16">
                                 {hasGameStarted ? (match.homeScore !== null ? match.homeScore : '-') : (displayDrafts[match.id]?.homeScore || '-')}
                               </div>
                             )}
+
+                            <span className="match-score-x">✕</span>
+
+                            {canEditBet ? (
+                              /* Stepper Away */
+                              <div className="score-stepper">
+                                <button
+                                  type="button"
+                                  className="score-stepper-btn"
+                                  onClick={() => stepScore(match.id, 'awayScore', 1)}
+                                  aria-label={`Aumentar gols de ${match.awayTeam}`}
+                                >
+                                  <ArrowUp size={18} />
+                                </button>
+                                <div className="score-stepper-value">
+                                  {displayDrafts[match.id]?.awayScore || '0'}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="score-stepper-btn"
+                                  onClick={() => stepScore(match.id, 'awayScore', -1)}
+                                  aria-label={`Diminuir gols de ${match.awayTeam}`}
+                                >
+                                  <ArrowDown size={18} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="score-display-box-p16">
+                                {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (displayDrafts[match.id]?.awayScore || '-')}
+                              </div>
+                            )}
                           </div>
 
-                          {/* Time 2 (Visitante) */}
+                          {/* Time Visitante (coluna direita) */}
                           <div className={awayClasses}>
                             <div className="team-flag-badge-p16">
                               <img loading="lazy" decoding="async"
@@ -1101,37 +1470,66 @@ function App() {
                                 }}
                               />
                             </div>
-                            <div className="team-code-badge-p16">
+                            <div className="team-code-label-p16">
                               {match.awayTeam}
                             </div>
-
-                            {/* Caixa de Score */}
-                            {canEditBet ? (
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                min="0"
-                                aria-label={`Seu palpite de gols para ${match.awayTeam}`}
-                                className="score-input-field-p16"
-                                value={displayDrafts[match.id]?.awayScore || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '' || parseInt(val) >= 0) {
-                                    setDraftBets((prev) => ({
-                                      ...prev,
-                                      [match.id]: { ...prev[match.id], awayScore: val }
-                                    }));
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <div className="score-display-box-p16">
-                                {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (displayDrafts[match.id]?.awayScore || '-')}
-                              </div>
-                            )}
                           </div>
                         </div>
+
+                        {/* Seção de Previsão do Oráculo */}
+                        {(() => {
+                          const key = makePairKey(match.homeTeamEn, match.awayTeamEn);
+                          const matchOdds = oddsMap[key] || getFallbackOdds(match.homeTeamEn, match.awayTeamEn);
+                          const isOracleExpanded = !!expandedPredictions[match.id];
+
+                          return (
+                            <div className="oracle-card-container-p16">
+                              <div
+                                className="oracle-card-header-p16"
+                                onClick={() => togglePredictionExpanded(match.id)}
+                              >
+                                <div className="oracle-title-left">
+                                  <span className="oracle-emoji-p16">🎯</span>
+                                  <span>PITACO DA CASA</span>
+                                </div>
+                                {isOracleExpanded ? (
+                                  <ChevronUp size={13} className="oracle-chevron" />
+                                ) : (
+                                  <ChevronDown size={13} className="oracle-chevron" />
+                                )}
+                              </div>
+
+                              <div className={`oracle-card-content-wrapper-p16 ${isOracleExpanded ? 'expanded' : ''}`}>
+                                <div className="oracle-card-content-inner-p16">
+                                  <div className="oracle-progress-bar">
+                                    <div className="oracle-progress-segment home" style={{ width: `${matchOdds.homePct}%` }}></div>
+                                    <div className="oracle-progress-segment draw" style={{ width: `${matchOdds.drawPct}%` }}></div>
+                                    <div className="oracle-progress-segment away" style={{ width: `${matchOdds.awayPct}%` }}></div>
+                                  </div>
+
+                                  <div className="oracle-prob-labels">
+                                    <div className="oracle-prob-col home">
+                                      <span className="oracle-team-name">{match.homeTeam}</span>
+                                      <span className="oracle-pct-value">{matchOdds.homePct}%</span>
+                                    </div>
+                                    <div className="oracle-prob-col draw">
+                                      <span className="oracle-team-name">Empate</span>
+                                      <span className="oracle-pct-value">{matchOdds.drawPct}%</span>
+                                    </div>
+                                    <div className="oracle-prob-col away">
+                                      <span className="oracle-team-name">{match.awayTeam}</span>
+                                      <span className="oracle-pct-value">{matchOdds.awayPct}%</span>
+                                    </div>
+                                  </div>
+
+                                  <p className="oracle-analysis-text">
+                                    {matchOdds.analysis}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Botão para expandir/comprimir palpites */}
                         <button
@@ -1372,7 +1770,7 @@ function App() {
       <nav className="bottom-nav">
         <button
           className={`nav-item ${activeTab === 'jogos' ? 'active' : ''}`}
-          onClick={() => setActiveTab('jogos')}
+          onClick={() => switchTab('jogos')}
           title="Partidas"
           aria-label="Partidas"
         >
@@ -1380,7 +1778,7 @@ function App() {
         </button>
         <button
           className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}
-          onClick={() => setActiveTab('palpites')}
+          onClick={() => switchTab('palpites')}
           title="Palpites"
           aria-label="Palpites"
         >
@@ -1388,7 +1786,7 @@ function App() {
         </button>
         <button
           className={`nav-item ${activeTab === 'ranking' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ranking')}
+          onClick={() => switchTab('ranking')}
           title="Ranking"
           aria-label="Ranking"
         >
@@ -1396,7 +1794,7 @@ function App() {
         </button>
         <button
           className={`nav-item ${activeTab === 'pix' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pix')}
+          onClick={() => switchTab('pix')}
           title="Pagamento"
           aria-label="Pagamento"
         >
@@ -1404,7 +1802,7 @@ function App() {
         </button>
         <button
           className={`nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
-          onClick={() => setActiveTab('perfil')}
+          onClick={() => switchTab('perfil')}
           title="Perfil"
           aria-label="Perfil"
         >

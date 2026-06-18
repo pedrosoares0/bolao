@@ -196,3 +196,63 @@ export const groupLabel = (stage: string | null, groupName: string | null): stri
 // Monta a URL da imagem da bandeira (aceita iso2 do flagcdn ou URL completa do crest)
 export const flagSrc = (flag: string, size: number): string =>
   flag.startsWith('http') ? flag : `https://flagcdn.com/w${size}/${flag}.png`;
+
+// Retorna as cores principais da bandeira de cada seleção (Copa 2026)
+export const getTeamColors = (teamNameEn: string): string[] => {
+  const normalized = (teamNameEn || '').trim();
+  const colorsMap: { [key: string]: string[] } = {
+    'Algeria': ['#006233', '#ffffff', '#d21034'],
+    'Argentina': ['#75aadb', '#ffffff', '#75aadb'],
+    'Australia': ['#00008b', '#ffcd00', '#00843d'],
+    'Austria': ['#ed2939', '#ffffff', '#ed2939'],
+    'Belgium': ['#000000', '#ffd100', '#ff0f21'],
+    'Bosnia-Herzegovina': ['#002395', '#fecb00', '#002395'],
+    'Bosnia and Herzegovina': ['#002395', '#fecb00', '#002395'],
+    'Brazil': ['#009739', '#fedf00', '#002776'],
+    'Canada': ['#ff0000', '#ffffff', '#ff0000'],
+    'Cape Verde Islands': ['#003893', '#ffd100', '#d21034'],
+    'Cape Verde': ['#003893', '#ffd100', '#d21034'],
+    'Colombia': ['#fcd116', '#003893', '#ce1126'],
+    'Congo DR': ['#007FFF', '#FDD017', '#D21034'],
+    'Democratic Republic of the Congo': ['#007FFF', '#FDD017', '#D21034'],
+    'Croatia': ['#ff0000', '#ffffff', '#171796'],
+    'Curaçao': ['#002b7f', '#f9e316', '#002b7f'],
+    'Czechia': ['#11457e', '#ffffff', '#d7141a'],
+    'Czech Republic': ['#11457e', '#ffffff', '#d7141a'],
+    'Ecuador': ['#ffdd00', '#0033a0', '#d51a2b'],
+    'Egypt': ['#c09307', '#ffffff', '#e4312b'],
+    'England': ['#ffffff', '#ce1124', '#ffffff'],
+    'France': ['#002654', '#ffffff', '#ed2939'],
+    'Germany': ['#000000', '#dd0000', '#ffce00'],
+    'Ghana': ['#e41c2c', '#fed100', '#008751'],
+    'Haiti': ['#00209f', '#d21034', '#00209f'],
+    'Iran': ['#239e46', '#ffffff', '#da0000'],
+    'Iraq': ['#ff0000', '#ffffff', '#000000'],
+    'Ivory Coast': ['#f77f00', '#ffffff', '#009e60'],
+    'Japan': ['#ffffff', '#bc002d', '#ffffff'],
+    'Jordan': ['#000000', '#ffffff', '#007a3d'],
+    'Mexico': ['#006847', '#ffffff', '#c8102e'],
+    'Morocco': ['#c1272d', '#006233', '#c1272d'],
+    'Netherlands': ['#21468b', '#ffffff', '#ae1c28'],
+    'New Zealand': ['#000000', '#ffffff', '#000000'],
+    'Norway': ['#ef2b2d', '#ffffff', '#00205b'],
+    'Panama': ['#da121a', '#ffffff', '#072357'],
+    'Paraguay': ['#d52b1e', '#ffffff', '#0038a8'],
+    'Portugal': ['#006600', '#ff0000', '#ffff00'],
+    'Qatar': ['#8a1538', '#ffffff', '#8a1538'],
+    'Saudi Arabia': ['#006c35', '#ffffff', '#006c35'],
+    'Scotland': ['#005eb8', '#ffffff', '#005eb8'],
+    'Senegal': ['#e41d2d', '#fec223', '#118b44'],
+    'South Africa': ['#007a4d', '#ffb81c', '#002395'],
+    'South Korea': ['#ffffff', '#cd2e3a', '#0a59f7'],
+    'Spain': ['#c1272d', '#fecb00', '#c1272d'],
+    'Sweden': ['#006aa7', '#fecc00', '#006aa7'],
+    'Switzerland': ['#da291c', '#ffffff', '#da291c'],
+    'Tunisia': ['#e70013', '#ffffff', '#e70013'],
+    'Turkey': ['#e30a17', '#ffffff', '#e30a17'],
+    'United States': ['#3c3b6e', '#ffffff', '#b22234'],
+    'Uruguay': ['#0081c8', '#ffffff', '#fcd116'],
+    'Uzbekistan': ['#00aeef', '#ffffff', '#1c355e'],
+  };
+  return colorsMap[normalized] || ['#8b8075', '#a8a29e', '#d6d3d1'];
+};
