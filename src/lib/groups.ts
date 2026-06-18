@@ -117,6 +117,12 @@ export async function createGroup(input: CreateGroupInput): Promise<string> {
   return data as string;
 }
 
+export async function deleteGroup(groupId: string): Promise<void> {
+  // RLS: só o dono (owner_id = auth.uid()) consegue apagar.
+  const { error } = await supabase.from(T.groups).delete().eq('id', groupId);
+  if (error) throw new Error(error.message);
+}
+
 export async function updateGroup(groupId: string, patch: Partial<{
   name: string; description: string | null; image_url: string | null;
   card_url: string | null; visibility: string; entry_fee_cents: number;

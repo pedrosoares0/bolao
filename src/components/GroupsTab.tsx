@@ -2,13 +2,14 @@
 // entra por código e abre o detalhe (membros, papéis, convites e ranking do
 // grupo). Ranking do grupo = mesmas apostas, filtradas aos membros (Opção A).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Users, Share2, Copy, Crown, Shield, LogOut, ArrowLeft, Ban, Camera, Trophy } from 'lucide-react';
+import { Plus, Users, Share2, Copy, Crown, Shield, LogOut, ArrowLeft, Ban, Camera, Trophy, Settings, Pencil, Trash2 } from 'lucide-react';
 import type { Participant, Match, Bet, SpecialPrediction, Group, GroupMember, GroupInvite, Season, GroupRole } from '../types';
 import { calculateStandings } from '../utils/rules';
 import { uploadImage } from '../lib/storage';
 import {
   listSeasons, listMyGroups, createGroup, listMembers, listInvites,
   createInvite, revokeInvite, redeemInvite, setMemberRole, setMemberStatus, leaveGroup,
+  updateGroup, deleteGroup,
 } from '../lib/groups';
 
 interface GroupsTabProps {
@@ -21,6 +22,7 @@ interface GroupsTabProps {
   activeGroup: Group | null;            // grupo em que o usuário "entrou" (group-centric)
   onEnterGroup: (g: Group) => void;     // abrir um grupo (vira contexto do app)
   onExitGroup: () => void;              // sair do grupo (volta pro lobby)
+  onGroupChanged: (g: Group) => void;   // grupo editado (atualiza contexto sem trocar de aba)
 }
 
 const reais = (cents: number) =>
@@ -30,7 +32,7 @@ const ROLE_LABEL: Record<GroupRole, string> = { owner: 'Dono', admin: 'Admin', m
 
 export const GroupsTab: React.FC<GroupsTabProps> = ({
   currentUser, participants, matches, bets, specials, onToast,
-  activeGroup, onEnterGroup, onExitGroup,
+  activeGroup, onEnterGroup, onExitGroup, onGroupChanged,
 }) => {
   const uid = currentUser.uid!;
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
@@ -55,6 +57,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
   const groupImgRef = useRef<HTMLInputElement>(null);
   const groupCardRef = useRef<HTMLInputElement>(null);
   const [imgUploading, setImgUploading] = useState<null | 'img' | 'card'>(null);
+
+  // Edição do grupo (dono/admin) + exclusão (dono)
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', description: '', imageUrl: null as string | null, cardUrl: null as string | null });
+  const [editUploading, setEditUploading] = useState<null | 'img' | 'card'>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const editImgRef = useRef<HTMLInputElement>(null);
+  const editCardRef = useRef<HTMLInputElement>(null);
 
   const loadGroups = useCallback(async (): Promise<Group[]> => {
     setLoading(true);
@@ -254,6 +264,76 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
     }
   };
 
+  // ---- Editar / excluir grupo (dono/admin) ---------------------------------
+  const startEdit = () => {
+    if (!selectedGroup) return;
+    setEditForm({
+      name: selectedGroup.name,
+      description: selectedGroup.description ?? '',
+      imageUrl: selectedGroup.imageUrl ?? null,
+      cardUrl: selectedGroup.cardUrl ?? null,
+    });
+    setEditing(true);
+  };
+
+  const handleEditImage = async (file: File | undefined, which: 'img' | 'card') => {
+    if (!file) return;
+    setEditUploading(which);
+    try {
+      const url = await uploadImage(file, uid, which === 'img' ? 'group-img' : 'group-card', selectedId ?? '');
+      setEditForm((f) => (which === 'img' ? { ...f, imageUrl: url } : { ...f, cardUrl: url }));
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Falha no upload.');
+    } finally {
+      setEditUploading(null);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedGroup) return;
+    if (editForm.name.trim().length < 2) { onToast('Dê um nome ao grupo.'); return; }
+    setBusy(true);
+    try {
+      await updateGroup(selectedGroup.id, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim() || null,
+        image_url: editForm.imageUrl,
+        card_url: editForm.cardUrl,
+      });
+      const updated: Group = {
+        ...selectedGroup,
+        name: editForm.name.trim(),
+        description: editForm.description.trim() || null,
+        imageUrl: editForm.imageUrl,
+        cardUrl: editForm.cardUrl,
+      };
+      onGroupChanged(updated);   // atualiza a barra/capa no app
+      await loadGroups();
+      setEditing(false);
+      onToast('Grupo atualizado!', 'success');
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup) return;
+    setBusy(true);
+    try {
+      await deleteGroup(selectedGroup.id);
+      setConfirmDelete(false);
+      onToast('Grupo excluído.', 'success');
+      onExitGroup();
+      await loadGroups();
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Não foi possível excluir.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // ==========================================================================
   // RENDER
   // ==========================================================================
@@ -416,10 +496,83 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({
           ))}
         </section>
 
+        {/* ADMINISTRAÇÃO (dono/admin): editar; excluir só o dono */}
+        {isAdmin && (
+          <section className="group-section">
+            <h3><Settings size={15} /> Administração</h3>
+
+            <input ref={editImgRef} type="file" accept="image/*" hidden
+              onChange={(e) => { handleEditImage(e.target.files?.[0], 'img'); e.target.value = ''; }} />
+            <input ref={editCardRef} type="file" accept="image/*" hidden
+              onChange={(e) => { handleEditImage(e.target.files?.[0], 'card'); e.target.value = ''; }} />
+
+            {!editing ? (
+              <button className="groups-mini-btn" onClick={startEdit}>
+                <Pencil size={14} /> Editar grupo
+              </button>
+            ) : (
+              <div className="groups-form" style={{ marginTop: '0.5rem' }}>
+                <div className="groups-cover-edit" style={editForm.cardUrl ? { backgroundImage: `url(${editForm.cardUrl})` } : undefined}>
+                  <div className="groups-avatar-edit" onClick={() => editImgRef.current?.click()}>
+                    {editForm.imageUrl ? <img src={editForm.imageUrl} alt="Imagem do grupo" /> : <Users size={28} />}
+                    <span className="groups-avatar-cam"><Camera size={12} /></span>
+                  </div>
+                  <button type="button" className="groups-cover-btn" onClick={() => editCardRef.current?.click()}>
+                    <Camera size={12} /> {editUploading === 'card' ? 'Enviando…' : 'Capa'}
+                  </button>
+                </div>
+
+                <label className="groups-label">Nome do grupo</label>
+                <input className="groups-input" value={editForm.name} maxLength={60}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+
+                <label className="groups-label">Descrição</label>
+                <textarea className="groups-input" value={editForm.description} maxLength={500} rows={3}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+
+                <div className="groups-row-2">
+                  <button className="groups-mini-btn" onClick={() => setEditing(false)} disabled={busy}>Cancelar</button>
+                  <button className="groups-primary-btn small" onClick={handleSaveEdit} disabled={busy || editUploading !== null}>
+                    {busy ? 'Salvando…' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {myRole === 'owner' && !editing && (
+              <button className="group-delete-btn" onClick={() => setConfirmDelete(true)} disabled={busy}>
+                <Trash2 size={15} /> Excluir grupo
+              </button>
+            )}
+          </section>
+        )}
+
         {myRole !== 'owner' && (
           <button className="groups-leave-btn" onClick={handleLeave} disabled={busy}>
             <LogOut size={15} /> Sair do grupo
           </button>
+        )}
+
+        {/* CONFIRMAÇÃO DE EXCLUSÃO */}
+        {confirmDelete && (
+          <div className="pix-modal-overlay" onClick={() => setConfirmDelete(false)}>
+            <div className="pix-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="pix-modal-emoji">🗑️</div>
+              <div className="pix-card-title">EXCLUIR GRUPO</div>
+              <div className="pix-modal-text">
+                Excluir <b>{selectedGroup.name}</b>? Isso remove o grupo, os membros e os
+                convites. <b>Não dá pra desfazer.</b>
+              </div>
+              <div className="confirm-modal-actions">
+                <button type="button" className="confirm-modal-cancel-btn" onClick={() => setConfirmDelete(false)}>
+                  CANCELAR
+                </button>
+                <button type="button" className="confirm-modal-confirm-btn" onClick={handleDeleteGroup} disabled={busy}>
+                  🗑️ EXCLUIR
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     );

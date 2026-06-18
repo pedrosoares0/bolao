@@ -1695,6 +1695,7 @@ function App() {
               activeGroup={activeGroup}
               onEnterGroup={handleEnterGroup}
               onExitGroup={handleExitGroup}
+              onGroupChanged={setActiveGroup}
             />
           </Suspense>
         )}
