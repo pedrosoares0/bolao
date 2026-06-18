@@ -28,9 +28,8 @@ create table if not exists public.participants_escalavel (
   is_platform_admin boolean not null default false,
   created_at timestamptz not null default now()
 );
-insert into public.participants_escalavel (id, username, name, avatar_url, created_at)
-  select id, username, name, avatar_url, created_at from public.participants
-  on conflict (id) do nothing;
+-- Dataset começa SEM usuários (cadastro cria os perfis). Não copiamos os
+-- participantes da main de propósito.
 
 alter table public.participants_escalavel enable row level security;
 do $$ begin
@@ -89,8 +88,7 @@ create table if not exists public.bets_escalavel (
   updated_at timestamptz not null default now(),
   unique (user_id, match_id)
 );
-insert into public.bets_escalavel (user_id, match_id, home_score, away_score, created_at, updated_at)
-  select user_id, match_id, home_score, away_score, created_at, updated_at from public.bets;
+-- Sem cópia de apostas: dataset limpo.
 
 create index if not exists be_match_idx on public.bets_escalavel (match_id);
 alter table public.bets_escalavel enable row level security;
@@ -105,8 +103,7 @@ create table if not exists public.submissions_escalavel (
   submitted_at timestamptz not null default now(),
   primary key (user_id, bet_date)
 );
-insert into public.submissions_escalavel (user_id, bet_date, submitted_at)
-  select user_id, bet_date, submitted_at from public.submissions on conflict do nothing;
+-- Sem cópia de lançamentos: dataset limpo.
 alter table public.submissions_escalavel enable row level security;
 do $$ begin
   create policy "se_select" on public.submissions_escalavel for select to authenticated using (true);
@@ -119,9 +116,7 @@ create table if not exists public.special_predictions_escalavel (
   brazil_stage  text not null,
   updated_at    timestamptz not null default now()
 );
-insert into public.special_predictions_escalavel (user_id, champion_team, brazil_stage, updated_at)
-  select user_id, champion_team, brazil_stage, updated_at from public.special_predictions
-  on conflict (user_id) do nothing;
+-- Sem cópia de palpites especiais: dataset limpo.
 alter table public.special_predictions_escalavel enable row level security;
 do $$ begin
   create policy "spe_select" on public.special_predictions_escalavel for select to authenticated using (true);
@@ -138,8 +133,7 @@ create table if not exists public.debts_escalavel (
   created_at timestamptz not null default now(),
   unique (user_id, debt_date)
 );
-insert into public.debts_escalavel (user_id, amount, debt_date, created_at)
-  select user_id, amount, debt_date, created_at from public.debts on conflict do nothing;
+-- Sem cópia de fiados: dataset limpo.
 alter table public.debts_escalavel enable row level security;
 do $$ begin
   create policy "de_select" on public.debts_escalavel for select to authenticated using (true);
@@ -467,41 +461,10 @@ create trigger trg_audit_member_change_escalavel
   for each row execute function public.audit_member_change_escalavel();
 
 -- ============================================================
--- 6. GRUPO DA COPA (migra os participantes atuais como membros)
---    Dono = 'pedro' se existir, senão o primeiro participante.
---    PIX do grupo = dados atuais (Rodrigo Weber / Banco Inter).
+-- 6. (REMOVIDO) Não criamos nenhum grupo automaticamente.
+--    O dataset começa limpo: sem grupos e sem usuários. Os grupos são criados
+--    pelo app (o criador vira dono e define a chave PIX).
 -- ============================================================
-do $$
-declare v_owner uuid; v_season bigint; v_group uuid;
-begin
-  select id into v_owner from public.participants_escalavel
-    where username = 'pedro' limit 1;
-  if v_owner is null then select id into v_owner from public.participants_escalavel order by created_at limit 1; end if;
-  if v_owner is null then return; end if; -- sem participantes, nada a fazer
-
-  select s.id into v_season from public.seasons_escalavel s
-    join public.competitions_escalavel c on c.id = s.competition_id
-    where c.provider_id = 'fifa.world' and s.name = '2026' limit 1;
-
-  -- Evita duplicar se já existir um grupo da Copa criado por este script
-  select id into v_group from public.groups_escalavel
-    where name = 'Copa do Mundo 2026' and owner_id = v_owner limit 1;
-
-  if v_group is null then
-    insert into public.groups_escalavel (owner_id, season_id, ruleset_id, name, description,
-      visibility, entry_fee_cents, pix_key, pix_recipient, pix_bank)
-    select v_owner, v_season, (select id from public.rulesets_escalavel order by id limit 1),
-      'Copa do Mundo 2026', 'Bolão da Copa entre amigos.', 'private', 250,
-      '7992a920-21c1-4a5c-8316-30cf039c5c43', 'Rodrigo Weber', 'Banco Inter'
-    returning id into v_group;
-  end if;
-
-  -- Todos os participantes viram membros (dono = owner, demais = member)
-  insert into public.group_members_escalavel (group_id, user_id, role)
-  select v_group, p.id, case when p.id = v_owner then 'owner' else 'member' end
-  from public.participants_escalavel p
-  on conflict (group_id, user_id) do nothing;
-end $$;
 
 -- ============================================================
 -- FIM. A branch usa só *_escalavel. A main segue intacta.
