@@ -195,7 +195,10 @@ interface OddsData {
   homePct: number;
   drawPct: number;
   awayPct: number;
-  analysis: string;
+  provider: string;
+  homeOdd: string;
+  drawOdd: string;
+  awayOdd: string;
 }
 
 const ALIAS: Record<string, string> = {
@@ -233,103 +236,6 @@ const parseAmericanOdd = (oddStr: string): number => {
   } else {
     return -odd / (-odd + 100);
   }
-};
-
-const generateAnalysisText = (home: string, away: string, homePct: number, awayPct: number): string => {
-  if (homePct > 55) {
-    return `O pedigree e o momento técnico do ${home} o tornam favorito para o confronto. O ${away} terá que adotar uma postura extremamente defensiva e explorar transições rápidas para tentar arrancar um resultado positivo.`;
-  }
-  if (awayPct > 55) {
-    return `O ${away} chega muito bem cotado para esta partida, apresentando odds superiores. Jogando fora ou dentro de casa, o ${home} precisará neutralizar a velocidade do adversário para equilibrar as ações e evitar a derrota.`;
-  }
-  if (Math.abs(homePct - awayPct) < 8) {
-    return `A proximidade das probabilidades indica um jogo de altíssimo equilíbrio tático. A expectativa é de uma partida disputada e estudada nos mínimos detalhes, onde erros individuais ou lances de bola parada devem ser decisivos para definir o vencedor.`;
-  }
-  if (homePct >= awayPct) {
-    return `O equilíbrio deve marcar o duelo, com o ${home} carregando uma ligeira vantagem. O ${away} tem velocidade no contra-ataque e promete criar dificuldades se encontrar espaços na defesa adversária.`;
-  } else {
-    return `Espera-se um jogo bastante parelho, com o ${away} ligeiramente favorito segundo as projeções. O ${home} precisará ser eficiente na marcação para conter o ímpeto ofensivo e buscar a vitória.`;
-  }
-};
-
-const TEAM_RATINGS: Record<string, number> = {
-  'Algeria': 76,
-  'Argentina': 95,
-  'Australia': 75,
-  'Austria': 82,
-  'Belgium': 89,
-  'Bosnia-Herzegovina': 68,
-  'Bosnia and Herzegovina': 68,
-  'Brazil': 94,
-  'Canada': 75,
-  'Cape Verde Islands': 67,
-  'Cape Verde': 67,
-  'Colombia': 87,
-  'Congo DR': 66,
-  'Democratic Republic of the Congo': 66,
-  'Croatia': 86,
-  'Curaçao': 54,
-  'Czechia': 78,
-  'Czech Republic': 78,
-  'Ecuador': 77,
-  'Egypt': 76,
-  'England': 92,
-  'France': 94,
-  'Germany': 86,
-  'Ghana': 70,
-  'Haiti': 55,
-  'Iran': 78,
-  'Iraq': 69,
-  'Ivory Coast': 75,
-  'Japan': 83,
-  'Jordan': 55,
-  'Mexico': 76,
-  'Morocco': 85,
-  'Netherlands': 90,
-  'New Zealand': 53,
-  'Norway': 81,
-  'Panama': 69,
-  'Paraguay': 75,
-  'Portugal': 91,
-  'Qatar': 70,
-  'Saudi Arabia': 70,
-  'Scotland': 66,
-  'Senegal': 80,
-  'South Africa': 68,
-  'South Korea': 78,
-  'Spain': 93,
-  'Sweden': 81,
-  'Switzerland': 82,
-  'Tunisia': 75,
-  'Turkey': 78,
-  'United States': 80,
-  'Uruguay': 88,
-  'Uzbekistan': 67,
-};
-
-const getFallbackOdds = (homeTeam: string, awayTeam: string): OddsData => {
-  const rHome = TEAM_RATINGS[homeTeam] ?? 70;
-  const rAway = TEAM_RATINGS[awayTeam] ?? 70;
-
-  const diff = rHome - rAway;
-  const wHome = 1 / (1 + Math.pow(10, -diff / 30));
-
-  const drawPct = Math.max(10, Math.round(26 - Math.abs(diff) * 0.4));
-  const rem = 100 - drawPct;
-
-  const homePct = Math.round(rem * wHome);
-  const awayPct = rem - homePct;
-
-  const homePt = translateTeam(homeTeam);
-  const awayPt = translateTeam(awayTeam);
-  const analysis = generateAnalysisText(homePt, awayPt, homePct, awayPct);
-
-  return {
-    homePct,
-    drawPct,
-    awayPct,
-    analysis
-  };
 };
 
 function App() {
@@ -379,6 +285,8 @@ function App() {
     }));
   };
 
+  const hasLiveForOdds = matches.some((m) => m.isLive);
+
   useEffect(() => {
     const fetchOdds = async () => {
       try {
@@ -414,28 +322,29 @@ function App() {
             const drawPct = 100 - homePct - awayPct;
 
             const key = makePairKey(homeName, awayName);
-            const homePt = translateTeam(homeName);
-            const awayPt = translateTeam(awayName);
-            const analysis = generateAnalysisText(homePt, awayPt, homePct, awayPct);
 
             newOddsMap[key] = {
               homePct,
               drawPct,
               awayPct,
-              analysis
+              provider: draftKingsOdds?.provider?.name ?? 'ESPN',
+              homeOdd: String(homeOddStr),
+              drawOdd: String(drawOddStr),
+              awayOdd: String(awayOddStr)
             };
           }
         }
         setOddsMap(newOddsMap);
       } catch (err) {
-        console.warn("Erro ao buscar odds do Oráculo da ESPN:", err);
+        console.warn("Erro ao buscar odds da ESPN:", err);
       }
     };
 
     fetchOdds();
-    const interval = setInterval(fetchOdds, 300000);
+    const refreshMs = hasLiveForOdds ? 30000 : 300000;
+    const interval = setInterval(fetchOdds, refreshMs);
     return () => clearInterval(interval);
-  }, []);
+  }, [hasLiveForOdds]);
 
   // Começa true: evita o flash de "Nenhum jogo agendado" antes da primeira carga
   const [loading, setLoading] = useState(true);
@@ -1551,10 +1460,11 @@ function App() {
                           </div>
                         </div>
 
-                        {/* Seção de Previsão do Oráculo */}
-                        {(() => {
+                        {/* Seção de palpite baseada somente nas odds retornadas pela ESPN */}
+                        {match.status !== 'finished' && (() => {
                           const key = makePairKey(match.homeTeamEn, match.awayTeamEn);
-                          const matchOdds = oddsMap[key] || getFallbackOdds(match.homeTeamEn, match.awayTeamEn);
+                          const matchOdds = oddsMap[key];
+                          if (!matchOdds) return null;
                           const isOracleExpanded = !!expandedPredictions[match.id];
 
                           return (
@@ -1565,7 +1475,7 @@ function App() {
                               >
                                 <div className="oracle-title-left">
                                   <span className="oracle-emoji-p16">🎯</span>
-                                  <span>PITACO DA CASA</span>
+                                  <span>PALPITE DA CASA</span>
                                 </div>
                                 {isOracleExpanded ? (
                                   <ChevronUp size={13} className="oracle-chevron" />
@@ -1596,10 +1506,6 @@ function App() {
                                       <span className="oracle-pct-value">{matchOdds.awayPct}%</span>
                                     </div>
                                   </div>
-
-                                  <p className="oracle-analysis-text">
-                                    {matchOdds.analysis}
-                                  </p>
                                 </div>
                               </div>
                             </div>
