@@ -6,31 +6,31 @@ import { supabase } from './supabase';
 import { T, RPC } from './tables';
 import type { Group, GroupMember, GroupInvite, GroupRole, Season } from '../types';
 
-// Linhas cruas (o select com nome de tabela dinâmico não é tipado pelo supabase-js).
-interface SeasonRowRaw { id: number; competition_id: number; name: string; competition: { name?: string; provider_id?: string } | null; }
-interface MyGroupRowRaw { role: string; group_id: string; group: unknown }
-interface MemberRowRaw {
-  group_id: string; user_id: string; role: string; status: GroupMember['status']; joined_at: string;
-  profile: { username?: string; name?: string; avatar_url?: string } | null;
-}
-
 // ---- Catálogo -------------------------------------------------------------
+// Sem embeds do PostgREST (que não resolvem relação de forma confiável nas
+// tabelas novas): buscamos seasons e competitions e juntamos no cliente.
+interface CompRow { id: number; name: string; provider_id: string | null }
+interface SeasonRow { id: number; competition_id: number; name: string }
+
 export async function listSeasons(): Promise<Season[]> {
-  const { data, error } = await supabase
-    .from(T.seasons)
-    .select('id, competition_id, name, competition:' + T.competitions + '(name, provider_id)')
-    .order('id');
-  if (error) throw new Error(error.message);
-  // O select com nome de tabela dinâmico não é tipado pelo supabase-js; casamos.
-  return ((data as unknown as SeasonRowRaw[]) ?? []).map((s) => {
-    const comp = s.competition as { name?: string; provider_id?: string } | null;
-    const compName = comp?.name ?? 'Competição';
+  const [seasonsRes, compsRes] = await Promise.all([
+    supabase.from(T.seasons).select('id, competition_id, name').order('id'),
+    supabase.from(T.competitions).select('id, name, provider_id'),
+  ]);
+  if (seasonsRes.error) throw new Error(seasonsRes.error.message);
+  if (compsRes.error) throw new Error(compsRes.error.message);
+
+  const comps = new Map<number, CompRow>(
+    ((compsRes.data as CompRow[]) ?? []).map((c) => [c.id, c])
+  );
+  return ((seasonsRes.data as SeasonRow[]) ?? []).map((s) => {
+    const c = comps.get(s.competition_id);
     return {
-      id: s.id as number,
-      competitionId: s.competition_id as number,
-      name: s.name as string,
-      competitionName: `${compName} ${s.name}`.trim(),
-      competitionProviderId: comp?.provider_id ?? null,
+      id: s.id,
+      competitionId: s.competition_id,
+      name: s.name,
+      competitionName: `${c?.name ?? 'Competição'} ${s.name}`.trim(),
+      competitionProviderId: c?.provider_id ?? null,
     };
   });
 }
@@ -57,30 +57,39 @@ const mapGroup = (g: RawGroup): Group => ({
 });
 
 export async function listMyGroups(uid: string): Promise<Group[]> {
-  const { data, error } = await supabase
+  // 1) minhas associações
+  const { data: mems, error } = await supabase
     .from(T.groupMembers)
-    .select('role, group_id, group:' + T.groups + '(*, season:' + T.seasons + '(name, competition:' + T.competitions + '(name)))')
+    .select('role, group_id')
     .eq('user_id', uid)
     .eq('status', 'active');
   if (error) throw new Error(error.message);
 
-  const groups = ((data as unknown as MyGroupRowRaw[]) ?? [])
-    .filter((row) => row.group)
-    .map((row) => {
-      const g = mapGroup(row.group as unknown as RawGroup);
-      g.myRole = row.role as GroupRole;
-      return g;
-    });
+  const ids = (mems ?? []).map((m) => m.group_id as string);
+  if (ids.length === 0) return [];
+  const roleByGroup = new Map<string, GroupRole>(
+    (mems ?? []).map((m) => [m.group_id as string, m.role as GroupRole])
+  );
 
-  const ids = groups.map((g) => g.id);
-  if (ids.length) {
-    const { data: counts } = await supabase
-      .from(T.groupMembers).select('group_id').in('group_id', ids).eq('status', 'active');
-    const tally = new Map<string, number>();
-    (counts ?? []).forEach((c) => tally.set(c.group_id, (tally.get(c.group_id) ?? 0) + 1));
-    groups.forEach((g) => { g.memberCount = tally.get(g.id) ?? 1; });
-  }
-  return groups;
+  // 2) grupos + rótulos de temporada + contagem de membros (sem embeds)
+  const [groupsRes, seasonsList, countsRes] = await Promise.all([
+    supabase.from(T.groups).select('*').in('id', ids),
+    listSeasons().catch(() => [] as Season[]),
+    supabase.from(T.groupMembers).select('group_id').in('group_id', ids).eq('status', 'active'),
+  ]);
+  if (groupsRes.error) throw new Error(groupsRes.error.message);
+
+  const seasonById = new Map<number, Season>(seasonsList.map((s) => [s.id, s]));
+  const tally = new Map<string, number>();
+  (countsRes.data ?? []).forEach((c) => tally.set(c.group_id, (tally.get(c.group_id) ?? 0) + 1));
+
+  return ((groupsRes.data as unknown as RawGroup[]) ?? []).map((g) => {
+    const mapped = mapGroup(g);
+    mapped.myRole = roleByGroup.get(g.id);
+    mapped.memberCount = tally.get(g.id) ?? 1;
+    mapped.seasonLabel = g.season_id != null ? seasonById.get(g.season_id)?.competitionName : undefined;
+    return mapped;
+  });
 }
 
 export interface CreateGroupInput {
@@ -120,17 +129,25 @@ export async function updateGroup(groupId: string, patch: Partial<{
 
 // ---- Membros --------------------------------------------------------------
 export async function listMembers(groupId: string): Promise<GroupMember[]> {
-  const { data, error } = await supabase
+  const { data: mems, error } = await supabase
     .from(T.groupMembers)
-    .select('group_id, user_id, role, status, joined_at, profile:' + T.participants + '(username, name, avatar_url)')
+    .select('group_id, user_id, role, status, joined_at')
     .eq('group_id', groupId)
     .order('role');
   if (error) throw new Error(error.message);
-  return ((data as unknown as MemberRowRaw[]) ?? []).map((m) => {
-    const p = m.profile as { username?: string; name?: string; avatar_url?: string } | null;
+
+  const ids = (mems ?? []).map((m) => m.user_id as string);
+  const profById = new Map<string, { username?: string; name?: string; avatar_url?: string }>();
+  if (ids.length) {
+    const { data: profs } = await supabase
+      .from(T.participants).select('id, username, name, avatar_url').in('id', ids);
+    (profs ?? []).forEach((p) => profById.set(p.id as string, p));
+  }
+  return (mems ?? []).map((m) => {
+    const p = profById.get(m.user_id as string);
     return {
-      groupId: m.group_id, userId: m.user_id, role: m.role as GroupRole,
-      status: m.status, joinedAt: m.joined_at,
+      groupId: m.group_id as string, userId: m.user_id as string, role: m.role as GroupRole,
+      status: m.status as GroupMember['status'], joinedAt: m.joined_at as string,
       username: p?.username, name: p?.name, avatarUrl: p?.avatar_url,
     };
   });
