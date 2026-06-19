@@ -1598,6 +1598,7 @@ function App() {
                                               <img
                                                 loading="lazy"
                                                 decoding="async"
+                                                referrerPolicy="no-referrer"
                                                 src={player.img}
                                                 alt={player.name}
                                                 className="scorer-player-img"
@@ -1753,6 +1754,7 @@ function App() {
                                           <div className="inline-guess-scorer-overlay">
                                             <img
                                               loading="lazy" decoding="async"
+                                              referrerPolicy="no-referrer"
                                               src={pickedPlayer.img}
                                               alt={pickedPlayer.name}
                                             />
