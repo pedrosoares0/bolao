@@ -14,7 +14,8 @@
 // ============================================================
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Fragment } from 'react';
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt } from './types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal } from './types';
+import { BRAZIL_PLAYERS } from './utils/players';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
@@ -29,18 +30,6 @@ import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc, getTeamColors 
 
 // Fuso horário de exibição: todos os horários dos jogos são convertidos para Brasília
 const TZ = 'America/Sao_Paulo';
-
-// Jogadores do Brasil disponíveis para o palpite de artilheiro por jogo
-const BRAZIL_PLAYERS = [
-  { id: 'vinijr', name: 'Vini Jr', img: 'https://img.sofascore.com/api/v1/player/868812/image' },
-  { id: 'paqueta', name: 'Paquetá', img: 'https://img.sofascore.com/api/v1/player/839981/image' },
-  { id: 'raphinha', name: 'Raphinha', img: 'https://img.sofascore.com/api/v1/player/831005/image' },
-  { id: 'igorthiago', name: 'Igor Thiago', img: 'https://img.sofascore.com/api/v1/player/1016907/image' },
-  { id: 'endrick', name: 'Endrick', img: 'https://img.sofascore.com/api/v1/player/1174937/image' },
-  { id: 'matheuscunha', name: 'M. Cunha', img: 'https://img.sofascore.com/api/v1/player/886363/image' },
-  { id: 'rayan', name: 'Rayan', img: 'https://img.sofascore.com/api/v1/player/1464966/image' },
-  { id: 'luizhenrique', name: 'L. Henrique', img: 'https://img.sofascore.com/api/v1/player/1035995/image' },
-] as const;
 
 const isBrazilMatch = (m: { homeTeamEn: string; awayTeamEn: string }) =>
   m.homeTeamEn === 'Brazil' || m.awayTeamEn === 'Brazil';
@@ -125,6 +114,7 @@ interface MatchDbRow {
   away_score: number | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
   live_clock: string | null;
+  goals: MatchGoal[] | null;
 }
 
 // Converte uma linha da tabela `matches` do Supabase para o formato do app
@@ -155,6 +145,7 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     winner: r.winner ?? null,
     isLive: ['IN_PLAY', 'PAUSED', 'LIVE', 'EXTRA_TIME', 'PENALTY_SHOOTOUT'].includes(r.status?.toUpperCase() || ''),
     liveClock: r.live_clock ?? null,
+    goals: r.goals ?? [],
   };
 };
 
@@ -501,7 +492,7 @@ function App() {
         supabase
           .from('matches')
           .select(
-            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock'
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock, goals'
           )
           .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id'),
@@ -899,10 +890,14 @@ function App() {
       const own = betByMatchUser.get(`${m.id}|${currentUser.id}`);
       const draft = displayDrafts[m.id];
       if (!draft) return false;
+      // Trocar só o artilheiro (jogos do Brasil) já habilita relançar
+      if (isBrazilMatch(m) && (displayScorers[m.id] || null) !== (own?.scorerId || null)) {
+        return true;
+      }
       if (!own) return draft.homeScore.trim() !== '' || draft.awayScore.trim() !== '';
       return draft.homeScore !== String(own.homeScore) || draft.awayScore !== String(own.awayScore);
     });
-  }, [playableMatches, betByMatchUser, displayDrafts, currentUser]);
+  }, [playableMatches, betByMatchUser, displayDrafts, displayScorers, currentUser]);
 
   // Ao cruzar um kickoff, recarrega os dados para atualizar o estado do jogo.
   useEffect(() => {
@@ -1572,7 +1567,7 @@ function App() {
                                 <div className={`scorer-picker-content-wrapper ${isExpanded ? 'expanded' : ''}`}>
                                   <div className="scorer-picker-content-inner">
                                     <div className="scorer-picker-subtitle">
-                                      Acerte o artilheiro e ganhe <b>+1 ponto extra</b>
+                                      Acerte o artilheiro e ganhe <b>+1 ponto por gol dele</b>
                                     </div>
                                     <div className="scorer-picker-grid">
                                       {BRAZIL_PLAYERS.map((player) => {

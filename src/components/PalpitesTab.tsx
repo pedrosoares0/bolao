@@ -15,17 +15,7 @@ import {
   SPECIAL_POINTS,
 } from '../utils/specials';
 import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
-
-const BRAZIL_PLAYERS = [
-  { id: 'vinijr', name: 'Vini Jr', img: 'https://img.sofascore.com/api/v1/player/868812/image' },
-  { id: 'paqueta', name: 'Paquetá', img: 'https://img.sofascore.com/api/v1/player/839981/image' },
-  { id: 'raphinha', name: 'Raphinha', img: 'https://img.sofascore.com/api/v1/player/831005/image' },
-  { id: 'igorthiago', name: 'Igor Thiago', img: 'https://img.sofascore.com/api/v1/player/1016907/image' },
-  { id: 'endrick', name: 'Endrick', img: 'https://img.sofascore.com/api/v1/player/1174937/image' },
-  { id: 'matheuscunha', name: 'M. Cunha', img: 'https://img.sofascore.com/api/v1/player/886363/image' },
-  { id: 'rayan', name: 'Rayan', img: 'https://img.sofascore.com/api/v1/player/1464966/image' },
-  { id: 'luizhenrique', name: 'L. Henrique', img: 'https://img.sofascore.com/api/v1/player/1035995/image' },
-] as const;
+import { BRAZIL_PLAYERS } from '../utils/players';
 
 interface PalpitesTabProps {
   matches: Match[];
@@ -285,6 +275,7 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                               <img
                                 src={player.img}
                                 alt={player.name}
+                                referrerPolicy="no-referrer"
                                 style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255, 255, 255, 0.2)' }}
                               />
                               <span className="history-bet-value" style={{ color: '#F2ECDD' }}>

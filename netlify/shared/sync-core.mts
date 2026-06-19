@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { runNotifications } from './notify-core.mts';
 import { fetchEspnOverrides, norm, pairKey } from './espn-core.mts';
 import type { EspnGoalDetail } from './espn-core.mts';
@@ -62,6 +62,22 @@ function toDbRow(r: MatchUpsertRow) {
   delete dbRow.awayTeamId;
   delete dbRow.goalsDetail;
   return dbRow;
+}
+
+// Persiste os autores dos gols (coluna matches.goals jsonb) para pontuar o
+// palpite de artilheiro. SÓ grava quando a ESPN trouxe gols — nunca limpa a
+// coluna com [] (a ESPN para de listar o jogo após o dia, então um jogo antigo
+// não pode perder os gols já salvos). Best-effort: não derruba a sincronização.
+async function persistGoals(
+  supabase: SupabaseClient,
+  rows: { id: number; goalsDetail?: EspnGoalDetail[] }[]
+): Promise<void> {
+  const goalRows = rows
+    .filter((r) => r.goalsDetail && r.goalsDetail.length > 0)
+    .map((r) => ({ id: r.id, goals: r.goalsDetail! }));
+  if (goalRows.length === 0) return;
+  const { error } = await supabase.from('matches').upsert(goalRows);
+  if (error) console.error('Erro ao gravar gols (artilheiro):', error.message);
 }
 
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
@@ -134,6 +150,9 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     // upsert quebraria assim que a ESPN aplicasse overrides (jogo ao vivo).
     const { error } = await supabase.from('matches').upsert(mergedRows.map(toDbRow));
     if (error) throw new Error(`Erro ao gravar partidas no Supabase: ${error.message}`);
+
+    // Autores dos gols (artilheiro) — gravados à parte, só quando há gols.
+    await persistGoals(supabase, mergedRows);
 
     // Notificações são best-effort: nunca derrubam a sincronização.
     try {
@@ -302,6 +321,9 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
 
   const { error } = await supabase.from('matches').upsert(dbUpdates);
   if (error) throw new Error(`Erro ao gravar ao vivo no Supabase: ${error.message}`);
+
+  // Autores dos gols (artilheiro) — gravados à parte, só quando há gols.
+  await persistGoals(supabase, updates);
 
   try {
     await runNotifications(supabase, prevById, updates);

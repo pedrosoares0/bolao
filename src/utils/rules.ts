@@ -1,5 +1,14 @@
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction } from '../types';
 import { computeChampion, computeBrazilStage, SPECIAL_POINTS } from './specials';
+import { goalsByPlayer } from './players';
+
+// Pontos extras do palpite de artilheiro: +1 por GOL marcado pelo jogador
+// escolhido (gol contra não conta). Só faz sentido em jogo com placar conhecido.
+export function scorerBonus(bet: Bet | undefined, match: Match): number {
+  if (!bet?.scorerId) return 0;
+  if (match.homeScore === null || match.awayScore === null) return 0;
+  return goalsByPlayer(match.goals, bet.scorerId);
+}
 
 export type BetResultType = 'exact' | 'draw' | 'winner' | 'wrong' | 'pending';
 
@@ -77,9 +86,12 @@ export function calculateStandings(
       if ((match.status === 'finished' || match.isLive) && match.homeScore !== null && match.awayScore !== null) {
         totalBets++;
         const analysis = analyzeBet(bet, match);
-        
+
         points += analysis.points;
-        
+        // Bônus do artilheiro: +1 por gol do jogador escolhido (jogos do Brasil).
+        // Não altera o "type" do palpite (profeta/on fire seguem só pelo placar).
+        points += scorerBonus(bet, match);
+
         if (analysis.type === 'exact') exactScoreCount++;
         else if (analysis.type === 'draw') correctDrawCount++;
         else if (analysis.type === 'winner') correctWinnerCount++;

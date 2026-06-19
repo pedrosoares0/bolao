@@ -11,6 +11,15 @@ export interface Participant {
 
 export type MatchStatus = 'scheduled' | 'finished';
 
+// Autor de um gol no jogo (vindo da ESPN, persistido na coluna matches.goals).
+// Usado para pontuar o palpite de artilheiro (ver utils/players.goalsByPlayer).
+export interface MatchGoal {
+  teamId?: string;
+  scorer: string; // nome do autor como a ESPN reporta
+  minute?: string;
+  ownGoal?: boolean;
+}
+
 export interface Match {
   id: string;
   homeTeam: string; // Ex: 'África do Sul'
@@ -33,6 +42,7 @@ export interface Match {
   winner?: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // decide pênaltis no mata-mata
   isLive?: boolean;
   liveClock?: string | null; // minuto/etapa ao vivo vindo da ESPN (ex.: "28'", "HT")
+  goals?: MatchGoal[]; // autores dos gols (para pontuar o artilheiro)
 }
 
 // Estágios possíveis para o palpite "até onde o Brasil vai"
