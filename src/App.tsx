@@ -1472,7 +1472,7 @@ function App() {
                                     <ArrowUp size={26} />
                                   </button>
                                   <div className="score-stepper-value">
-                                    {displayDrafts[match.id]?.homeScore || '0'}
+                                    {displayDrafts[match.id]?.homeScore || '-'}
                                   </div>
                                   <button
                                     type="button"
@@ -1503,7 +1503,7 @@ function App() {
                                     <ArrowUp size={26} />
                                   </button>
                                   <div className="score-stepper-value">
-                                    {displayDrafts[match.id]?.awayScore || '0'}
+                                    {displayDrafts[match.id]?.awayScore || '-'}
                                   </div>
                                   <button
                                     type="button"
