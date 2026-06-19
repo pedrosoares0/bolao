@@ -878,14 +878,13 @@ function App() {
     return activeDateMatches.filter((m) => m.status === 'scheduled' && isBettable(m.kickoff, nowTs));
   }, [activeDateMatches, selectedDate, nowTs]);
 
-  // Verifica se todos os palpites das partidas jogáveis de hoje foram preenchidos
-  const areAllPredictionsFilled = useMemo(() => {
-    if (playableMatches.length === 0) return false;
-    return playableMatches.every((m) => {
-      const draft = displayDrafts[m.id];
-      return draft && draft.homeScore.trim() !== '' && draft.awayScore.trim() !== '';
-    });
-  }, [playableMatches, displayDrafts]);
+  // Habilita o lançamento sempre que houver jogos jogáveis na rodada. Todo jogo
+  // começa valendo 0×0 (o placar exibido no stepper é o palpite real), então não
+  // exigimos toque em cada um — o usuário só ajusta os que quer diferente de zero.
+  const areAllPredictionsFilled = useMemo(
+    () => playableMatches.length > 0,
+    [playableMatches]
+  );
 
   // Verifica se a aposta já foi lançada para o dia selecionado
   const isSubmittedForSelectedDate = useMemo(() => {
@@ -994,12 +993,13 @@ function App() {
     }
 
     const payload = playableMatches.map((m) => {
-      const draft = displayDrafts[m.id];
+      const draft = displayDrafts[m.id] ?? { homeScore: '0', awayScore: '0' };
       const scorerId = isBrazilMatch(m) ? displayScorers[m.id] || null : null;
+      // Palpite não tocado vale 0 (o stepper já exibe 0 e nunca fica abaixo disso)
       return {
         match_id: Number(m.id),
-        home_score: parseInt(draft.homeScore, 10),
-        away_score: parseInt(draft.awayScore, 10),
+        home_score: parseInt(draft.homeScore || '0', 10),
+        away_score: parseInt(draft.awayScore || '0', 10),
         scorer_id: scorerId,
       };
     });
@@ -1472,7 +1472,7 @@ function App() {
                                     <ArrowUp size={26} />
                                   </button>
                                   <div className="score-stepper-value">
-                                    {displayDrafts[match.id]?.homeScore || '-'}
+                                    {displayDrafts[match.id]?.homeScore || '0'}
                                   </div>
                                   <button
                                     type="button"
@@ -1503,7 +1503,7 @@ function App() {
                                     <ArrowUp size={26} />
                                   </button>
                                   <div className="score-stepper-value">
-                                    {displayDrafts[match.id]?.awayScore || '-'}
+                                    {displayDrafts[match.id]?.awayScore || '0'}
                                   </div>
                                   <button
                                     type="button"
