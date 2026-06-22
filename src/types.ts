@@ -74,7 +74,8 @@ export interface ParticipantStanding {
   participantId: string;
   name: string;
   avatarUrl: string;
-  points: number;
+  points: number; // total (placar + artilheiro + especiais)
+  scorerPoints: number; // só o bônus de artilheiro (+1 por gol), para auditar
   exactScoreCount: number; // 3 pontos
   correctDrawCount: number; // 2 pontos
   correctWinnerCount: number; // 1 ponto

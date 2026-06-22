@@ -8,23 +8,10 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { Match } from '../types';
 import { flagSrc } from '../lib/teamMaps';
+import { computeGroupStandings, computeBestThirds } from '../utils/groups';
 
 interface BracketTabProps {
   matches: Match[];
-}
-
-// Linha da tabela de classificação de um grupo
-interface GroupRow {
-  en: string;       // nome em inglês (chave)
-  name: string;     // nome em português (exibição)
-  flag: string;     // código/URL da bandeira
-  played: number;   // jogos
-  won: number;
-  drawn: number;
-  lost: number;
-  gf: number;       // gols pró
-  ga: number;       // gols contra
-  pts: number;
 }
 
 const TBD = 'A definir';
@@ -59,54 +46,13 @@ function BracketTab({ matches }: BracketTabProps) {
   const toggleStage = (key: string) =>
     setOpenStages((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // ---- Classificação dos grupos ----
-  const groups = useMemo(() => {
-    const byGroup = new Map<string, Map<string, GroupRow>>();
+  // ---- Classificação dos grupos (com desempate por confronto direto) ----
+  const groups = useMemo(() => computeGroupStandings(matches), [matches]);
 
-    const ensureRow = (g: Map<string, GroupRow>, en: string, name: string, flag: string): GroupRow => {
-      let row = g.get(en);
-      if (!row) {
-        row = { en, name, flag, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 };
-        g.set(en, row);
-      }
-      return row;
-    };
-
-    matches
-      .filter((m) => m.stage === 'GROUP_STAGE' && m.group.startsWith('Grupo'))
-      .forEach((m) => {
-        if (!byGroup.has(m.group)) byGroup.set(m.group, new Map());
-        const g = byGroup.get(m.group)!;
-        // Registra os dois times mesmo sem jogo disputado (aparecem com zeros)
-        const home = ensureRow(g, m.homeTeamEn, m.homeTeam, m.homeFlag);
-        const away = ensureRow(g, m.awayTeamEn, m.awayTeam, m.awayFlag);
-        if (m.status !== 'finished' || m.homeScore === null || m.awayScore === null) return;
-
-        home.played++; away.played++;
-        home.gf += m.homeScore; home.ga += m.awayScore;
-        away.gf += m.awayScore; away.ga += m.homeScore;
-        if (m.homeScore > m.awayScore) {
-          home.won++; home.pts += 3; away.lost++;
-        } else if (m.awayScore > m.homeScore) {
-          away.won++; away.pts += 3; home.lost++;
-        } else {
-          home.drawn++; away.drawn++; home.pts++; away.pts++;
-        }
-      });
-
-    return Array.from(byGroup.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], 'pt'))
-      .map(([label, rowsMap]) => {
-        const rows = Array.from(rowsMap.values()).sort((x, y) => {
-          if (y.pts !== x.pts) return y.pts - x.pts;
-          const sgX = x.gf - x.ga, sgY = y.gf - y.ga;
-          if (sgY !== sgX) return sgY - sgX;
-          if (y.gf !== x.gf) return y.gf - x.gf;
-          return x.name.localeCompare(y.name, 'pt');
-        });
-        return { label, rows };
-      });
-  }, [matches]);
+  // ---- Melhores terceiros (8 vagas na Copa 2026) ----
+  const bestThirds = useMemo(() => computeBestThirds(groups), [groups]);
+  // Só mostra quando já há terceiros que jogaram (senão é uma lista de zeros).
+  const showThirds = bestThirds.some((t) => t.played > 0);
 
   // ---- Mata-mata por fase ----
   const knockout = useMemo(() => {
@@ -187,6 +133,50 @@ function BracketTab({ matches }: BracketTabProps) {
               </div>
             </div>
           ))}
+
+          {/* MELHORES TERCEIROS — 8 vagas (Copa 2026) */}
+          {showThirds && (
+            <div className="brk-group-card brk-thirds-card">
+              <div className="brk-group-title">Melhores Terceiros</div>
+              <div className="brk-thirds-sub">As 8 melhores seleções em 3º lugar avançam.</div>
+              <div className="brk-table">
+                <div className="brk-table-head">
+                  <span className="brk-col-team">Time</span>
+                  <span className="brk-col-stat">P</span>
+                  <span className="brk-col-stat">V</span>
+                  <span className="brk-col-stat">E</span>
+                  <span className="brk-col-stat">D</span>
+                  <span className="brk-col-stat">SG</span>
+                  <span className="brk-col-pts">Pts</span>
+                </div>
+                {bestThirds.map((t, i) => {
+                  const tsg = t.gf - t.ga;
+                  return (
+                    <div key={t.en} className={`brk-table-row ${t.qualified ? 'qualified' : 'eliminated'}`}>
+                      <span className="brk-col-team">
+                        <span className="brk-pos">{i + 1}</span>
+                        <img
+                          loading="lazy" decoding="async"
+                          src={flagSrc(t.flag, 40)}
+                          alt={t.name}
+                          className="brk-flag"
+                          onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
+                        />
+                        <span className="brk-team-name">{t.name}</span>
+                        <span className="brk-thirds-group">{t.group.replace('Grupo ', '')}</span>
+                      </span>
+                      <span className="brk-col-stat">{t.played}</span>
+                      <span className="brk-col-stat">{t.won}</span>
+                      <span className="brk-col-stat">{t.drawn}</span>
+                      <span className="brk-col-stat">{t.lost}</span>
+                      <span className="brk-col-stat">{tsg > 0 ? `+${tsg}` : tsg}</span>
+                      <span className="brk-col-pts">{t.pts}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -215,7 +205,7 @@ function BracketTab({ matches }: BracketTabProps) {
                   const win = winnerSide(m);
                   const finished = m.status === 'finished';
                   return (
-                    <div key={m.id} className="brk-match">
+                    <div key={m.id} className={`brk-match ${finished ? 'finished' : ''}`}>
                       <div className={`brk-match-team ${win === 'home' ? 'win' : win === 'away' ? 'lose' : ''}`}>
                         <img
                           loading="lazy" decoding="async"
@@ -225,6 +215,7 @@ function BracketTab({ matches }: BracketTabProps) {
                           onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
                         />
                         <span className="brk-team-name">{isTbd(m.homeTeamEn) ? TBD : m.homeTeam}</span>
+                        {win === 'home' && <span className="brk-win-check">✓</span>}
                         <span className="brk-match-score">
                           {finished && m.homeScore !== null ? m.homeScore : '-'}
                         </span>
@@ -238,6 +229,7 @@ function BracketTab({ matches }: BracketTabProps) {
                           onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
                         />
                         <span className="brk-team-name">{isTbd(m.awayTeamEn) ? TBD : m.awayTeam}</span>
+                        {win === 'away' && <span className="brk-win-check">✓</span>}
                         <span className="brk-match-score">
                           {finished && m.awayScore !== null ? m.awayScore : '-'}
                         </span>

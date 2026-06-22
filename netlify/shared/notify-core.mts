@@ -18,6 +18,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EspnGoalDetail } from './espn-core.mts';
+import { countScorerGoals, scorerName } from './scorer-core.mts';
 
 // ---- Linha crua da tabela `matches` (o que sync-core monta) ----
 interface MatchRow {
@@ -135,7 +136,7 @@ const dmFromIso = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 // ============================================================
 
 type ResultType = 'exact' | 'draw' | 'winner' | 'wrong' | 'pending';
-interface BetRow { user_id: string; match_id?: number; home_score: number; away_score: number; }
+interface BetRow { user_id: string; match_id?: number; home_score: number; away_score: number; scorer_id?: string | null; }
 
 const analyze = (bet: BetRow | undefined, m: MatchRow): { points: number; type: ResultType } => {
   if (!bet || m.home_score === null || m.away_score === null) return { points: 0, type: 'pending' };
@@ -255,9 +256,27 @@ const msgGoalAnnulled = (m: MatchRow, sideTeamEn: string): string =>
     scoreLine(m),
   ].join('\n');
 
-const msgEnd = (m: MatchRow, scorers: { name: string; points: number; type: ResultType }[]): string => {
+interface ScorerLine {
+  name: string;
+  points: number;      // pontos do PLACAR
+  type: ResultType;
+  scorerGoals: number; // gols do artilheiro escolhido (+1 cada)
+  scorerLabel: string | null; // nome do artilheiro escolhido
+  total: number;       // placar + artilheiro
+}
+
+const msgEnd = (m: MatchRow, scorers: ScorerLine[]): string => {
+  const lineFor = (s: ScorerLine): string => {
+    const partes: string[] = [];
+    if (s.points > 0) partes.push(`${typeLabel[s.type] || ''} +${s.points}`);
+    if (s.scorerGoals > 0) {
+      const golTxt = s.scorerGoals === 1 ? 'gol' : 'gols';
+      partes.push(`⚽ ${s.scorerLabel ?? 'artilheiro'} ${s.scorerGoals} ${golTxt} +${s.scorerGoals}`);
+    }
+    return `• *${s.name}*  +${s.total}  (${partes.join(', ')})`;
+  };
   const bloco = scorers.length
-    ? ['🎯 *Pontuou nesse jogo:*', ...scorers.map((s) => `• *${s.name}*  +${s.points}  (${typeLabel[s.type] || ''})`)].join('\n')
+    ? ['🎯 *Pontuou nesse jogo:*', ...scorers.map(lineFor)].join('\n')
     : '😬 Ninguém pontuou nesse jogo.';
   return ['🔴 *FIM DE JOGO*', '', scoreLine(m), '', bloco].join('\n');
 };
@@ -397,15 +416,24 @@ export async function runNotifications(
     if (m.status === 'FINISHED' && prev.status !== 'FINISHED') {
       const { data: betRows } = await supabase
         .from('bets')
-        .select('user_id, home_score, away_score')
+        .select('user_id, home_score, away_score, scorer_id')
         .eq('match_id', m.id);
       const scorers = ((betRows ?? []) as BetRow[])
         .map((b) => {
           const a = analyze(b, m);
-          return { name: nameByUid.get(b.user_id) || '??', points: a.points, type: a.type };
+          // Bônus do artilheiro: +1 por gol do jogador escolhido (jogos do Brasil).
+          const scorerGoals = countScorerGoals(m.goalsDetail, b.scorer_id);
+          return {
+            name: nameByUid.get(b.user_id) || '??',
+            points: a.points,
+            type: a.type,
+            scorerGoals,
+            scorerLabel: scorerGoals > 0 ? scorerName(b.scorer_id) : null,
+            total: a.points + scorerGoals,
+          };
         })
-        .filter((s) => s.points > 0)
-        .sort((a, b) => b.points - a.points);
+        .filter((s) => s.total > 0)
+        .sort((a, b) => b.total - a.total);
       await sendOnce(supabase, `end:${m.id}`, msgEnd(m, scorers));
       finishedDatesTouched.add(isoDateOf(m.utc_date));
     }
@@ -419,15 +447,33 @@ export async function runNotifications(
     const key = `dayfinal:${iso}`;
     if (!(await reserve(supabase, key))) continue;
 
-    // todas as apostas (para somar rodada + geral)
-    const { data: allBets } = await supabase.from('bets').select('user_id, match_id, home_score, away_score');
+    // todas as apostas (para somar rodada + geral) — inclui o artilheiro escolhido
+    const { data: allBets } = await supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id');
     const betsByKey = new Map<string, BetRow>();
     ((allBets ?? []) as BetRow[]).forEach((b) => betsByKey.set(`${b.user_id}_${b.match_id}`, b));
 
     const finishedAll = rows.filter((r) => r.status === 'FINISHED');
 
+    // Gols de cada jogo (persistidos em matches.goals) para o bônus de artilheiro.
+    // Buscamos do banco: os `rows` deste ciclo só trazem goalsDetail dos jogos que
+    // a ESPN tocou agora — a pontuação geral precisa de todos os jogos encerrados.
+    const { data: goalRows } = await supabase
+      .from('matches')
+      .select('id, goals')
+      .in('id', finishedAll.map((r) => r.id));
+    const goalsByMatch = new Map<number, { scorer: string; ownGoal?: boolean }[]>();
+    ((goalRows ?? []) as { id: number; goals: { scorer: string; ownGoal?: boolean }[] | null }[])
+      .forEach((g) => goalsByMatch.set(g.id, g.goals ?? []));
+
+    // Total = pontos do placar + bônus de artilheiro (+1 por gol). Some o saldo;
+    // a mensagem mostra só o total final, sem separar o bônus.
     const sumFor = (uid: string, matches: MatchRow[]) =>
-      matches.reduce((acc, mm) => acc + analyze(betsByKey.get(`${uid}_${mm.id}`), mm).points, 0);
+      matches.reduce((acc, mm) => {
+        const bet = betsByKey.get(`${uid}_${mm.id}`);
+        const placar = analyze(bet, mm).points;
+        const bonus = countScorerGoals(goalsByMatch.get(mm.id), bet?.scorer_id);
+        return acc + placar + bonus;
+      }, 0);
 
     const dayScores = participants
       .map((p) => ({ name: p.name, points: sumFor(p.id, dayMatches) }))

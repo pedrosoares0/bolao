@@ -80,6 +80,91 @@ async function persistGoals(
   if (error) console.error('Erro ao gravar gols (artilheiro):', error.message);
 }
 
+// YYYYMMDD (UTC) para o parâmetro ?dates= da ESPN
+const ymdKey = (utc: string): string => utc.slice(0, 10).replace(/-/g, '');
+// YYYY-MM-DD (UTC) do dia anterior — a ESPN guarda jogos de madrugada (UTC)
+// no bucket do dia anterior (fuso US), então buscamos os dois dias.
+const prevYmdKey = (utc: string): string => {
+  const d = new Date(`${utc.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+};
+
+// Recupera os autores dos gols de jogos JÁ ENCERRADOS cujo `goals` ficou nulo
+// (o live-loop não capturou o gol na hora e a ESPN parou de listar o jogo no
+// scoreboard "de hoje"). Busca a ESPN por data (dia do kickoff + o anterior,
+// p/ jogos de madrugada) e grava só quando casa o confronto e a data UTC.
+// Best-effort e throttled (~15 min) — não derruba a sincronização.
+const GOALS_BACKFILL_THROTTLE_MS = 15 * 60 * 1000;
+const GOALS_BACKFILL_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000; // só jogos dos últimos 7 dias
+
+export async function backfillMissingGoals(
+  supabase: SupabaseClient,
+  force = false
+): Promise<{ skipped: boolean; filled?: number; reason?: string }> {
+  if (!force) {
+    const { data: state } = await supabase
+      .from('sync_state')
+      .select('last_goals_backfill')
+      .eq('id', 1)
+      .single();
+    const last = state?.last_goals_backfill ? new Date(state.last_goals_backfill).getTime() : 0;
+    if (Date.now() - last < GOALS_BACKFILL_THROTTLE_MS) {
+      return { skipped: true, reason: 'Backfill de gols feito há pouco.' };
+    }
+  }
+  // Marca o tempo já aqui (mesmo sem nada a fazer) para o throttle valer.
+  await supabase.from('sync_state').upsert({ id: 1, last_goals_backfill: new Date().toISOString() });
+
+  const sinceIso = new Date(Date.now() - GOALS_BACKFILL_LOOKBACK_MS).toISOString();
+  const { data: missing } = await supabase
+    .from('matches')
+    .select('id, utc_date, home_team, away_team')
+    .eq('status', 'FINISHED')
+    .is('goals', null)
+    .gte('utc_date', sinceIso);
+  if (!missing || missing.length === 0) return { skipped: false, filled: 0 };
+
+  // Datas a consultar na ESPN (dia do kickoff + dia anterior), sem repetir.
+  const dateKeys = new Set<string>();
+  for (const m of missing as { utc_date: string }[]) {
+    dateKeys.add(ymdKey(m.utc_date));
+    dateKeys.add(prevYmdKey(m.utc_date));
+  }
+
+  // Overrides da ESPN por confronto (mantém o que tiver gols).
+  const byPair = new Map<string, { dateIso: string; goalsDetail: EspnGoalDetail[] }>();
+  for (const dk of dateKeys) {
+    try {
+      const ov = await fetchEspnOverrides(dk);
+      ov.forEach((v, k) => {
+        if (v.goalsDetail && v.goalsDetail.length > 0 && !byPair.has(k)) {
+          byPair.set(k, { dateIso: v.dateIso, goalsDetail: v.goalsDetail });
+        }
+      });
+    } catch (err) {
+      console.warn(`Backfill: ESPN falhou para ${dk}:`, err);
+    }
+  }
+
+  const goalRows: { id: number; goals: EspnGoalDetail[] }[] = [];
+  for (const m of missing as { id: number; utc_date: string; home_team: string; away_team: string }[]) {
+    const ov = byPair.get(pairKey(m.home_team, m.away_team));
+    // Confere a data UTC do jogo (evita casar um confronto que se repete).
+    if (!ov || ov.dateIso !== m.utc_date.slice(0, 10)) continue;
+    goalRows.push({ id: m.id, goals: ov.goalsDetail });
+  }
+  if (goalRows.length === 0) return { skipped: false, filled: 0 };
+
+  const { error } = await supabase.from('matches').upsert(goalRows);
+  if (error) {
+    console.error('Backfill: erro ao gravar gols:', error.message);
+    return { skipped: false, filled: 0 };
+  }
+  console.log(`Backfill: gols recuperados em ${goalRows.length} jogo(s).`);
+  return { skipped: false, filled: goalRows.length };
+}
+
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
 // e grava/atualiza na tabela `matches` do Supabase usando a service_role.
 // Throttle: se sincronizou há menos de 30 segundos, pula (limite free: 10 req/min).
@@ -163,6 +248,14 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
   }
 
   await supabase.from('sync_state').upsert({ id: 1, last_sync: new Date().toISOString() });
+
+  // Recupera gols faltantes de jogos encerrados (throttle próprio ~15 min).
+  // Best-effort: nunca derruba a sincronização.
+  try {
+    await backfillMissingGoals(supabase);
+  } catch (err) {
+    console.error('Falha no backfill de gols:', err);
+  }
 
   return { skipped: false, count: mergedRows.length };
 }

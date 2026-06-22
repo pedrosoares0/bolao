@@ -83,9 +83,13 @@ export const pairKey = (teamA: string, teamB: string): string =>
 // Busca o scoreboard da Copa na ESPN e devolve os overrides (só jogos ao vivo
 // ou encerrados), indexados pela chave do confronto. Lança erro se a ESPN
 // falhar — quem chama trata como "sem ESPN" e segue no football-data.
-export async function fetchEspnOverrides(): Promise<Map<string, EspnOverride>> {
+export async function fetchEspnOverrides(dateKey?: string): Promise<Map<string, EspnOverride>> {
+  // Sem dateKey: scoreboard do dia (ao vivo). Com dateKey (AAAAMMDD): os jogos
+  // daquele dia — usado pelo backfill de gols de jogos já encerrados, que a
+  // ESPN não lista mais no scoreboard "de hoje".
+  const base = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
   const res = await fetch(
-    'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
+    dateKey ? `${base}?dates=${dateKey}` : base,
     { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BolaoBandidos/1.0)' } }
   );
   if (!res.ok) throw new Error(`ESPN respondeu ${res.status}`);

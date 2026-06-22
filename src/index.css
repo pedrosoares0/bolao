@@ -4372,6 +4372,20 @@ body {
   max-width: 100% !important;
 }
 
+/* Selo do bônus de artilheiro no ranking (+1 por gol do jogador escolhido) */
+.standing-row-scorer-bonus {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #15110E;
+  background: linear-gradient(90deg, #fedf00, #f5b300);
+  border-radius: 9999px;
+  padding: 0.08rem 0.4rem;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(245, 179, 0, 0.4);
+}
+
 /* Medalha de fogo posicionada como expoente no topo-direito do nome */
 .standing-name-with-rank .fire-medal-badge,
 .podium-name-with-rank .fire-medal-badge {
@@ -5827,6 +5841,33 @@ body {
   border-radius: 8px;
 }
 
+.brk-table-row.eliminated {
+  opacity: 0.5;
+}
+
+/* ---- Melhores terceiros ---- */
+.brk-thirds-card {
+  border: 1px solid rgba(245, 179, 0, 0.45);
+}
+
+.brk-thirds-sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(21, 17, 14, 0.6);
+  margin: -0.3rem 0 0.6rem 0;
+}
+
+.brk-thirds-group {
+  margin-left: 0.3rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: rgba(21, 17, 14, 0.55);
+  background: rgba(21, 17, 14, 0.08);
+  border-radius: 9999px;
+  padding: 0.05rem 0.35rem;
+  flex-shrink: 0;
+}
+
 .brk-col-team {
   display: flex;
   align-items: center;
@@ -5930,12 +5971,25 @@ body {
   gap: 0.7rem;
 }
 
+.brk-win-check {
+  flex-shrink: 0;
+  font-weight: 900;
+  font-size: 0.85rem;
+  color: var(--primary);
+  margin-left: 0.2rem;
+}
+
 .brk-match {
   background-color: #FAFBF7;
   border: 1px solid rgba(21, 17, 14, 0.10);
+  border-left: 3px solid rgba(21, 17, 14, 0.10);
   border-radius: 14px;
   padding: 0.7rem 0.85rem 0.45rem 0.85rem;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.brk-match.finished {
+  border-left-color: var(--primary);
 }
 
 .brk-match-team {

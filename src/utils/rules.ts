@@ -73,6 +73,7 @@ export function calculateStandings(
 
   const standings: ParticipantStanding[] = participants.map((p) => {
     let points = 0;
+    let scorerPoints = 0;
     let exactScoreCount = 0;
     let correctDrawCount = 0;
     let correctWinnerCount = 0;
@@ -90,7 +91,10 @@ export function calculateStandings(
         points += analysis.points;
         // Bônus do artilheiro: +1 por gol do jogador escolhido (jogos do Brasil).
         // Não altera o "type" do palpite (profeta/on fire seguem só pelo placar).
-        points += scorerBonus(bet, match);
+        // Contabilizado à parte (scorerPoints) para poder auditar/exibir separado.
+        const bonus = scorerBonus(bet, match);
+        points += bonus;
+        scorerPoints += bonus;
 
         if (analysis.type === 'exact') exactScoreCount++;
         else if (analysis.type === 'draw') correctDrawCount++;
@@ -111,6 +115,7 @@ export function calculateStandings(
       name: p.name,
       avatarUrl: p.avatarUrl,
       points,
+      scorerPoints,
       exactScoreCount,
       correctDrawCount,
       correctWinnerCount,
