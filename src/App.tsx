@@ -13,9 +13,9 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Fragment } from 'react';
-import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal } from './types';
-import { BRAZIL_PLAYERS } from './utils/players';
+import { BRAZIL_PLAYERS, goalsByPlayer } from './utils/players';
 import { calculateStandings, analyzeBet } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
@@ -24,6 +24,7 @@ const StandingsTable = lazy(() => import('./components/StandingsTable'));
 const PixTab = lazy(() => import('./components/PixTab'));
 const PalpitesTab = lazy(() => import('./components/PalpitesTab'));
 const ProfileTab = lazy(() => import('./components/ProfileTab'));
+const BracketTab = lazy(() => import('./components/BracketTab'));
 import { PixKeyRow, PIX_RECIPIENT, PIX_BANK } from './components/PixKeyCopy';
 import { supabase } from './lib/supabase';
 import { translateTeam, mapFifaCode, flagOf, groupLabel, flagSrc, getTeamColors } from './lib/teamMaps';
@@ -359,9 +360,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado da Navegação Principal (Abas da bottom bar)
-  const [activeTab, setActiveTab] = useState<'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil'>('jogos');
+  const [activeTab, setActiveTab] = useState<'jogos' | 'chaveamento' | 'palpites' | 'ranking' | 'pix' | 'perfil'>('jogos');
 
-  const switchTab = (tab: 'jogos' | 'palpites' | 'ranking' | 'pix' | 'perfil') => {
+  const switchTab = (tab: 'jogos' | 'chaveamento' | 'palpites' | 'ranking' | 'pix' | 'perfil') => {
     setActiveTab(tab);
   };
 
@@ -1731,6 +1732,12 @@ function App() {
                                       : null))
                                   : null;
 
+                                // Gols do artilheiro escolhido neste jogo (+1 ponto cada).
+                                // Só conta com o jogo já em andamento/encerrado (placar conhecido).
+                                const scorerGoals = pickedPlayer && (isFinished || match.isLive)
+                                  ? goalsByPlayer(match.goals, pickedPlayer.id)
+                                  : 0;
+
                                 return (
                                   <div key={p.id} className="inline-guess-row-p16">
                                     <div className="inline-guess-user-info-p16">
@@ -1795,6 +1802,14 @@ function App() {
                                       <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
                                         {pointsText}
                                       </div>
+                                      {scorerGoals > 0 && pickedPlayer && (
+                                        <div
+                                          className="inline-guess-scorer-badge"
+                                          title={`${pickedPlayer.name} marcou ${scorerGoals} ${scorerGoals === 1 ? 'gol' : 'gols'} — +${scorerGoals} ${scorerGoals === 1 ? 'ponto' : 'pontos'}`}
+                                        >
+                                          ⚽ {pickedPlayer.name} +{scorerGoals}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -1858,6 +1873,13 @@ function App() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* ABA: CHAVEAMENTO (grupos + mata-mata) */}
+        {activeTab === 'chaveamento' && (
+          <Suspense fallback={tabFallback}>
+            <BracketTab matches={matches} />
+          </Suspense>
         )}
 
         {/* ABA: PALPITES (especiais + histórico pessoal) */}
@@ -1939,6 +1961,14 @@ function App() {
           aria-label="Partidas"
         >
           <Calendar size={24} />
+        </button>
+        <button
+          className={`nav-item ${activeTab === 'chaveamento' ? 'active' : ''}`}
+          onClick={() => switchTab('chaveamento')}
+          title="Chaveamento"
+          aria-label="Chaveamento"
+        >
+          <Network size={24} />
         </button>
         <button
           className={`nav-item ${activeTab === 'palpites' ? 'active' : ''}`}

@@ -979,7 +979,9 @@ body {
 .inline-guess-result-info-p16 {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
 }
 
 .inline-guess-scores-container-p16 {
@@ -1041,6 +1043,23 @@ body {
 
 .inline-guess-badge-p16.pending {
   background-color: #94a3b8; /* Cinza pendente */
+}
+
+/* Selo do bônus de artilheiro: jogador escolhido marcou (+1 por gol) */
+.inline-guess-scorer-badge {
+  font-family: var(--font-family);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.22rem 0.55rem;
+  border-radius: 9999px;
+  color: #15110E;
+  background: linear-gradient(90deg, #fedf00, #f5b300);
+  border: 1px solid rgba(21, 17, 14, 0.18);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  box-shadow: 0 2px 6px rgba(245, 179, 0, 0.35);
 }
 
 /* ==========================================================================
@@ -5694,3 +5713,267 @@ body {
 }
 
 
+
+/* ============================================= */
+/* ABA CHAVEAMENTO (grupos + mata-mata)          */
+/* ============================================= */
+.brk-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 1rem 1rem 1rem;
+}
+
+.brk-page-title {
+  font-family: var(--font-family-condensed);
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  color: var(--text-white);
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.brk-toggle {
+  display: flex;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 9999px;
+  padding: 0.3rem;
+}
+
+.brk-toggle-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.55rem 0;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.brk-toggle-btn.active {
+  background: var(--accent-gold);
+  color: #15110E;
+}
+
+.brk-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+}
+
+/* ---- Grupos ---- */
+.brk-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.brk-group-card {
+  background-color: #F2ECDD;
+  border-radius: 1.25rem;
+  padding: 0.9rem 1rem 1rem 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.brk-group-title {
+  font-family: var(--font-family-condensed);
+  font-size: 1.3rem;
+  letter-spacing: 0.03em;
+  color: #15110E;
+  margin-bottom: 0.6rem;
+}
+
+.brk-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.brk-table-head,
+.brk-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4rem 1.4rem 1.4rem 1.4rem 2rem 2rem;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.brk-table-head {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(21, 17, 14, 0.55);
+  padding: 0.2rem 0.3rem 0.4rem 0.3rem;
+  border-bottom: 1px solid rgba(21, 17, 14, 0.12);
+}
+
+.brk-table-row {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #15110E;
+  padding: 0.4rem 0.3rem;
+  border-bottom: 1px solid rgba(21, 17, 14, 0.07);
+}
+
+.brk-table-row:last-child {
+  border-bottom: none;
+}
+
+.brk-table-row.qualified {
+  background: linear-gradient(90deg, rgba(0, 156, 59, 0.14), rgba(0, 156, 59, 0));
+  border-radius: 8px;
+}
+
+.brk-col-team {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.brk-col-stat,
+.brk-col-pts {
+  text-align: center;
+}
+
+.brk-col-pts {
+  font-weight: 900;
+}
+
+.brk-pos {
+  width: 1.1rem;
+  text-align: center;
+  font-weight: 900;
+  color: rgba(21, 17, 14, 0.5);
+  flex-shrink: 0;
+}
+
+.brk-flag {
+  width: 22px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.brk-team-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Mata-mata ---- */
+.brk-knockout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.brk-stage-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-family-condensed);
+  font-size: 1.35rem;
+  letter-spacing: 0.03em;
+  color: var(--accent-gold);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(245, 179, 0, 0.25);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.brk-stage-title > span:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.brk-stage-title.open {
+  background: rgba(245, 179, 0, 0.12);
+}
+
+.brk-stage-count {
+  font-family: var(--font-family);
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #15110E;
+  background: var(--accent-gold);
+  border-radius: 9999px;
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0;
+}
+
+.brk-stage-games {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-top 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.brk-stage-games.open {
+  grid-template-rows: 1fr;
+  margin-top: 0.7rem;
+}
+
+.brk-stage-games-inner {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.brk-match {
+  background-color: #FAFBF7;
+  border: 1px solid rgba(21, 17, 14, 0.10);
+  border-radius: 14px;
+  padding: 0.7rem 0.85rem 0.45rem 0.85rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.brk-match-team {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.25rem 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #15110E;
+}
+
+.brk-match-team .brk-team-name {
+  flex: 1;
+}
+
+.brk-match-team.win {
+  color: var(--primary);
+  font-weight: 900;
+}
+
+.brk-match-team.lose {
+  opacity: 0.5;
+}
+
+.brk-match-score {
+  font-weight: 900;
+  font-size: 1.05rem;
+  min-width: 1.2rem;
+  text-align: right;
+}
+
+.brk-match-meta {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(21, 17, 14, 0.45);
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(21, 17, 14, 0.08);
+}
