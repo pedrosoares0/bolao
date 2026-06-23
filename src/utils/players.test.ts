@@ -57,7 +57,7 @@ describe('countScorerGoals (servidor) espelha goalsByPlayer (front)', () => {
 // (netlify/shared/scorer-core.mts) nunca saiam de sincronia.
 describe('paridade front × servidor', () => {
   const norm = (s: string): string =>
-    (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
   it('mesmos ids', () => {
     expect(BRAZIL_SCORERS.map((p) => p.id).sort()).toEqual(BRAZIL_PLAYERS.map((p) => p.id).sort());

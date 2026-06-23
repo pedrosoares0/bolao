@@ -3359,6 +3359,24 @@ body {
   }
 }
 
+/* Jogo em andamento/encerrado: borda do escolhido vira verde (marcou)
+   ou vermelha (não marcou), sem o pulse de seleção. */
+.scorer-player-img-wrapper.selected.scored {
+  border-color: #009739;
+  box-shadow:
+    0 0 0 3px rgba(0, 151, 57, 0.3),
+    0 4px 12px rgba(0, 151, 57, 0.25);
+  animation: none;
+}
+
+.scorer-player-img-wrapper.selected.missed {
+  border-color: #d62828;
+  box-shadow:
+    0 0 0 3px rgba(214, 40, 40, 0.3),
+    0 4px 12px rgba(214, 40, 40, 0.25);
+  animation: none;
+}
+
 .scorer-player-img {
   width: 100%;
   height: 100%;

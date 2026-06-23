@@ -1542,6 +1542,12 @@ function App() {
                               ? BRAZIL_PLAYERS.find((pl) => pl.id === selectedScorer) ?? null
                               : null;
                             const isExpanded = !!expandedScorers[match.id];
+                            // Com o jogo em andamento/encerrado, a borda do jogador
+                            // escolhido fica verde (marcou) ou vermelha (não marcou).
+                            const scorerResolved = (isFinished || isLiveGame) && !!selectedScorer;
+                            const selectedScored = scorerResolved
+                              ? goalsByPlayer(match.goals, selectedScorer) > 0
+                              : false;
 
                             return (
                               <div className="scorer-picker-container">
@@ -1590,7 +1596,7 @@ function App() {
                                             }}
                                             disabled={isLocked}
                                           >
-                                            <div className={`scorer-player-img-wrapper ${isSelected ? 'selected' : ''}`}>
+                                            <div className={`scorer-player-img-wrapper ${isSelected ? 'selected' : ''} ${isSelected && scorerResolved ? (selectedScored ? 'scored' : 'missed') : ''}`}>
                                               <img
                                                 loading="lazy"
                                                 decoding="async"
@@ -1732,12 +1738,6 @@ function App() {
                                       : null))
                                   : null;
 
-                                // Gols do artilheiro escolhido neste jogo (+1 ponto cada).
-                                // Só conta com o jogo já em andamento/encerrado (placar conhecido).
-                                const scorerGoals = pickedPlayer && (isFinished || match.isLive)
-                                  ? goalsByPlayer(match.goals, pickedPlayer.id)
-                                  : 0;
-
                                 return (
                                   <div key={p.id} className="inline-guess-row-p16">
                                     <div className="inline-guess-user-info-p16">
@@ -1802,14 +1802,6 @@ function App() {
                                       <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
                                         {pointsText}
                                       </div>
-                                      {scorerGoals > 0 && pickedPlayer && (
-                                        <div
-                                          className="inline-guess-scorer-badge"
-                                          title={`${pickedPlayer.name} marcou ${scorerGoals} ${scorerGoals === 1 ? 'gol' : 'gols'} — +${scorerGoals} ${scorerGoals === 1 ? 'ponto' : 'pontos'}`}
-                                        >
-                                          ⚽ {pickedPlayer.name} +{scorerGoals}
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
                                 );

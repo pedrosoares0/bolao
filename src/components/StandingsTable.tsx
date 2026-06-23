@@ -529,14 +529,6 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
                     <span className="standing-name-with-rank">
                       <span className="standing-row-name">{standing.name}</span>
                       {renderFireMedals(standing.participantId)}
-                      {standing.scorerPoints > 0 && (
-                        <span
-                          className="standing-row-scorer-bonus"
-                          title={`+${standing.scorerPoints} de bônus de artilheiro`}
-                        >
-                          ⚽ +{standing.scorerPoints}
-                        </span>
-                      )}
                     </span>
                     {renderRankChange(standing.participantId)}
                   </div>

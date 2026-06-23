@@ -33,7 +33,7 @@ export const BRAZIL_PLAYERS: BrazilPlayer[] = [
 const normPlayerName = (s: string): string =>
   (s || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // remove acentos
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
