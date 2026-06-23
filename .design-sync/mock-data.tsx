@@ -202,3 +202,76 @@ export const accumulated = 320.0;
 
 // No-op async handlers for the interactive props (previews render statically).
 export const noop = async () => {};
+
+// ── Full knockout bracket (preview only) ──────────────────────────────────────
+// Alimenta a view "Mata-mata" do BracketTab com uma chave completa
+// (16 avos → final + 3º lugar) para conferir o layout e as linhas.
+type KoTeam = [name: string, flag: string];
+
+const KO_TEAMS: KoTeam[] = [
+  ['Espanha', 'es'], ['Japão', 'jp'], ['França', 'fr'], ['Senegal', 'sn'],
+  ['Brasil', 'br'], ['México', 'mx'], ['Argentina', 'ar'], ['EUA', 'us'],
+  ['Alemanha', 'de'], ['Croácia', 'hr'], ['Inglaterra', 'gb-eng'], ['Portugal', 'pt'],
+  ['Itália', 'it'], ['Holanda', 'nl'], ['Bélgica', 'be'], ['Marrocos', 'ma'],
+  ['Colômbia', 'co'], ['Suíça', 'ch'], ['Dinamarca', 'dk'], ['Coreia', 'kr'],
+  ['Sérvia', 'rs'], ['Polônia', 'pl'], ['Arábia S.', 'sa'], ['Gana', 'gh'],
+  ['Camarões', 'cm'], ['Austrália', 'au'], ['Equador', 'ec'], ['Irã', 'ir'],
+  ['Noruega', 'no'], ['Egito', 'eg'], ['Nigéria', 'ng'], ['Uruguai', 'uy'],
+];
+
+const koMatch = (
+  id: string,
+  stage: string,
+  home: KoTeam,
+  away: KoTeam,
+  hs: number | null,
+  as: number | null,
+  extra: Partial<Match> = {},
+): Match => {
+  const finished = hs !== null && as !== null;
+  return {
+    id,
+    homeTeam: home[0], awayTeam: away[0],
+    homeCode: home[0].slice(0, 3).toUpperCase(), awayCode: away[0].slice(0, 3).toUpperCase(),
+    homeFlag: home[1], awayFlag: away[1],
+    date: '02/07', time: '17:00', group: stage,
+    homeScore: hs, awayScore: as,
+    status: finished ? 'finished' : 'scheduled',
+    kickoff: '2026-07-02T20:00:00Z', isoDate: '2026-07-02',
+    homeTeamEn: home[0], awayTeamEn: away[0], stage,
+    winner: finished ? (hs > as ? 'HOME_TEAM' : as > hs ? 'AWAY_TEAM' : 'DRAW') : null,
+    ...extra,
+  };
+};
+
+// Gera os pares de uma fase a partir de uma lista de seleções (2 por jogo).
+const koRound = (
+  stage: string,
+  teams: KoTeam[],
+  scored: boolean,
+): Match[] => {
+  const out: Match[] = [];
+  for (let i = 0; i * 2 + 1 < teams.length; i += 1) {
+    const [hs, as] = scored ? (i % 2 === 0 ? [2, 1] : [1, 2]) : [null, null];
+    out.push(koMatch(`ko-${stage}-${i}`, stage, teams[i * 2], teams[i * 2 + 1], hs, as));
+  }
+  return out;
+};
+
+const r32 = koRound('LAST_32', KO_TEAMS, true);
+const r16Teams = KO_TEAMS.filter((_, i) => i % 2 === 0); // 16 seleções
+const r16 = koRound('LAST_16', r16Teams, true);
+const qfTeams = r16Teams.filter((_, i) => i % 2 === 0); // 8
+const qf = koRound('QUARTER_FINALS', qfTeams, true);
+const sfTeams = qfTeams.filter((_, i) => i % 2 === 0); // 4
+const sf = koRound('SEMI_FINALS', sfTeams, false);
+const finalTeams = sfTeams.filter((_, i) => i % 2 === 0); // 2
+const finalMatch = koMatch('ko-FINAL', 'FINAL', finalTeams[0], finalTeams[1], null, null);
+const thirdMatch = koMatch('ko-THIRD', 'THIRD_PLACE', sfTeams[1], sfTeams[3], null, null);
+
+// Marca um jogo dos 16 avos como "ao vivo" para conferir o destaque.
+if (r32[5]) Object.assign(r32[5], { status: 'scheduled', isLive: true, liveClock: "63'", homeScore: 1, awayScore: 1, winner: null });
+
+export const knockoutMatches: Match[] = [
+  ...r32, ...r16, ...qf, ...sf, finalMatch, thirdMatch,
+];

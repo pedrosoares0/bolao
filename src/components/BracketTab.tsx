@@ -4,7 +4,7 @@
 // placares e o time vencedor destacado. Puramente leitura: deriva tudo dos
 // `matches` já carregados em App.tsx (não vai ao banco).
 // ============================================================
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Match } from '../types';
 import { flagSrc } from '../lib/teamMaps';
 import { computeGroupStandings, computeBestThirds } from '../utils/groups';
@@ -83,6 +83,7 @@ function CompactMatchCard({
   return (
     <button
       type="button"
+      data-match-id={m.id}
       className={`brk-mini-match ${focus ? 'focus' : ''} ${selected ? 'selected' : ''} ${finished ? 'finished' : ''} ${live ? 'live' : ''}`}
       title={title}
       aria-label={title}
@@ -165,63 +166,41 @@ type MiniRound = {
   games: Match[];
 };
 
-type ConnectorPath = {
-  d: string;
-  side: 'left' | 'right';
-};
+type Side = 'left' | 'right';
+type Connection = { fromId: string; toId: string; side: Side };
+type ConnectorPath = { d: string; side: Side };
 
-const ROUND_VERTICAL_PAD: Record<string, number> = {
-  LAST_32: 0,
-  LAST_16: 6,
-  QUARTER_FINALS: 16,
-  SEMI_FINALS: 0,
-};
+// Pares de jogos que se conectam na chave (por id). A geometria (a linha em si)
+// é calculada depois, medindo a posição real dos cards no DOM — assim as linhas
+// encostam sempre, em qualquer tamanho de tela.
+// OBS: liga por POSIÇÃO (ordem dos jogos), não por seed real, porque o banco
+// não guarda o destino do vencedor de cada jogo.
+function buildConnections(leftRounds: MiniRound[], rightRounds: MiniRound[], finalGame?: Match): Connection[] {
+  const out: Connection[] = [];
 
-const slotY = (round: MiniRound, index: number) => {
-  const count = Math.max(round.games.length, 1);
-  const pad = ROUND_VERTICAL_PAD[round.key] ?? 0;
-  return pad + ((index + 0.5) / count) * (100 - pad * 2);
-};
-
-function buildConnectorPaths(leftRounds: MiniRound[], rightRounds: MiniRound[], finalGame?: Match): ConnectorPath[] {
-  const paths: ConnectorPath[] = [];
-  const leftX = [7, 18.5, 30, 41.5];
-  const rightX = [93, 81.5, 70, 58.5];
-  const finalY = 50;
-
-  const connectSide = (rounds: MiniRound[], xs: number[], side: 'left' | 'right') => {
-    for (let roundIndex = 0; roundIndex < rounds.length - 1; roundIndex += 1) {
-      const from = rounds[roundIndex];
-      const to = rounds[roundIndex + 1];
-      if (!from.games.length || !to.games.length) continue;
-
-      from.games.forEach((_, gameIndex) => {
-        const targetIndex = Math.min(Math.floor(gameIndex / 2), to.games.length - 1);
-        const x1 = xs[roundIndex];
-        const x2 = xs[roundIndex + 1];
-        const midX = (x1 + x2) / 2;
-        const y1 = slotY(from, gameIndex);
-        const y2 = slotY(to, targetIndex);
-        paths.push({ side, d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}` });
+  // Em cada lado, liga a fase r ao seu jogo "pai" na fase r+1 (em direção ao centro).
+  const addSide = (rounds: MiniRound[], side: Side) => {
+    for (let r = 0; r < rounds.length - 1; r += 1) {
+      const from = rounds[r];
+      const to = rounds[r + 1];
+      from.games.forEach((g, gi) => {
+        const target = to.games[Math.min(Math.floor(gi / 2), to.games.length - 1)];
+        if (g && target) out.push({ fromId: g.id, toId: target.id, side });
       });
     }
   };
 
-  connectSide(leftRounds, leftX, 'left');
-  connectSide(rightRounds, rightX, 'right');
+  addSide(leftRounds, 'left'); // [16 avos, oitavas, quartas, semi]
+  addSide([...rightRounds].reverse(), 'right'); // idem (rightRounds vem do centro p/ fora)
 
   if (finalGame) {
-    const leftSemi = leftRounds[leftRounds.length - 1];
-    const rightSemi = rightRounds[rightRounds.length - 1];
-    if (leftSemi?.games.length) {
-      paths.push({ side: 'left', d: `M ${leftX[3]} ${slotY(leftSemi, 0)} H 48 V ${finalY} H 50` });
-    }
-    if (rightSemi?.games.length) {
-      paths.push({ side: 'right', d: `M ${rightX[3]} ${slotY(rightSemi, 0)} H 52 V ${finalY} H 50` });
-    }
+    const leftSemi = leftRounds[leftRounds.length - 1]?.games[0];
+    const rightSemi = rightRounds[0]?.games[0]; // rightRounds = [semi, quartas, ...]
+    if (leftSemi) out.push({ fromId: leftSemi.id, toId: finalGame.id, side: 'left' });
+    if (rightSemi) out.push({ fromId: rightSemi.id, toId: finalGame.id, side: 'right' });
   }
 
-  return paths;
+  return out;
 }
 
 function MiniRoundColumn({
@@ -319,9 +298,59 @@ function BracketTab({ matches }: BracketTabProps) {
       leftRounds,
       rightRounds,
       finalGame,
-      connectorPaths: buildConnectorPaths(leftRounds, [...rightRounds].reverse(), finalGame),
+      connections: buildConnections(leftRounds, rightRounds, finalGame),
     };
   }, [treeRounds]);
+
+  // Linhas da chave: medidas a partir da posição real dos cards no DOM, então
+  // se alinham sozinhas em qualquer tela e recalculam ao redimensionar.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [connectors, setConnectors] = useState<{ paths: ConnectorPath[]; w: number; h: number }>({
+    paths: [],
+    w: 0,
+    h: 0,
+  });
+
+  useLayoutEffect(() => {
+    if (view !== 'mata') return;
+    const board = boardRef.current;
+    if (!board) return;
+
+    const compute = () => {
+      const b = board.getBoundingClientRect();
+      const rectById = new Map<string, DOMRect>();
+      board.querySelectorAll<HTMLElement>('[data-match-id]').forEach((el) => {
+        if (el.dataset.matchId) rectById.set(el.dataset.matchId, el.getBoundingClientRect());
+      });
+
+      const paths: ConnectorPath[] = [];
+      for (const c of bracketLayout.connections) {
+        const f = rectById.get(c.fromId);
+        const t = rectById.get(c.toId);
+        if (!f || !t) continue;
+        const y1 = f.top + f.height / 2 - b.top;
+        const y2 = t.top + t.height / 2 - b.top;
+        // O "from" é o card mais distante do centro; sai pela borda voltada ao centro.
+        const x1 = (c.side === 'left' ? f.right : f.left) - b.left;
+        const x2 = (c.side === 'left' ? t.left : t.right) - b.left;
+        const midX = (x1 + x2) / 2;
+        paths.push({ side: c.side, d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}` });
+      }
+      setConnectors({ paths, w: b.width, h: b.height });
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(board);
+    window.addEventListener('resize', compute);
+    // Recalcula quando as fontes terminarem de carregar (a altura dos rótulos
+    // pode mudar e deslocar os cards).
+    document.fonts?.ready?.then(compute).catch(() => {});
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
+  }, [bracketLayout, view]);
 
   const selectableMatches = useMemo(() => {
     const treeGames = treeRounds.flatMap((round) => round.games);
@@ -470,9 +499,15 @@ function BracketTab({ matches }: BracketTabProps) {
           <div className="brk-empty">O mata-mata começa após a fase de grupos.</div>
         ) : (
           <div className="brk-knockout">
-            <div className="brk-world-board">
-              <svg className="brk-world-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                {bracketLayout.connectorPaths.map((path, index) => (
+            <div className="brk-world-board" ref={boardRef}>
+              <svg
+                className="brk-world-lines"
+                width={connectors.w}
+                height={connectors.h}
+                viewBox={`0 0 ${connectors.w || 1} ${connectors.h || 1}`}
+                aria-hidden="true"
+              >
+                {connectors.paths.map((path, index) => (
                   <path
                     key={`${path.side}-${index}`}
                     d={path.d}

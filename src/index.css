@@ -5954,7 +5954,7 @@ body {
 
 .brk-world-lines {
   position: absolute;
-  inset: 24px 0 8px;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
 }
@@ -6051,14 +6051,6 @@ body {
   display: grid;
   grid-template-rows: repeat(var(--slot-count), minmax(0, 1fr));
   align-items: center;
-}
-
-.brk-mini-round-last_16 .brk-mini-slots {
-  padding-block: 6%;
-}
-
-.brk-mini-round-quarter_finals .brk-mini-slots {
-  padding-block: 16%;
 }
 
 .brk-mini-slot {
