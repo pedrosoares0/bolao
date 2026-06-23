@@ -1,0 +1,25 @@
+{
+  "projectId": "4958413e-e4bb-47dd-935e-e1b5b083ddc0",
+  "shape": "package",
+  "pkg": "bolao-bandidos-apostados",
+  "globalName": "BolaoApp",
+  "entry": "./.design-sync/ds-entry.tsx",
+  "srcDir": "src",
+  "cssEntry": "src/index.css",
+  "componentSrcMap": {
+    "Aurora": "src/components/Aurora.tsx",
+    "LightRays": "src/components/LightRays.tsx",
+    "BracketTab": "src/components/BracketTab.tsx",
+    "PalpitesTab": "src/components/PalpitesTab.tsx",
+    "PixTab": "src/components/PixTab.tsx",
+    "ProfileTab": "src/components/ProfileTab.tsx",
+    "StandingsTable": "src/components/StandingsTable.tsx",
+    "PixKeyRow": "src/components/PixKeyCopy.tsx"
+  },
+  "extraFonts": ".design-sync/ds-fonts.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Aurora": { "cardMode": "column" },
+    "LightRays": { "cardMode": "column" }
+  }
+}
