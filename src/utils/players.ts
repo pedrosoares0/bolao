@@ -22,7 +22,7 @@ export const BRAZIL_PLAYERS: BrazilPlayer[] = [
   { id: 'vinijr', name: 'Vini Jr', img: 'https://img.sofascore.com/api/v1/player/868812/image', aliases: ['Vinicius Junior', 'Vinícius Júnior', 'Vinicius Jr', 'Vini Jr', 'Vinicius'] },
   { id: 'paqueta', name: 'Paquetá', img: 'https://img.sofascore.com/api/v1/player/839981/image', aliases: ['Lucas Paqueta', 'Lucas Paquetá', 'Paqueta', 'Paquetá'] },
   { id: 'raphinha', name: 'Raphinha', img: 'https://img.sofascore.com/api/v1/player/831005/image', aliases: ['Raphinha', 'Raphael Dias Belloli'] },
-  { id: 'igorthiago', name: 'Igor Thiago', img: 'https://img.sofascore.com/api/v1/player/1016907/image', aliases: ['Igor Thiago', 'Igor Thiago Nascimento'] },
+  { id: 'neymar', name: 'Neymar', img: 'https://img.sofascore.com/api/v1/player/124712/image', aliases: ['Neymar', 'Neymar Jr', 'Neymar Junior', 'Neymar da Silva Santos Junior'] },
   { id: 'endrick', name: 'Endrick', img: 'https://img.sofascore.com/api/v1/player/1174937/image', aliases: ['Endrick', 'Endrick Felipe'] },
   { id: 'matheuscunha', name: 'M. Cunha', img: 'https://img.sofascore.com/api/v1/player/886363/image', aliases: ['Matheus Cunha', 'M. Cunha'] },
   { id: 'rayan', name: 'Rayan', img: 'https://img.sofascore.com/api/v1/player/1464966/image', aliases: ['Rayan', 'Rayan Vitor'] },

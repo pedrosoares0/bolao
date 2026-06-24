@@ -21,7 +21,7 @@ export const BRAZIL_SCORERS: ScorerPlayer[] = [
   { id: 'vinijr', name: 'Vini Jr', aliases: ['Vinicius Junior', 'Vinícius Júnior', 'Vinicius Jr', 'Vini Jr', 'Vinicius'] },
   { id: 'paqueta', name: 'Paquetá', aliases: ['Lucas Paqueta', 'Lucas Paquetá', 'Paqueta', 'Paquetá'] },
   { id: 'raphinha', name: 'Raphinha', aliases: ['Raphinha', 'Raphael Dias Belloli'] },
-  { id: 'igorthiago', name: 'Igor Thiago', aliases: ['Igor Thiago', 'Igor Thiago Nascimento'] },
+  { id: 'neymar', name: 'Neymar', aliases: ['Neymar', 'Neymar Jr', 'Neymar Junior', 'Neymar da Silva Santos Junior'] },
   { id: 'endrick', name: 'Endrick', aliases: ['Endrick', 'Endrick Felipe'] },
   { id: 'matheuscunha', name: 'M. Cunha', aliases: ['Matheus Cunha', 'M. Cunha'] },
   { id: 'rayan', name: 'Rayan', aliases: ['Rayan', 'Rayan Vitor'] },
