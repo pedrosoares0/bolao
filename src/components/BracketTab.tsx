@@ -6,6 +6,7 @@
 // cotovelo e botão de tela cheia. Puramente leitura: deriva tudo dos `matches`.
 // ============================================================
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type React from 'react';
 import type { Match } from '../types';
 import { flagSrc } from '../lib/teamMaps';
 import { computeGroupStandings, computeBestThirds } from '../utils/groups';
@@ -278,6 +279,31 @@ function BracketTab({ matches }: BracketTabProps) {
     else el.requestFullscreen?.().catch(() => {});
   };
 
+  // Trocar de fase arrastando pro lado (swipe) — além das setas. Só dispara em
+  // gestos predominantemente horizontais, pra não atrapalhar o scroll vertical.
+  const swipeRef = useRef<{ x: number; y: number } | null>(null);
+  const wheelLock = useRef(0);
+  const onPointerDown = (e: React.PointerEvent) => {
+    swipeRef.current = { x: e.clientX, y: e.clientY };
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      pickStage(stageIdx + (dx < 0 ? 1 : -1));
+    }
+  };
+  const onWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 24) return;
+    const now = Date.now();
+    if (now < wheelLock.current) return;
+    wheelLock.current = now + 500;
+    pickStage(stageIdx + (e.deltaX > 0 ? 1 : -1));
+  };
+
   return (
     <div className="brk-tab">
       <h1 className="brk-page-title">CHAVEAMENTO</h1>
@@ -432,9 +458,18 @@ function BracketTab({ matches }: BracketTabProps) {
               </button>
             </div>
 
-            {/* Quadro com as colunas + conectores. A key por fase reinicia a
-                animação de slide ao trocar de fase. */}
-            <div className={`brk2-board brk2-anim-${dir}`} key={stageIdx} ref={boardRef}>
+            {/* Área que captura o swipe horizontal (arrastar pro lado troca de
+                fase). O scroll vertical segue normal. */}
+            <div
+              className="brk2-scroll"
+              onPointerDown={onPointerDown}
+              onPointerUp={onPointerUp}
+              onPointerCancel={() => { swipeRef.current = null; }}
+              onWheel={onWheel}
+            >
+              {/* Quadro com as colunas + conectores. A key por fase reinicia a
+                  animação de slide ao trocar de fase. */}
+              <div className={`brk2-board brk2-anim-${dir}`} key={stageIdx} ref={boardRef}>
               <svg
                 className="brk2-lines"
                 width={conn.w}
@@ -466,6 +501,7 @@ function BracketTab({ matches }: BracketTabProps) {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         )
