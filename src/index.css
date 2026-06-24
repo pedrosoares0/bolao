@@ -6407,3 +6407,285 @@ body {
   padding-top: 0.35rem;
   border-top: 1px solid rgba(21, 17, 14, 0.08);
 }
+
+/* ============================================================
+   Chaveamento — mata-mata estilo "janela de 3 fases" (Sofascore)
+   ============================================================ */
+.brk2 {
+  width: 100%;
+}
+.brk2:fullscreen {
+  background: #100c0a;
+  padding: 1rem;
+  overflow: auto;
+}
+
+/* Barra de navegação de fases (setas + dropdown + tela cheia) */
+.brk2-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+  position: relative;
+}
+.brk2-arrow,
+.brk2-fs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.brk2-arrow:hover:not(:disabled),
+.brk2-fs:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.brk2-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.brk2-fs {
+  position: absolute;
+  right: 0;
+}
+.brk2-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.brk2-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: 0.92rem;
+  font-weight: 700;
+  padding: 0.5rem 2.1rem 0.5rem 0.9rem;
+  border-radius: 10px;
+  cursor: pointer;
+  min-width: 190px;
+  text-align: center;
+}
+.brk2-select option {
+  background: #1a1410;
+  color: #fff;
+}
+.brk2-select-caret {
+  position: absolute;
+  right: 0.7rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+/* Quadro: 3 colunas lado a lado + SVG dos conectores por cima */
+.brk2-board {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+/* Transição ao trocar de fase: desliza + fade (ease-out-expo). A direção
+   depende de avançar (da direita) ou voltar (da esquerda). */
+@keyframes brk2-slide-fwd {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes brk2-slide-back {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.brk2-anim-fwd {
+  animation: brk2-slide-fwd 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.brk2-anim-back {
+  animation: brk2-slide-back 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .brk2-anim-fwd,
+  .brk2-anim-back {
+    animation: none;
+  }
+}
+.brk2-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+.brk2-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1.5;
+}
+
+/* Coluna de uma fase */
+.brk2-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.8rem;
+  z-index: 2;
+}
+.brk2-col-head {
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.55rem 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brk2-col-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 0.6rem;
+}
+
+/* Coluna em FOCO: painel escuro destacado */
+.brk2-col.focus {
+  background: rgba(0, 0, 0, 0.38);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+.brk2-col.focus .brk2-col-head {
+  color: rgba(255, 255, 255, 0.85);
+}
+/* A coluna da Final empilha Final + 3º lugar no topo (não distribui) */
+.brk2-col.final .brk2-col-body {
+  justify-content: center;
+  gap: 1.1rem;
+}
+
+/* Card do confronto (2 linhas) */
+.brk2-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+}
+.brk2-card.live {
+  border-color: rgba(255, 77, 77, 0.5);
+  box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.25);
+}
+.brk2-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.brk2-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+.brk2-flag {
+  width: 26px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.brk2-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.brk2-row.win .brk2-name {
+  font-weight: 800;
+  color: #fff;
+}
+.brk2-row.lose .brk2-name {
+  color: rgba(255, 255, 255, 0.45);
+}
+.brk2-score {
+  margin-left: auto;
+  font-family: var(--font-family-condensed);
+  font-weight: 800;
+  font-size: 1.15rem;
+  padding-left: 0.4rem;
+}
+.brk2-row.lose .brk2-score {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Rodapé com data · hora (quando o jogo ainda não começou) — abaixo dos times,
+   para o nome usar a largura toda do card. */
+.brk2-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.brk2-sep {
+  color: rgba(255, 255, 255, 0.35);
+}
+.brk2-date {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+.brk2-time {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+.brk2-livedot {
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fff;
+  background: #e11d48;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+}
+.brk2-badge {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-gold, #f5b300);
+  color: #1a1206;
+  white-space: nowrap;
+}
+.brk2-card:has(.brk2-badge) {
+  margin-bottom: 6px;
+}

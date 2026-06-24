@@ -1,8 +1,9 @@
 // ============================================================
-// BracketTab — aba "Chaveamento". Mostra a fase de grupos (classificação +
-// placares de cada grupo) e a chave do mata-mata (16 avos → final) com os
-// placares e o time vencedor destacado. Puramente leitura: deriva tudo dos
-// `matches` já carregados em App.tsx (não vai ao banco).
+// BracketTab — aba "Chaveamento". Mostra a fase de grupos (classificação) e a
+// chave do mata-mata no formato "janela de 3 fases" (estilo Sofascore): um
+// seletor de fase (dropdown + setas) desliza por 16avos → final, com a fase
+// escolhida em destaque ao centro e as vizinhas dos lados, conectores em
+// cotovelo e botão de tela cheia. Puramente leitura: deriva tudo dos `matches`.
 // ============================================================
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Match } from '../types';
@@ -16,29 +17,39 @@ interface BracketTabProps {
 const TBD = 'A definir';
 const isTbd = (s: string) => !s || s === TBD;
 
-// Fases que compõem a árvore da chave, da esquerda (16 avos) à direita (final).
-// A disputa de 3º lugar fica fora da árvore (é mostrada à parte).
+// Fases da árvore, da esquerda (16avos) à direita (final). 3º lugar fica à parte.
 const TREE_ORDER = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
-const SIDE_ORDER = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS'];
-const STAGE_SHORT_LABEL: Record<string, string> = {
-  LAST_32: '16 avos',
-  LAST_16: 'Oitavas',
-  QUARTER_FINALS: 'Quartas',
-  SEMI_FINALS: 'Semi',
+
+// Rótulos das fases (iguais ao Sofascore PT).
+const STAGE_LABEL: Record<string, string> = {
+  LAST_32: '16Avos-de-final',
+  LAST_16: 'Oitavos-de-Final',
+  QUARTER_FINALS: 'Quartas de final',
+  SEMI_FINALS: 'Semifinais',
+  THIRD_PLACE: 'Disputa do 3º Lugar',
   FINAL: 'Final',
 };
 
-// Ordem e nome das fases do mata-mata
+// Ordem/nome das fases do mata-mata (inclui 3º lugar, fora da árvore principal).
 const KNOCKOUT_STAGES: { key: string; label: string }[] = [
-  { key: 'LAST_32', label: '16 avos de Final' },
-  { key: 'LAST_16', label: 'Oitavas de Final' },
-  { key: 'QUARTER_FINALS', label: 'Quartas de Final' },
-  { key: 'SEMI_FINALS', label: 'Semifinal' },
-  { key: 'THIRD_PLACE', label: 'Disputa do 3º Lugar' },
-  { key: 'FINAL', label: 'Final' },
+  { key: 'LAST_32', label: STAGE_LABEL.LAST_32 },
+  { key: 'LAST_16', label: STAGE_LABEL.LAST_16 },
+  { key: 'QUARTER_FINALS', label: STAGE_LABEL.QUARTER_FINALS },
+  { key: 'SEMI_FINALS', label: STAGE_LABEL.SEMI_FINALS },
+  { key: 'THIRD_PLACE', label: STAGE_LABEL.THIRD_PLACE },
+  { key: 'FINAL', label: STAGE_LABEL.FINAL },
 ];
 
-// Quem venceu (considera a coluna winner — cobre pênaltis; senão o placar)
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+// "29/06" -> "29 de jun."
+const dateLabel = (d: string): string => {
+  const [dd, mm] = (d || '').split('/');
+  const mi = parseInt(mm, 10) - 1;
+  if (!dd || isNaN(mi) || !MONTHS[mi]) return d || '';
+  return `${parseInt(dd, 10)} de ${MONTHS[mi]}.`;
+};
+
+// Quem venceu (considera a coluna winner — cobre pênaltis; senão o placar).
 const winnerSide = (m: Match): 'home' | 'away' | null => {
   if (m.status !== 'finished') return null;
   if (m.winner === 'HOME_TEAM') return 'home';
@@ -57,259 +68,155 @@ const fmtLiveClock = (clock?: string | null): string | null => {
   return clock;
 };
 
-const matchStatusLabel = (m: Match) => {
-  if (m.isLive) return `Ao vivo${fmtLiveClock(m.liveClock) ? ` · ${fmtLiveClock(m.liveClock)}` : ''}`;
-  if (m.status === 'finished') return 'Encerrado';
-  return `${m.date} · ${m.time}`;
-};
+type Stage = { key: string; label: string; games: Match[] };
 
-function CompactMatchCard({
-  m,
-  focus = false,
-  selected = false,
-  onSelect,
+// Linha de um time dentro do card do confronto.
+function TeamLine({
+  flag,
+  name,
+  score,
+  showScore,
+  state,
 }: {
-  m: Match;
-  focus?: boolean;
-  selected?: boolean;
-  onSelect?: (id: string) => void;
+  flag: string;
+  name: string;
+  score: number | null;
+  showScore: boolean;
+  state: 'win' | 'lose' | '';
 }) {
+  return (
+    <div className={`brk2-row ${state}`}>
+      <img
+        loading="lazy"
+        decoding="async"
+        src={flagSrc(flag, 40)}
+        alt=""
+        className="brk2-flag"
+        onError={(e) => {
+          e.currentTarget.src = 'https://flagcdn.com/w40/un.png';
+        }}
+      />
+      <span className="brk2-name">{name}</span>
+      {showScore && <span className="brk2-score">{score ?? '-'}</span>}
+    </div>
+  );
+}
+
+// Card de um confronto (2 linhas). À direita: placar (se jogado/ao vivo) ou
+// data/hora. Marca o vencedor e um selo opcional (Final / 3º lugar).
+function KnoMatchCard({ m, badge }: { m: Match; badge?: string }) {
   const win = winnerSide(m);
   const finished = m.status === 'finished';
   const live = !!m.isLive;
   const showScore = finished || live;
-  const title = `${isTbd(m.homeTeamEn) ? TBD : m.homeTeam} x ${isTbd(m.awayTeamEn) ? TBD : m.awayTeam}`;
+  const homeName = isTbd(m.homeTeamEn) ? TBD : m.homeTeam;
+  const awayName = isTbd(m.awayTeamEn) ? TBD : m.awayTeam;
 
   return (
-    <button
-      type="button"
-      data-match-id={m.id}
-      className={`brk-mini-match ${focus ? 'focus' : ''} ${selected ? 'selected' : ''} ${finished ? 'finished' : ''} ${live ? 'live' : ''}`}
-      title={title}
-      aria-label={title}
-      aria-pressed={selected}
-      onClick={() => onSelect?.(m.id)}
+    <div
+      data-mid={m.id}
+      className={`brk2-card ${finished ? 'finished' : ''} ${live ? 'live' : ''}`}
+      title={`${homeName} x ${awayName}`}
     >
-      <div className={`brk-mini-team ${win === 'home' ? 'win' : win === 'away' ? 'lose' : ''}`}>
-        <img
-          loading="lazy"
-          decoding="async"
-          src={flagSrc(m.homeFlag, 40)}
-          alt={m.homeTeam}
-          className="brk-mini-flag"
-          onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
-        />
-        <span className="brk-mini-score">
-          {showScore && m.homeScore !== null ? m.homeScore : '-'}
-        </span>
+      <div className="brk2-rows">
+        <TeamLine flag={m.homeFlag} name={homeName} score={m.homeScore} showScore={showScore} state={win === 'home' ? 'win' : win === 'away' ? 'lose' : ''} />
+        <TeamLine flag={m.awayFlag} name={awayName} score={m.awayScore} showScore={showScore} state={win === 'away' ? 'win' : win === 'home' ? 'lose' : ''} />
       </div>
-      <span className="brk-mini-versus" aria-hidden="true">x</span>
-      <div className={`brk-mini-team ${win === 'away' ? 'win' : win === 'home' ? 'lose' : ''}`}>
-        <img
-          loading="lazy"
-          decoding="async"
-          src={flagSrc(m.awayFlag, 40)}
-          alt={m.awayTeam}
-          className="brk-mini-flag"
-          onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
-        />
-        <span className="brk-mini-score">
-          {showScore && m.awayScore !== null ? m.awayScore : '-'}
-        </span>
-      </div>
-    </button>
-  );
-}
 
-function MatchDetail({ match }: { match: Match }) {
-  const finished = match.status === 'finished';
-  const live = !!match.isLive;
-  const showScore = finished || live;
-
-  return (
-    <div className={`brk-match-detail ${live ? 'live' : ''}`}>
-      <div className="brk-detail-team">
-        <img
-          loading="lazy"
-          decoding="async"
-          src={flagSrc(match.homeFlag, 40)}
-          alt={match.homeTeam}
-          className="brk-detail-flag"
-          onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
-        />
-        <span>{isTbd(match.homeTeamEn) ? TBD : match.homeTeam}</span>
-      </div>
-      <div className="brk-detail-score">
-        <span>{showScore && match.homeScore !== null ? match.homeScore : '-'}</span>
-        <strong>x</strong>
-        <span>{showScore && match.awayScore !== null ? match.awayScore : '-'}</span>
-      </div>
-      <div className="brk-detail-team right">
-        <span>{isTbd(match.awayTeamEn) ? TBD : match.awayTeam}</span>
-        <img
-          loading="lazy"
-          decoding="async"
-          src={flagSrc(match.awayFlag, 40)}
-          alt={match.awayTeam}
-          className="brk-detail-flag"
-          onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
-        />
-      </div>
-      <div className="brk-detail-meta">{matchStatusLabel(match)}</div>
+      {!showScore && (
+        <div className="brk2-foot">
+          <span className="brk2-date">{dateLabel(m.date)}</span>
+          <span className="brk2-sep">·</span>
+          <span className="brk2-time">{m.time}</span>
+        </div>
+      )}
+      {live && <span className="brk2-livedot">{fmtLiveClock(m.liveClock) ?? 'AO VIVO'}</span>}
+      {badge && <span className="brk2-badge">{badge}</span>}
     </div>
   );
 }
 
-type MiniRound = {
-  key: string;
-  label: string;
-  games: Match[];
-};
-
-type Side = 'left' | 'right';
-type Connection = { fromId: string; toId: string; side: Side };
-type ConnectorPath = { d: string; side: Side };
-
-// Pares de jogos que se conectam na chave (por id). A geometria (a linha em si)
-// é calculada depois, medindo a posição real dos cards no DOM — assim as linhas
-// encostam sempre, em qualquer tamanho de tela.
-// OBS: liga por POSIÇÃO (ordem dos jogos), não por seed real, porque o banco
-// não guarda o destino do vencedor de cada jogo.
-function buildConnections(leftRounds: MiniRound[], rightRounds: MiniRound[], finalGame?: Match): Connection[] {
-  const out: Connection[] = [];
-
-  // Em cada lado, liga a fase r ao seu jogo "pai" na fase r+1 (em direção ao centro).
-  const addSide = (rounds: MiniRound[], side: Side) => {
-    for (let r = 0; r < rounds.length - 1; r += 1) {
-      const from = rounds[r];
-      const to = rounds[r + 1];
-      from.games.forEach((g, gi) => {
-        const target = to.games[Math.min(Math.floor(gi / 2), to.games.length - 1)];
-        if (g && target) out.push({ fromId: g.id, toId: target.id, side });
-      });
-    }
-  };
-
-  addSide(leftRounds, 'left'); // [16 avos, oitavas, quartas, semi]
-  addSide([...rightRounds].reverse(), 'right'); // idem (rightRounds vem do centro p/ fora)
-
-  if (finalGame) {
-    const leftSemi = leftRounds[leftRounds.length - 1]?.games[0];
-    const rightSemi = rightRounds[0]?.games[0]; // rightRounds = [semi, quartas, ...]
-    if (leftSemi) out.push({ fromId: leftSemi.id, toId: finalGame.id, side: 'left' });
-    if (rightSemi) out.push({ fromId: rightSemi.id, toId: finalGame.id, side: 'right' });
-  }
-
-  return out;
-}
-
-function MiniRoundColumn({
-  round,
-  selectedMatchId,
-  onSelectMatch,
-}: {
-  round: MiniRound;
-  selectedMatchId: string | null;
-  onSelectMatch: (id: string) => void;
-}) {
-  const focus = round.key === 'SEMI_FINALS';
-
-  return (
-    <div className={`brk-mini-round brk-mini-round-${round.key.toLowerCase()}`}>
-      <div className="brk-mini-round-label">{round.label}</div>
-      <div className="brk-mini-slots" style={{ '--slot-count': Math.max(round.games.length, 1) } as React.CSSProperties}>
-        {round.games.map((m) => (
-          <div key={m.id} className="brk-mini-slot">
-            <CompactMatchCard
-              m={m}
-              focus={focus}
-              selected={selectedMatchId === m.id}
-              onSelect={onSelectMatch}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// Conexão (cotovelo) entre um card e seu "pai" na fase seguinte.
+type Connection = { fromId: string; toId: string };
+type ConnPath = { d: string };
 
 function BracketTab({ matches }: BracketTabProps) {
   const [view, setView] = useState<'grupos' | 'mata'>('grupos');
 
-  // ---- Classificação dos grupos (com desempate por confronto direto) ----
+  // ---- Classificação dos grupos ----
   const groups = useMemo(() => computeGroupStandings(matches), [matches]);
-
-  // ---- Melhores terceiros (8 vagas na Copa 2026) ----
   const bestThirds = useMemo(() => computeBestThirds(groups), [groups]);
-  // Só mostra quando já há terceiros que jogaram (senão é uma lista de zeros).
   const showThirds = bestThirds.some((t) => t.played > 0);
 
   // ---- Mata-mata por fase ----
-  const knockout = useMemo(() => {
-    return KNOCKOUT_STAGES
-      .map(({ key, label }) => ({
-        key,
-        label,
-        games: matches
-          .filter((m) => m.stage === key)
-          .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff)),
-      }))
-      .filter((s) => s.games.length > 0);
+  const knockout = useMemo<Stage[]>(() => {
+    return KNOCKOUT_STAGES.map(({ key, label }) => ({
+      key,
+      label,
+      games: matches
+        .filter((m) => m.stage === key)
+        .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff)),
+    })).filter((s) => s.games.length > 0);
   }, [matches]);
 
   const hasGroups = groups.length > 0;
   const hasKnockout = knockout.length > 0;
 
-  // Colunas da árvore (16 avos → final) e a disputa de 3º lugar, à parte.
-  const treeRounds = useMemo(
-    () => knockout.filter((s) => TREE_ORDER.includes(s.key)),
-    [knockout]
+  // Fases da árvore (16avos → final) e a disputa de 3º lugar à parte.
+  const treeStages = useMemo(() => knockout.filter((s) => TREE_ORDER.includes(s.key)), [knockout]);
+  const thirdPlace = useMemo(() => knockout.find((s) => s.key === 'THIRD_PLACE') ?? null, [knockout]);
+
+  // Fase em foco (a destacada). Por padrão segue o "jogo do momento".
+  const defaultStageIdx = useMemo(() => {
+    if (!treeStages.length) return 0;
+    const live = treeStages.findIndex((s) => s.games.some((g) => g.isLive));
+    if (live >= 0) return live;
+    const next = treeStages.findIndex((s) => s.games.some((g) => g.status !== 'finished'));
+    if (next >= 0) return next;
+    return treeStages.length - 1;
+  }, [treeStages]);
+
+  // Fase em foco = escolha do usuário (se houver), senão segue o padrão.
+  // Estado derivado (sem efeito) para evitar setState-em-effect.
+  const [userStageIdx, setUserStageIdx] = useState<number | null>(null);
+  const maxIdx = Math.max(0, treeStages.length - 1);
+  const stageIdx = Math.min(userStageIdx ?? defaultStageIdx, maxIdx);
+  // Direção da transição (avançar = desliza da direita; voltar = da esquerda).
+  const [dir, setDir] = useState<'fwd' | 'back'>('fwd');
+  const pickStage = (i: number) => {
+    const clamped = Math.max(0, Math.min(i, maxIdx));
+    setDir(clamped >= stageIdx ? 'fwd' : 'back');
+    setUserStageIdx(clamped);
+  };
+
+  // Janela de 2 colunas: a fase em foco + a seguinte (onde os vencedores vão).
+  // Na última fase (Final) mostra a anterior + a Final. Cabe nome completo no
+  // celular sem rolar pro lado; rola só pra baixo. Memoizada p/ não recriar o
+  // array a cada render (senão o efeito dos conectores re-dispararia em loop).
+  const windowStart = Math.min(stageIdx, Math.max(0, treeStages.length - 2));
+  const visible = useMemo(
+    () => treeStages.slice(windowStart, windowStart + 2),
+    [treeStages, windowStart]
   );
-  const thirdPlace = useMemo(
-    () => knockout.find((s) => s.key === 'THIRD_PLACE') ?? null,
-    [knockout]
-  );
 
-  const bracketLayout = useMemo(() => {
-    const roundByKey = new Map(treeRounds.map((round) => [round.key, round]));
-    const makeSideRound = (key: string, side: 'left' | 'right'): MiniRound => {
-      const round = roundByKey.get(key);
-      const games = round?.games ?? [];
-      const split = Math.ceil(games.length / 2);
-      const label =
-        key === 'SEMI_FINALS'
-          ? side === 'left'
-            ? 'Semi 1'
-            : 'Semi 2'
-          : STAGE_SHORT_LABEL[key] ?? round?.label ?? key;
+  // Conexões entre colunas visíveis consecutivas (pares -> jogo pai).
+  const connections = useMemo<Connection[]>(() => {
+    const out: Connection[] = [];
+    for (let c = 0; c < visible.length - 1; c += 1) {
+      const a = visible[c].games;
+      const b = visible[c + 1].games;
+      if (!b.length) continue;
+      a.forEach((g, i) => {
+        const parent = b[Math.min(Math.floor(i / 2), b.length - 1)];
+        if (g && parent) out.push({ fromId: g.id, toId: parent.id });
+      });
+    }
+    return out;
+  }, [visible]);
 
-      return {
-        key,
-        label,
-        games: side === 'left' ? games.slice(0, split) : games.slice(split),
-      };
-    };
-
-    const leftRounds = SIDE_ORDER.map((key) => makeSideRound(key, 'left'));
-    const rightRounds = SIDE_ORDER.map((key) => makeSideRound(key, 'right')).reverse();
-    const finalGame = roundByKey.get('FINAL')?.games[0];
-
-    return {
-      leftRounds,
-      rightRounds,
-      finalGame,
-      connections: buildConnections(leftRounds, rightRounds, finalGame),
-    };
-  }, [treeRounds]);
-
-  // Linhas da chave: medidas a partir da posição real dos cards no DOM, então
-  // se alinham sozinhas em qualquer tela e recalculam ao redimensionar.
+  // Linhas medidas da posição real dos cards no DOM (alinham em qualquer tela).
   const boardRef = useRef<HTMLDivElement>(null);
-  const [connectors, setConnectors] = useState<{ paths: ConnectorPath[]; w: number; h: number }>({
-    paths: [],
-    w: 0,
-    h: 0,
-  });
+  const [conn, setConn] = useState<{ paths: ConnPath[]; w: number; h: number }>({ paths: [], w: 0, h: 0 });
 
   useLayoutEffect(() => {
     if (view !== 'mata') return;
@@ -317,88 +224,69 @@ function BracketTab({ matches }: BracketTabProps) {
     if (!board) return;
 
     const compute = () => {
-      const b = board.getBoundingClientRect();
-      const rectById = new Map<string, DOMRect>();
-      board.querySelectorAll<HTMLElement>('[data-match-id]').forEach((el) => {
-        if (el.dataset.matchId) rectById.set(el.dataset.matchId, el.getBoundingClientRect());
+      const bb = board.getBoundingClientRect();
+      const rect = new Map<string, DOMRect>();
+      board.querySelectorAll<HTMLElement>('[data-mid]').forEach((el) => {
+        if (el.dataset.mid) rect.set(el.dataset.mid, el.getBoundingClientRect());
       });
-
-      const paths: ConnectorPath[] = [];
-      for (const c of bracketLayout.connections) {
-        const f = rectById.get(c.fromId);
-        const t = rectById.get(c.toId);
+      const paths: ConnPath[] = [];
+      for (const c of connections) {
+        const f = rect.get(c.fromId);
+        const t = rect.get(c.toId);
         if (!f || !t) continue;
-        const y1 = f.top + f.height / 2 - b.top;
-        const y2 = t.top + t.height / 2 - b.top;
-        // O "from" é o card mais distante do centro; sai pela borda voltada ao centro.
-        const x1 = (c.side === 'left' ? f.right : f.left) - b.left;
-        const x2 = (c.side === 'left' ? t.left : t.right) - b.left;
+        const x1 = f.right - bb.left;
+        const y1 = f.top + f.height / 2 - bb.top;
+        const x2 = t.left - bb.left;
+        const y2 = t.top + t.height / 2 - bb.top;
         const midX = (x1 + x2) / 2;
-        paths.push({ side: c.side, d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}` });
+        paths.push({ d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}` });
       }
-      setConnectors({ paths, w: b.width, h: b.height });
+      // Só atualiza se algo realmente mudou — evita loop com o ResizeObserver.
+      setConn((prev) => {
+        const same =
+          prev.w === bb.width &&
+          prev.h === bb.height &&
+          prev.paths.length === paths.length &&
+          prev.paths.every((p, i) => p.d === paths[i].d);
+        return same ? prev : { paths, w: bb.width, h: bb.height };
+      });
     };
 
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(board);
     window.addEventListener('resize', compute);
-    // Recalcula quando as fontes terminarem de carregar (a altura dos rótulos
-    // pode mudar e deslocar os cards).
     document.fonts?.ready?.then(compute).catch(() => {});
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', compute);
     };
-  }, [bracketLayout, view]);
+  }, [connections, view, stageIdx]);
 
-  const selectableMatches = useMemo(() => {
-    const treeGames = treeRounds.flatMap((round) => round.games);
-    const thirdGames = thirdPlace?.games ?? [];
-    return [...treeGames, ...thirdGames];
-  }, [treeRounds, thirdPlace]);
-
-  const preferredSelectedId = useMemo(() => {
-    const live = selectableMatches.find((m) => m.isLive);
-    if (live) return live.id;
-    const final = selectableMatches.find((m) => m.stage === 'FINAL');
-    if (final) return final.id;
-    const pending = selectableMatches.find((m) => m.status !== 'finished');
-    return pending?.id ?? selectableMatches[0]?.id ?? null;
-  }, [selectableMatches]);
-
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-
+  // Tela cheia do quadro.
+  const fsRef = useRef<HTMLDivElement>(null);
+  const [isFs, setIsFs] = useState(false);
   useEffect(() => {
-    if (!selectableMatches.length) {
-      if (selectedMatchId) setSelectedMatchId(null);
-      return;
-    }
-
-    const selectedStillExists = selectableMatches.some((m) => m.id === selectedMatchId);
-    if (!selectedStillExists) setSelectedMatchId(preferredSelectedId);
-  }, [preferredSelectedId, selectableMatches, selectedMatchId]);
-
-  const selectedMatch = useMemo(
-    () => selectableMatches.find((m) => m.id === selectedMatchId) ?? null,
-    [selectableMatches, selectedMatchId]
-  );
+    const onChange = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    const el = fsRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else el.requestFullscreen?.().catch(() => {});
+  };
 
   return (
     <div className="brk-tab">
       <h1 className="brk-page-title">CHAVEAMENTO</h1>
 
       <div className="brk-toggle">
-        <button
-          className={`brk-toggle-btn ${view === 'grupos' ? 'active' : ''}`}
-          onClick={() => setView('grupos')}
-        >
+        <button className={`brk-toggle-btn ${view === 'grupos' ? 'active' : ''}`} onClick={() => setView('grupos')}>
           Grupos
         </button>
-        <button
-          className={`brk-toggle-btn ${view === 'mata' ? 'active' : ''}`}
-          onClick={() => setView('mata')}
-        >
+        <button className={`brk-toggle-btn ${view === 'mata' ? 'active' : ''}`} onClick={() => setView('mata')}>
           Mata-mata
         </button>
       </div>
@@ -448,7 +336,6 @@ function BracketTab({ matches }: BracketTabProps) {
             </div>
           ))}
 
-          {/* MELHORES TERCEIROS — 8 vagas (Copa 2026) */}
           {showThirds && (
             <div className="brk-group-card brk-thirds-card">
               <div className="brk-group-title">Melhores Terceiros</div>
@@ -498,81 +385,88 @@ function BracketTab({ matches }: BracketTabProps) {
         !hasKnockout ? (
           <div className="brk-empty">O mata-mata começa após a fase de grupos.</div>
         ) : (
-          <div className="brk-knockout">
-            <div className="brk-world-board" ref={boardRef}>
+          <div className="brk2" ref={fsRef}>
+            {/* Barra de navegação de fases */}
+            <div className="brk2-bar">
+              <button
+                className="brk2-arrow"
+                onClick={() => pickStage(stageIdx - 1)}
+                disabled={stageIdx <= 0}
+                aria-label="Fase anterior"
+              >
+                ‹
+              </button>
+
+              <div className="brk2-select-wrap">
+                <select
+                  className="brk2-select"
+                  value={stageIdx}
+                  onChange={(e) => pickStage(Number(e.target.value))}
+                  aria-label="Selecionar fase"
+                >
+                  {treeStages.map((s, i) => (
+                    <option key={s.key} value={i}>
+                      {STAGE_LABEL[s.key] ?? s.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="brk2-select-caret" aria-hidden="true">▾</span>
+              </div>
+
+              <button
+                className="brk2-arrow"
+                onClick={() => pickStage(stageIdx + 1)}
+                disabled={stageIdx >= treeStages.length - 1}
+                aria-label="Próxima fase"
+              >
+                ›
+              </button>
+
+              <button
+                className="brk2-fs"
+                onClick={toggleFullscreen}
+                aria-label={isFs ? 'Sair da tela cheia' : 'Tela cheia'}
+                title={isFs ? 'Sair da tela cheia' : 'Tela cheia'}
+              >
+                {isFs ? '✕' : '⛶'}
+              </button>
+            </div>
+
+            {/* Quadro com as colunas + conectores. A key por fase reinicia a
+                animação de slide ao trocar de fase. */}
+            <div className={`brk2-board brk2-anim-${dir}`} key={stageIdx} ref={boardRef}>
               <svg
-                className="brk-world-lines"
-                width={connectors.w}
-                height={connectors.h}
-                viewBox={`0 0 ${connectors.w || 1} ${connectors.h || 1}`}
+                className="brk2-lines"
+                width={conn.w}
+                height={conn.h}
+                viewBox={`0 0 ${conn.w || 1} ${conn.h || 1}`}
                 aria-hidden="true"
               >
-                {connectors.paths.map((path, index) => (
-                  <path
-                    key={`${path.side}-${index}`}
-                    d={path.d}
-                    className={`brk-world-line ${path.side}`}
-                    vectorEffect="non-scaling-stroke"
-                  />
+                {conn.paths.map((p, i) => (
+                  <path key={i} d={p.d} className="brk2-line" vectorEffect="non-scaling-stroke" />
                 ))}
               </svg>
 
-              <div className="brk-world-side brk-world-left">
-                {bracketLayout.leftRounds.map((round) => (
-                  <MiniRoundColumn
-                    key={round.key}
-                    round={round}
-                    selectedMatchId={selectedMatchId}
-                    onSelectMatch={setSelectedMatchId}
-                  />
-                ))}
-              </div>
-
-              <div className="brk-world-center">
-                <img src="/imagens/trofeu.webp" alt="" className="brk-world-trophy" aria-hidden="true" />
-                <div className="brk-world-final-label">Final</div>
-                {bracketLayout.finalGame ? (
-                  <CompactMatchCard
-                    m={bracketLayout.finalGame}
-                    focus
-                    selected={selectedMatchId === bracketLayout.finalGame.id}
-                    onSelect={setSelectedMatchId}
-                  />
-                ) : (
-                  <div className="brk-mini-match focus empty">
-                    <span>Final</span>
+              {visible.map((s) => {
+                const absIdx = windowStart + visible.indexOf(s);
+                const focus = absIdx === stageIdx;
+                const isFinalCol = s.key === 'FINAL';
+                return (
+                  <div key={s.key} className={`brk2-col ${focus ? 'focus' : ''} ${isFinalCol ? 'final' : ''}`}>
+                    <div className="brk2-col-head">{STAGE_LABEL[s.key] ?? s.label}</div>
+                    <div className="brk2-col-body">
+                      {s.games.map((m) => (
+                        <KnoMatchCard key={m.id} m={m} badge={isFinalCol ? 'Final' : undefined} />
+                      ))}
+                      {/* Disputa de 3º lugar acompanha a coluna da Final */}
+                      {isFinalCol && thirdPlace?.games.map((m) => (
+                        <KnoMatchCard key={m.id} m={m} badge="3º lugar" />
+                      ))}
+                    </div>
                   </div>
-                )}
-              </div>
-
-              <div className="brk-world-side brk-world-right">
-                {bracketLayout.rightRounds.map((round) => (
-                  <MiniRoundColumn
-                    key={round.key}
-                    round={round}
-                    selectedMatchId={selectedMatchId}
-                    onSelectMatch={setSelectedMatchId}
-                  />
-                ))}
-              </div>
+                );
+              })}
             </div>
-
-            {selectedMatch && <MatchDetail match={selectedMatch} />}
-
-            {thirdPlace && (
-              <div className="brk-third brk-third-compact">
-                <div className="brk-third-head">{thirdPlace.label}</div>
-                {thirdPlace.games.map((m) => (
-                  <CompactMatchCard
-                    key={m.id}
-                    m={m}
-                    focus
-                    selected={selectedMatchId === m.id}
-                    onSelect={setSelectedMatchId}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         )
       )}
