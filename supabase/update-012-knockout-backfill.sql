@@ -8,7 +8,7 @@
 -- quem se classificou (ex.: "Brazil" nos 16avos). O backfill casa cada jogo do
 -- banco com o card da ESPN pelo horário de início e preenche o lado já definido.
 -- Esta coluna evita refazer essa varredura (várias datas) a cada minuto: o
--- backfill só roda a cada ~20 min.
+-- backfill só roda a cada ~5 min.
 -- ============================================================
 
 ALTER TABLE public.sync_state

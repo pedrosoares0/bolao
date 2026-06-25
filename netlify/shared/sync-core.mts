@@ -207,10 +207,10 @@ export async function backfillMissingGoals(
 // HORÁRIO DE INÍCIO (kickoff bate ao minuto entre as duas APIs) e preenchemos só
 // o lado cujo nome da ESPN casa com uma seleção REAL da Copa (as da fase de
 // grupos). Placeholders ("Group F 2nd Place", "Round of 32 1 Winner") são
-// ignorados. Best-effort e throttled (~20 min) — não derruba a sincronização.
+// ignorados. Best-effort e throttled (~5 min) — não derruba a sincronização.
 // O preserveKnownTeams (no syncMatches) garante que esse preenchimento não seja
 // zerado pelo próximo sync que ainda receba 'A definir' do football-data.
-const KO_BACKFILL_THROTTLE_MS = 20 * 60 * 1000;
+const KO_BACKFILL_THROTTLE_MS = 5 * 60 * 1000;
 const KO_HORIZON_MS = 14 * 24 * 60 * 60 * 1000; // só olha o mata-mata dos próximos ~14 dias
 
 export async function backfillKnockoutTeams(
@@ -419,7 +419,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     console.error('Falha no backfill de gols:', err);
   }
 
-  // Preenche as seleções já definidas do mata-mata via ESPN (throttle ~20 min).
+  // Preenche as seleções já definidas do mata-mata via ESPN (throttle ~5 min).
   // Best-effort: nunca derruba a sincronização.
   try {
     await backfillKnockoutTeams(supabase);
