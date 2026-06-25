@@ -162,8 +162,15 @@ export interface EspnKnockoutSlot {
 // que é justamente o caso do mata-mata ainda por vir.
 export async function fetchEspnKnockout(dateKey: string): Promise<EspnKnockoutSlot[]> {
   const base = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
-  const res = await fetch(`${base}?dates=${dateKey}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BolaoBandidos/1.0)' },
+  // Cache-buster (`_`): a CDN da ESPN às vezes serve um snapshot PARCIAL/velho
+  // (com placeholders onde já há seleção definida), e o conteúdo varia por nó.
+  // Forçar uma URL única a cada chamada reduz a chance de cair num cache estagnado
+  // e devolve o estado mais fresco. Combinado com as múltiplas passadas no backfill.
+  const res = await fetch(`${base}?dates=${dateKey}&_=${Date.now()}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; BolaoBandidos/1.0)',
+      'Cache-Control': 'no-cache',
+    },
   });
   if (!res.ok) throw new Error(`ESPN respondeu ${res.status}`);
 

@@ -212,6 +212,7 @@ export async function backfillMissingGoals(
 // zerado pelo próximo sync que ainda receba 'A definir' do football-data.
 const KO_BACKFILL_THROTTLE_MS = 5 * 60 * 1000;
 const KO_HORIZON_MS = 14 * 24 * 60 * 60 * 1000; // só olha o mata-mata dos próximos ~14 dias
+const KO_ESPN_PASSES = 3; // passadas por data na ESPN (uniões cobrem snapshots parciais)
 
 export async function backfillKnockoutTeams(
   supabase: SupabaseClient,
@@ -265,14 +266,27 @@ export async function backfillKnockoutTeams(
   }
   if (dateKeys.size === 0) return { skipped: false, filled: 0 };
 
-  // Cards da ESPN indexados pelo horário de início (epoch ms).
+  // Cards da ESPN indexados pelo horário de início (epoch ms). Cada lado guarda
+  // o MELHOR nome visto: uma seleção real (presente em `known`) sempre vence um
+  // placeholder. Como a ESPN serve fatias parciais (umas chamadas trazem uns
+  // times definidos, outras trazem outros), fazemos VÁRIAS passadas por data e
+  // unimos — assim um lado que veio placeholder numa passada é preenchido por
+  // outra que o trouxe real, em vez de "primeiro card vence" (que perdia times).
+  const isReal = (name: string): boolean => known.has(norm(name));
   const byKick = new Map<number, { home: string; away: string }>();
-  for (const dk of dateKeys) {
-    try {
-      const slots = await fetchEspnKnockout(dk);
-      for (const s of slots) if (!byKick.has(s.kickoffMs)) byKick.set(s.kickoffMs, { home: s.home, away: s.away });
-    } catch (err) {
-      console.warn(`Backfill mata-mata: ESPN falhou para ${dk}:`, err);
+  const mergeSide = (cur: string, next: string): string =>
+    isReal(next) ? next : (cur && isReal(cur) ? cur : (cur || next));
+  for (let pass = 0; pass < KO_ESPN_PASSES; pass += 1) {
+    for (const dk of dateKeys) {
+      try {
+        const slots = await fetchEspnKnockout(dk);
+        for (const s of slots) {
+          const cur = byKick.get(s.kickoffMs) ?? { home: '', away: '' };
+          byKick.set(s.kickoffMs, { home: mergeSide(cur.home, s.home), away: mergeSide(cur.away, s.away) });
+        }
+      } catch (err) {
+        console.warn(`Backfill mata-mata: ESPN falhou para ${dk} (passada ${pass + 1}):`, err);
+      }
     }
   }
   if (byKick.size === 0) return { skipped: false, filled: 0 };
