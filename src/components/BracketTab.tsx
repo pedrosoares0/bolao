@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { Match } from '../types';
-import { flagSrc } from '../lib/teamMaps';
+import { flagSrc, translateTeam, flagOf } from '../lib/teamMaps';
 import { computeGroupStandings, computeBestThirds } from '../utils/groups';
 
 interface BracketTabProps {
@@ -17,6 +17,40 @@ interface BracketTabProps {
 
 const TBD = 'A definir';
 const isTbd = (s: string) => !s || s === TBD;
+
+// ---- Enriquecimento do mata-mata pela ESPN, DIRETO DO NAVEGADOR ----
+// A football-data deixa os dois lados nulos ('A definir') até a fase de grupos
+// fechar, e a ESPN servida ao nosso servidor (Netlify, região US) vem atrasada.
+// Mas a ESPN entrega os times já definidos com Access-Control-Allow-Origin: *,
+// e o navegador do usuário (no Brasil) cai num edge atualizado. Então buscamos a
+// ESPN aqui no cliente e completamos o chaveamento na tela — sem depender da
+// região do servidor. Só preenche um lado quando o nome da ESPN casa com uma
+// seleção REAL da Copa (as da fase de grupos); placeholders ("Group F 2nd
+// Place", "Round of 32 1 Winner") são ignorados.
+const TEAM_ALIAS: Record<string, string> = {
+  usa: 'unitedstates',
+  unitedstatesofamerica: 'unitedstates',
+  korearepublic: 'southkorea',
+  iriran: 'iran',
+  cotedivoire: 'ivorycoast',
+  drcongo: 'congodr',
+  democraticrepublicofthecongo: 'congodr',
+  capeverdeislands: 'capeverde',
+  caboverde: 'capeverde',
+  bosniaandherzegovina: 'bosniaherzegovina',
+  czechrepublic: 'czechia',
+  turkiye: 'turkey',
+};
+const normTeam = (s: string): string => {
+  const base = (s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  return TEAM_ALIAS[base] ?? base;
+};
+const ESPN_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const KO_HORIZON_MS = 14 * 24 * 60 * 60 * 1000; // só busca o mata-mata dos próximos ~14 dias
 
 // Fases da árvore, da esquerda (16avos) à direita (final). 3º lugar fica à parte.
 const TREE_ORDER = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
@@ -149,16 +183,140 @@ function BracketTab({ matches }: BracketTabProps) {
   const bestThirds = useMemo(() => computeBestThirds(groups), [groups]);
   const showThirds = bestThirds.some((t) => t.played > 0);
 
-  // ---- Mata-mata por fase ----
+  // ---- ESPN no cliente: completa os times do mata-mata (ver nota no topo) ----
+  // Índice das seleções REAIS da Copa (nome normalizado -> nome em inglês do
+  // football-data), tirado da fase de grupos — usado para validar o que a ESPN
+  // traz e gravar o nome no padrão que o teamMaps entende (bandeira/tradução).
+  const knownByNorm = useMemo(() => {
+    const map = new Map<string, string>();
+    matches.forEach((m) => {
+      if (m.stage !== 'GROUP_STAGE') return;
+      if (!isTbd(m.homeTeamEn)) map.set(normTeam(m.homeTeamEn), m.homeTeamEn);
+      if (!isTbd(m.awayTeamEn)) map.set(normTeam(m.awayTeamEn), m.awayTeamEn);
+    });
+    return map;
+  }, [matches]);
+
+  // Datas (AAAAMMDD) do mata-mata ainda com algum lado indefinido. Como string
+  // estável: o efeito de busca só re-dispara quando esse conjunto muda (e não a
+  // cada placar ao vivo). Sem datas (tudo definido) => não bate na ESPN. O corte
+  // de horizonte (próximos dias) fica no efeito, que pode usar o relógio.
+  const missingKoDatesKey = useMemo(() => {
+    const dates = new Set<string>();
+    matches.forEach((m) => {
+      if (m.stage === 'GROUP_STAGE') return;
+      if (!isTbd(m.homeTeamEn) && !isTbd(m.awayTeamEn)) return;
+      if (m.kickoff) dates.add(m.kickoff.slice(0, 10).replace(/-/g, ''));
+    });
+    return Array.from(dates).sort().join(',');
+  }, [matches]);
+
+  // kickoff (epoch ms) -> seleções reais que a ESPN já definiu para o confronto.
+  const [espnFill, setEspnFill] = useState<Map<number, { home?: string; away?: string }>>(new Map());
+  // Espelho do índice de seleções conhecidas, lido só dentro do efeito (refs não
+  // podem ser acessadas no render). Mantém o efeito fora de `knownByNorm` nas deps.
+  const knownRef = useRef(knownByNorm);
+  useEffect(() => {
+    knownRef.current = knownByNorm;
+  }, [knownByNorm]);
+
+  useEffect(() => {
+    // AAAAMMDD -> epoch (UTC) para cortar o que está além do horizonte.
+    const dateKeys = missingKoDatesKey
+      .split(',')
+      .filter(Boolean)
+      .filter((dk) => {
+        const t = Date.UTC(+dk.slice(0, 4), +dk.slice(4, 6) - 1, +dk.slice(6, 8));
+        return t <= Date.now() + KO_HORIZON_MS;
+      });
+    // Nada faltando no horizonte: não busca. Um `espnFill` antigo é inofensivo —
+    // enrichKo só usa o preenchimento em lados ainda 'A definir'.
+    if (dateKeys.length === 0) return;
+    let cancelled = false;
+
+    const run = async () => {
+      const known = knownRef.current;
+      const fill = new Map<number, { home?: string; away?: string }>();
+      await Promise.all(
+        dateKeys.map(async (dk) => {
+          try {
+            const res = await fetch(`${ESPN_SCOREBOARD}?dates=${dk}&_=${Date.now()}`, { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            for (const ev of data.events ?? []) {
+              const comp = ev.competitions?.[0];
+              const competitors: Array<{ homeAway?: string; team?: { displayName?: string } }> = comp?.competitors ?? [];
+              const home = competitors.find((c) => c.homeAway === 'home');
+              const away = competitors.find((c) => c.homeAway === 'away');
+              const k = Date.parse(ev.date ?? '');
+              if (!k) continue;
+              const hEn = known.get(normTeam(home?.team?.displayName ?? ''));
+              const aEn = known.get(normTeam(away?.team?.displayName ?? ''));
+              if (hEn || aEn) {
+                const cur = fill.get(k) ?? {};
+                if (hEn) cur.home = hEn;
+                if (aEn) cur.away = aEn;
+                fill.set(k, cur);
+              }
+            }
+          } catch {
+            /* ESPN indisponível no cliente — segue com o que o servidor já tem */
+          }
+        })
+      );
+      if (cancelled) return;
+      // Só atualiza o estado se algo mudou (evita re-render à toa).
+      setEspnFill((prev) => {
+        if (prev.size === fill.size && Array.from(fill).every(([k, v]) => {
+          const p = prev.get(k);
+          return p && p.home === v.home && p.away === v.away;
+        })) return prev;
+        return fill;
+      });
+    };
+
+    run();
+    const id = window.setInterval(run, 5 * 60 * 1000); // re-busca a cada 5 min
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [missingKoDatesKey]);
+
+  // Aplica o que a ESPN trouxe num jogo do mata-mata (só nos lados indefinidos).
+  const enrichKo = useMemo(() => {
+    return (m: Match): Match => {
+      const needHome = isTbd(m.homeTeamEn);
+      const needAway = isTbd(m.awayTeamEn);
+      if (!needHome && !needAway) return m;
+      const f = espnFill.get(Date.parse(m.kickoff));
+      if (!f) return m;
+      const out = { ...m };
+      if (needHome && f.home) {
+        out.homeTeamEn = f.home;
+        out.homeTeam = translateTeam(f.home);
+        out.homeFlag = flagOf(f.home, '');
+      }
+      if (needAway && f.away) {
+        out.awayTeamEn = f.away;
+        out.awayTeam = translateTeam(f.away);
+        out.awayFlag = flagOf(f.away, '');
+      }
+      return out;
+    };
+  }, [espnFill]);
+
+  // ---- Mata-mata por fase (com os times já completados pela ESPN) ----
   const knockout = useMemo<Stage[]>(() => {
     return KNOCKOUT_STAGES.map(({ key, label }) => ({
       key,
       label,
       games: matches
         .filter((m) => m.stage === key)
+        .map(enrichKo)
         .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff)),
     })).filter((s) => s.games.length > 0);
-  }, [matches]);
+  }, [matches, enrichKo]);
 
   const hasGroups = groups.length > 0;
   const hasKnockout = knockout.length > 0;
