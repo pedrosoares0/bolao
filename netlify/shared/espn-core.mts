@@ -142,3 +142,42 @@ export async function fetchEspnOverrides(dateKey?: string): Promise<Map<string, 
 
   return map;
 }
+
+// ---- Confronto do mata-mata segundo a ESPN (mandante/visitante por kickoff) ----
+// A ESPN já posiciona nos cards do mata-mata as seleções JÁ DEFINIDAS (ex.:
+// "Brazil" nos 16avos) enquanto o adversário ainda é um placeholder textual
+// ("Group F 2nd Place", "Round of 32 1 Winner"). Diferente do football-data —
+// que mantém os dois lados nulos até a fase de grupos fechar — a ESPN antecipa
+// o que já dá pra antecipar. Devolvemos o nome cru de cada lado (incl. o
+// placeholder); quem chama decide o que é seleção real (ver sync-core).
+export interface EspnKnockoutSlot {
+  kickoffMs: number; // início do jogo (epoch ms) — chave p/ casar com o football-data
+  home: string;      // nome do mandante como a ESPN reporta (pode ser placeholder)
+  away: string;      // idem visitante
+}
+
+// Busca o scoreboard de UMA data (AAAAMMDD) e devolve os confrontos do dia com
+// o nome cru de cada lado. Lança erro se a ESPN falhar — quem chama trata como
+// "sem ESPN" e segue. Não filtra por status: pega jogos agendados ('pre') também,
+// que é justamente o caso do mata-mata ainda por vir.
+export async function fetchEspnKnockout(dateKey: string): Promise<EspnKnockoutSlot[]> {
+  const base = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+  const res = await fetch(`${base}?dates=${dateKey}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BolaoBandidos/1.0)' },
+  });
+  if (!res.ok) throw new Error(`ESPN respondeu ${res.status}`);
+
+  const data = (await res.json()) as EspnScoreboard;
+  const out: EspnKnockoutSlot[] = [];
+  for (const ev of data.events ?? []) {
+    const comp = ev.competitions?.[0];
+    const home = comp?.competitors?.find((c) => c.homeAway === 'home');
+    const away = comp?.competitors?.find((c) => c.homeAway === 'away');
+    const homeName = home?.team?.displayName ?? home?.team?.name ?? '';
+    const awayName = away?.team?.displayName ?? away?.team?.name ?? '';
+    const kickoffMs = Date.parse(ev.date ?? '');
+    if (!kickoffMs || (!homeName && !awayName)) continue;
+    out.push({ kickoffMs, home: homeName, away: awayName });
+  }
+  return out;
+}

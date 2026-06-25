@@ -1344,6 +1344,12 @@ function App() {
                     // Determinar se o jogo já começou ou terminou
                     const hasGameStarted = match.status === 'finished' || !isGameInFuture(match.kickoff, nowTs);
 
+                    // No mata-mata os palpites dos outros ficam OCULTOS até o
+                    // jogo começar (só o próprio usuário vê o seu). Na fase de
+                    // grupos seguem públicos como sempre.
+                    const isKnockout = match.stage !== 'GROUP_STAGE';
+                    const hideOpponentPicks = isKnockout && !hasGameStarted;
+
                     const sessionOpen = nowTs >= startOfBrDay(selectedDate);
                     const canEditBet = sessionOpen && match.status === 'scheduled' && isBettable(match.kickoff, nowTs);
 
@@ -1696,6 +1702,11 @@ function App() {
                                 const bet = betByMatchUser.get(`${match.id}|${p.id}`);
                                 const analysis = analyzeBet(bet, match);
 
+                                // No mata-mata, esconde o palpite dos adversários
+                                // antes do jogo começar — o usuário só enxerga o seu.
+                                const isOwnPick = !!currentUser && p.id === currentUser.id;
+                                const pickHidden = hideOpponentPicks && !isOwnPick;
+
                                 // Mini-títulos do jogo
                                 const isProfeta = finishedTitles && analysis.type === 'exact';
                                 const isPeFrio = p.id === peFrioId;
@@ -1737,11 +1748,13 @@ function App() {
                                       ? BRAZIL_PLAYERS.find((pl) => pl.id === bet.scorerId) ?? null
                                       : null))
                                   : null;
+                                // Não revela o artilheiro do adversário antes do jogo (mata-mata).
+                                const showScorer = !!pickedPlayer && !pickHidden;
 
                                 return (
                                   <div key={p.id} className="inline-guess-row-p16">
                                     <div className="inline-guess-user-info-p16">
-                                      <div className={`inline-guess-avatar-wrapper ${pickedPlayer ? 'has-scorer' : ''}`}>
+                                      <div className={`inline-guess-avatar-wrapper ${showScorer ? 'has-scorer' : ''}`}>
                                         <div className="inline-guess-avatar-border-p16">
                                           <img loading="lazy" decoding="async"
                                             src={`/imagens/ranking ${p.id}.webp`}
@@ -1752,7 +1765,7 @@ function App() {
                                             }}
                                           />
                                         </div>
-                                        {pickedPlayer && (
+                                        {showScorer && pickedPlayer && (
                                           <div className="inline-guess-scorer-overlay">
                                             <img
                                               loading="lazy" decoding="async"
@@ -1782,7 +1795,9 @@ function App() {
                                     </div>
 
                                     <div className="inline-guess-result-info-p16">
-                                      {bet ? (
+                                      {pickHidden ? (
+                                        <span className="inline-guess-hidden-text-p16">🔒 Oculto</span>
+                                      ) : bet ? (
                                         <div className="inline-guess-scores-container-p16">
                                           <span className="inline-guess-score-text-p16">
                                             {bet.homeScore} x {bet.awayScore}
@@ -1799,9 +1814,11 @@ function App() {
                                         <span className="inline-guess-none-text-p16">Sem Palpite</span>
                                       )}
 
-                                      <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
-                                        {pointsText}
-                                      </div>
+                                      {!pickHidden && (
+                                        <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
+                                          {pointsText}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );

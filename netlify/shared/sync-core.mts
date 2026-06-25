@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { runNotifications } from './notify-core.mts';
-import { fetchEspnOverrides, norm, pairKey } from './espn-core.mts';
+import { fetchEspnOverrides, fetchEspnKnockout, norm, pairKey } from './espn-core.mts';
 import type { EspnGoalDetail } from './espn-core.mts';
 
 // ---- Formato cru de uma partida na football-data.org (só os campos que usamos) ----
@@ -24,11 +24,46 @@ interface ApiMatch {
 }
 
 // ---- Estado anterior de um jogo (para detectar transições e notificar) ----
+// Inclui os times já gravados — usados para preservar a seleção do mata-mata
+// já conhecida (preserveKnownTeams) e não rebaixá-la a 'A definir'.
 interface PrevState {
   id: number;
   status: string;
   home_score: number | null;
   away_score: number | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  home_tla?: string | null;
+  away_tla?: string | null;
+  home_crest?: string | null;
+  away_crest?: string | null;
+}
+
+// Placeholder de seleção indefinida (mandante/visitante ainda por decidir).
+const TBD = 'A definir';
+const isTbd = (s: string | null | undefined): boolean => !s || s === TBD;
+
+// Fases do mata-mata (tudo que não é a fase de grupos).
+const KNOCKOUT_STAGES = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL'];
+
+// Mantém "grudenta" a seleção do mata-mata já conhecida: quando a linha nova vem
+// com 'A definir' num lado mas já havia uma seleção real gravada, conserva a real
+// (com tla/crest). Nunca faz o contrário (uma seleção real nunca vira 'A definir').
+function preserveKnownTeams(rows: MatchUpsertRow[], prevById: Map<number, PrevState>): void {
+  for (const r of rows) {
+    const p = prevById.get(r.id);
+    if (!p) continue;
+    if (isTbd(r.home_team) && !isTbd(p.home_team)) {
+      r.home_team = p.home_team as string;
+      r.home_tla = p.home_tla ?? r.home_tla;
+      r.home_crest = p.home_crest ?? r.home_crest;
+    }
+    if (isTbd(r.away_team) && !isTbd(p.away_team)) {
+      r.away_team = p.away_team as string;
+      r.away_tla = p.away_tla ?? r.away_tla;
+      r.away_crest = p.away_crest ?? r.away_crest;
+    }
+  }
 }
 
 // ---- Linha gravada na tabela `matches` (o que montamos para o upsert) ----
@@ -165,6 +200,124 @@ export async function backfillMissingGoals(
   return { skipped: false, filled: goalRows.length };
 }
 
+// Preenche as seleções do mata-mata JÁ DEFINIDAS usando a ESPN, enquanto o
+// football-data ainda deixa os dois lados nulos ('A definir'). A ESPN antecipa
+// quem já se classificou (ex.: "Brazil" nos 16avos) e mantém o adversário como
+// placeholder textual — então casamos cada jogo do banco com o card da ESPN pelo
+// HORÁRIO DE INÍCIO (kickoff bate ao minuto entre as duas APIs) e preenchemos só
+// o lado cujo nome da ESPN casa com uma seleção REAL da Copa (as da fase de
+// grupos). Placeholders ("Group F 2nd Place", "Round of 32 1 Winner") são
+// ignorados. Best-effort e throttled (~20 min) — não derruba a sincronização.
+// O preserveKnownTeams (no syncMatches) garante que esse preenchimento não seja
+// zerado pelo próximo sync que ainda receba 'A definir' do football-data.
+const KO_BACKFILL_THROTTLE_MS = 20 * 60 * 1000;
+const KO_HORIZON_MS = 14 * 24 * 60 * 60 * 1000; // só olha o mata-mata dos próximos ~14 dias
+
+export async function backfillKnockoutTeams(
+  supabase: SupabaseClient,
+  force = false
+): Promise<{ skipped: boolean; filled?: number; reason?: string }> {
+  if (!force) {
+    const { data: state } = await supabase
+      .from('sync_state')
+      .select('last_ko_backfill')
+      .eq('id', 1)
+      .single();
+    const last = state?.last_ko_backfill ? new Date(state.last_ko_backfill).getTime() : 0;
+    if (Date.now() - last < KO_BACKFILL_THROTTLE_MS) {
+      return { skipped: true, reason: 'Backfill de mata-mata feito há pouco.' };
+    }
+  }
+  // Marca o tempo já aqui (mesmo sem nada a fazer) para o throttle valer.
+  await supabase.from('sync_state').upsert({ id: 1, last_ko_backfill: new Date().toISOString() });
+
+  // Jogos do mata-mata com algum lado ainda indefinido.
+  const { data: koData } = await supabase
+    .from('matches')
+    .select('id, utc_date, stage, home_team, away_team, home_tla, away_tla, home_crest, away_crest')
+    .in('stage', KNOCKOUT_STAGES);
+  const missing = (koData ?? []).filter(
+    (m) => isTbd(m.home_team) || isTbd(m.away_team)
+  ) as KnockoutDbRow[];
+  if (missing.length === 0) return { skipped: false, filled: 0 };
+
+  // Índice das seleções REAIS da Copa (nome normalizado -> nome/tla/crest do
+  // football-data), montado a partir da fase de grupos. Serve para (a) decidir
+  // se o nome que a ESPN traz é uma seleção de verdade e (b) gravar o nome no
+  // padrão do football-data (que o front usa p/ tradução, bandeira e cores).
+  const { data: gsData } = await supabase
+    .from('matches')
+    .select('home_team, away_team, home_tla, away_tla, home_crest, away_crest')
+    .eq('stage', 'GROUP_STAGE');
+  const known = new Map<string, { name: string; tla: string; crest: string }>();
+  for (const g of (gsData ?? []) as KnockoutDbRow[]) {
+    if (!isTbd(g.home_team)) known.set(norm(g.home_team!), { name: g.home_team!, tla: g.home_tla ?? '', crest: g.home_crest ?? '' });
+    if (!isTbd(g.away_team)) known.set(norm(g.away_team!), { name: g.away_team!, tla: g.away_tla ?? '', crest: g.away_crest ?? '' });
+  }
+  if (known.size === 0) return { skipped: false, filled: 0 };
+
+  // Datas (AAAAMMDD) a consultar na ESPN: só os jogos faltantes dos próximos
+  // ~14 dias (a ESPN só define a seleção perto da fase). Sem repetir.
+  const horizon = Date.now() + KO_HORIZON_MS;
+  const dateKeys = new Set<string>();
+  for (const m of missing) {
+    if (Date.parse(m.utc_date) <= horizon) dateKeys.add(ymdKey(m.utc_date));
+  }
+  if (dateKeys.size === 0) return { skipped: false, filled: 0 };
+
+  // Cards da ESPN indexados pelo horário de início (epoch ms).
+  const byKick = new Map<number, { home: string; away: string }>();
+  for (const dk of dateKeys) {
+    try {
+      const slots = await fetchEspnKnockout(dk);
+      for (const s of slots) if (!byKick.has(s.kickoffMs)) byKick.set(s.kickoffMs, { home: s.home, away: s.away });
+    } catch (err) {
+      console.warn(`Backfill mata-mata: ESPN falhou para ${dk}:`, err);
+    }
+  }
+  if (byKick.size === 0) return { skipped: false, filled: 0 };
+
+  // Monta os updates: só o(s) lado(s) faltante(s) que a ESPN já definiu.
+  const updates: Partial<MatchUpsertRow>[] = [];
+  for (const m of missing) {
+    const slot = byKick.get(Date.parse(m.utc_date));
+    if (!slot) continue;
+    const upd: Partial<MatchUpsertRow> & { id: number } = { id: m.id };
+    let changed = false;
+    if (isTbd(m.home_team)) {
+      const k = known.get(norm(slot.home));
+      if (k) { upd.home_team = k.name; upd.home_tla = k.tla; upd.home_crest = k.crest; changed = true; }
+    }
+    if (isTbd(m.away_team)) {
+      const k = known.get(norm(slot.away));
+      if (k) { upd.away_team = k.name; upd.away_tla = k.tla; upd.away_crest = k.crest; changed = true; }
+    }
+    if (changed) updates.push(upd);
+  }
+  if (updates.length === 0) return { skipped: false, filled: 0 };
+
+  const { error } = await supabase.from('matches').upsert(updates);
+  if (error) {
+    console.error('Backfill mata-mata: erro ao gravar:', error.message);
+    return { skipped: false, filled: 0 };
+  }
+  console.log(`Backfill mata-mata: ${updates.length} confronto(s) preenchido(s) via ESPN.`);
+  return { skipped: false, filled: updates.length };
+}
+
+// Linha de `matches` lida para o backfill do mata-mata (só as colunas usadas).
+interface KnockoutDbRow {
+  id: number;
+  utc_date: string;
+  stage: string | null;
+  home_team: string | null;
+  away_team: string | null;
+  home_tla: string | null;
+  away_tla: string | null;
+  home_crest: string | null;
+  away_crest: string | null;
+}
+
 // Busca todos os jogos da Copa 2026 na football-data.org (competição "WC")
 // e grava/atualiza na tabela `matches` do Supabase usando a service_role.
 // Throttle: se sincronizou há menos de 30 segundos, pula (limite free: 10 req/min).
@@ -221,14 +374,23 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
 
   if (mergedRows.length > 0) {
     // Estado ANTERIOR (antes de sobrescrever) — usado para detectar
-    // transições (começou / gol / intervalo / fim) e notificar o WhatsApp.
+    // transições (começou / gol / intervalo / fim) e notificar o WhatsApp, e
+    // também para PRESERVAR o time do mata-mata já conhecido (ver abaixo).
     const { data: prevRows } = await supabase
       .from('matches')
-      .select('id, status, home_score, away_score')
+      .select('id, status, home_score, away_score, home_team, away_team, home_tla, away_tla, home_crest, away_crest')
       .in('id', mergedRows.map((r) => r.id));
     const prevById = new Map(
       ((prevRows ?? []) as PrevState[]).map((r) => [r.id, r] as const)
     );
+
+    // Time "grudento" no mata-mata: o football-data devolve os dois lados nulos
+    // ('A definir') enquanto a fase de grupos não fecha, e a API free ainda serve
+    // snapshots inconsistentes — então um confronto já preenchido (pelo backfill
+    // da ESPN, abaixo) poderia ser ZERADO de volta pra 'A definir' no próximo
+    // sync. Aqui garantimos: nunca rebaixar uma seleção já conhecida para 'A
+    // definir' (só substituímos placeholder por nome real, nunca o contrário).
+    preserveKnownTeams(mergedRows, prevById);
 
     // Remove os campos transitórios (homeTeamId/awayTeamId/goalsDetail) que NÃO
     // são colunas da tabela — eles servem só às notificações abaixo. Sem isso, o
@@ -255,6 +417,14 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     await backfillMissingGoals(supabase);
   } catch (err) {
     console.error('Falha no backfill de gols:', err);
+  }
+
+  // Preenche as seleções já definidas do mata-mata via ESPN (throttle ~20 min).
+  // Best-effort: nunca derruba a sincronização.
+  try {
+    await backfillKnockoutTeams(supabase);
+  } catch (err) {
+    console.error('Falha no backfill de mata-mata:', err);
   }
 
   return { skipped: false, count: mergedRows.length };

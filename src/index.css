@@ -1014,6 +1014,15 @@ body {
   color: #8b8075;
 }
 
+/* Palpite oculto no mata-mata (revelado só quando o jogo começa) */
+.inline-guess-hidden-text-p16 {
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  color: #b3a994;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .inline-guess-badge-p16 {
   font-family: var(--font-family);
   font-size: 0.7rem;
