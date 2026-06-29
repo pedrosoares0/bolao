@@ -1,4 +1,4 @@
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction } from '../types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, ThiefSteal } from '../types';
 import { computeChampion, computeBrazilStage, SPECIAL_POINTS } from './specials';
 import { goalsByPlayer } from './players';
 
@@ -98,11 +98,15 @@ export function analyzeBet(bet: Bet | undefined, match: Match): BetAnalysis {
 // Gera a tabela de classificação/ranking ordenada e calcula os pagamentos.
 // Os palpites especiais (campeão + até onde o Brasil vai) somam 5 pontos
 // cada quando confirmados pelos resultados reais.
+// Gera a tabela de classificação/ranking ordenada e calcula os pagamentos.
+// Os palpites especiais (campeão + até onde o Brasil vai) somam 5 pontos
+// cada quando confirmados pelos resultados reais.
 export function calculateStandings(
   participants: Participant[],
   matches: Match[],
   bets: Bet[],
-  specials: SpecialPrediction[] = []
+  specials: SpecialPrediction[] = [],
+  steals: ThiefSteal[] = []
 ): ParticipantStanding[] {
   const champion = computeChampion(matches);
   const brazilStage = computeBrazilStage(matches);
@@ -179,6 +183,14 @@ export function calculateStandings(
   const fireCounts = calculateFireCounts(matches, bets, participants);
   const peFrioCounts = calculatePeFrioCounts(matches, bets, participants);
 
+  // Aplicar roubos da habilidade Ladrão (Thief)
+  steals.forEach((steal) => {
+    const thiefStanding = standings.find((s) => s.participantId === steal.thiefId);
+    const victimStanding = standings.find((s) => s.participantId === steal.victimId);
+    if (thiefStanding) thiefStanding.points += 1;
+    if (victimStanding) victimStanding.points -= 1;
+  });
+
   // Ordena por:
   // 1. Pontos (decrescente)
   // 2. Mais ON FIRE (fires) (decrescente)
@@ -200,6 +212,83 @@ export function calculateStandings(
     return 0;
   });
 }
+
+export interface ThiefStatus {
+  roundDate: string; // YYYY-MM-DD
+  thiefId: string | null; // ID do Ladrão da rodada se houver (e não for anulado ou líder)
+  status: 'active' | 'annulled' | 'leader_ineligible' | 'none';
+  pointsScored: number;
+}
+
+// Calcula quem tem o direito de ser o "Ladrão" em cada rodada diária completada (isoDate)
+export function calculateThiefRounds(
+  matches: Match[],
+  bets: Bet[],
+  participants: Participant[]
+): Record<string, ThiefStatus> {
+  const result: Record<string, ThiefStatus> = {};
+  if (!matches || !bets || participants.length === 0) return result;
+
+  // Encontra todas as datas únicas de jogos
+  const allDates = Array.from(new Set(matches.map((m) => m.isoDate))).sort();
+
+  // Filtra as datas onde todos os jogos estão finalizados (FINISHED)
+  const completedDates = allDates.filter((iso) => {
+    const dayMatches = matches.filter((m) => m.isoDate === iso);
+    return dayMatches.length > 0 && dayMatches.every(
+      (m) => m.status === 'finished' && m.homeScore !== null && m.awayScore !== null
+    );
+  });
+
+  const betIndex = new Map<string, Bet>();
+  bets.forEach((b) => betIndex.set(`${b.participantId}|${b.matchId}`, b));
+
+  completedDates.forEach((iso) => {
+    const dayMatches = matches.filter((m) => m.isoDate === iso);
+    const dayScores = participants.map((p) => {
+      let pts = 0;
+      dayMatches.forEach((m) => {
+        const bet = betIndex.get(`${p.id}|${m.id}`);
+        const a = analyzeBet(bet, m);
+        pts += a.points + scorerBonus(bet, m) + pensBonus(bet, m);
+      });
+      return { id: p.id, pts };
+    });
+
+    // Filtra participantes que fizeram mais de 6 pontos (> 6)
+    const aboveSix = dayScores.filter((x) => x.pts > 6);
+
+    if (aboveSix.length === 0) {
+      result[iso] = { roundDate: iso, thiefId: null, status: 'none', pointsScored: 0 };
+      return;
+    }
+
+    // Se duas ou mais pessoas fizerem mais de 6 pontos, a habilidade é anulada
+    if (aboveSix.length > 1) {
+      const maxPts = Math.max(...aboveSix.map((x) => x.pts));
+      result[iso] = { roundDate: iso, thiefId: null, status: 'annulled', pointsScored: maxPts };
+      return;
+    }
+
+    // Apenas um participante fez mais de 6 pontos
+    const potentialThief = aboveSix[0];
+
+    // O líder do campeonato não pode ser o Ladrão.
+    // Calculamos a classificação até essa data (inclusive o dia) para ver quem era o líder
+    const matchesUpToDate = matches.filter((m) => Date.parse(m.kickoff) <= Date.parse(dayMatches[dayMatches.length - 1].kickoff));
+    const standingsUpToDate = calculateStandings(participants, matchesUpToDate, bets, [], []);
+    const leaderId = standingsUpToDate[0]?.participantId;
+
+    if (potentialThief.id === leaderId) {
+      result[iso] = { roundDate: iso, thiefId: null, status: 'leader_ineligible', pointsScored: potentialThief.pts };
+    } else {
+      result[iso] = { roundDate: iso, thiefId: potentialThief.id, status: 'active', pointsScored: potentialThief.pts };
+    }
+  });
+
+  return result;
+}
+
 
 // Calcula os fogos (ONFIRE) permanentes e a sequência atual de pontuação.
 // Duas regras concedem +1 fogo permanente:

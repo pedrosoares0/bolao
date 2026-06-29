@@ -96,3 +96,12 @@ export interface Debt {
   createdAt: string;
 }
 
+export interface ThiefSteal {
+  id: string;
+  thiefId: string;
+  victimId: string;
+  roundDate: string; // YYYY-MM-DD
+  createdAt: string;
+}
+
+

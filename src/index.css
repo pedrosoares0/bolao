@@ -7333,4 +7333,185 @@ body {
   }
 }
 
+/* ============================================================
+   Cartões da Habilidade Ladrão (Thief)
+   ============================================================ */
+.thief-attacker-card {
+  position: relative;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1e152a 0%, #0d0814 100%);
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 8px 32px rgba(168, 85, 247, 0.15);
+  padding: 1.2rem;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.thief-attacker-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.thief-attacker-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.thief-attacker-header {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
+.thief-attacker-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.thief-attacker-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.thief-attacker-title {
+  font-family: var(--font-family-condensed);
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #c084fc;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 10px rgba(192, 132, 252, 0.3);
+}
+
+.thief-attacker-desc {
+  font-size: 0.82rem;
+  color: rgba(242, 236, 221, 0.8);
+  line-height: 1.4;
+}
+
+.thief-attacker-action-row {
+  display: flex;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.thief-attacker-select {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.thief-attacker-select:focus {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.thief-attacker-btn {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+}
+
+.thief-attacker-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
+}
+
+.thief-attacker-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Vitima do Roubo (Thief Victim Card) */
+.thief-victim-card {
+  position: relative;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2e0808 0%, #0f0202 100%);
+  border: 1.5px solid rgba(239, 68, 68, 0.25);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
+  padding: 1rem 2.5rem 1rem 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.thief-victim-content {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.thief-victim-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.thief-victim-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.thief-victim-title {
+  font-family: var(--font-family-condensed);
+  font-size: 1rem;
+  font-weight: 900;
+  color: #f87171;
+  letter-spacing: 0.05em;
+}
+
+.thief-victim-desc {
+  font-size: 0.8rem;
+  color: rgba(242, 236, 221, 0.85);
+  line-height: 1.35;
+}
+
+.thief-victim-close {
+  position: absolute;
+  top: 50%;
+  right: 0.8rem;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: rgba(242, 236, 221, 0.4);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.3rem;
+  transition: color 0.2s ease;
+  line-height: 1;
+}
+
+.thief-victim-close:hover {
+  color: #fff;
+}
+
+
 

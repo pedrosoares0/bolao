@@ -14,9 +14,9 @@
 // ============================================================
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Fragment } from 'react';
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal } from './types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal, ThiefSteal } from './types';
 import { BRAZIL_PLAYERS, goalsByPlayer } from './utils/players';
-import { calculateStandings, analyzeBet } from './utils/rules';
+import { calculateStandings, analyzeBet, calculateThiefRounds } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
 // WebGL do Ranking (ogl) — quando o usuário abre a aba, deixando o boot mais leve.
@@ -320,6 +320,15 @@ function App() {
     { user_id: string; champion_team: string; brazil_stage: BrazilStage }[]
   >([]);
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [thiefSteals, setThiefSteals] = useState<ThiefSteal[]>([]);
+  const [dismissedSteals, setDismissedSteals] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dismissed_steals') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [selectedVictims, setSelectedVictims] = useState<Record<string, string>>({});
 
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
   const [showPixModal, setShowPixModal] = useState(false);
@@ -500,7 +509,7 @@ function App() {
   const loadAll = async (uid: string, withSpinner: boolean) => {
     if (withSpinner) setLoading(true);
     try {
-      const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes] = await Promise.all([
+      const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes, stealsRes] = await Promise.all([
         supabase.from('participants').select('id, username, name, avatar_url').order('username'),
         // Só as colunas que o app usa (ver MatchDbRow) — evita trafegar a linha
         // inteira a cada evento do Realtime, que recarrega ~104 jogos de uma vez.
@@ -514,19 +523,20 @@ function App() {
         supabase.from('submissions').select('bet_date').eq('user_id', uid),
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
         supabase.from('debts').select('id, user_id, amount, debt_date, created_at'),
+        supabase.from('thief_steals').select('id, thief_id, victim_id, round_date, created_at'),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
       if (firstError) throw new Error(firstError.message);
 
-      setParticipants(
-        (partsRes.data ?? []).map((p) => ({
-          id: p.username,
-          uid: p.id,
-          name: p.name,
-          avatarUrl: p.avatar_url,
-        }))
-      );
+      const loadedParticipants = (partsRes.data ?? []).map((p) => ({
+        id: p.username,
+        uid: p.id,
+        name: p.name,
+        avatarUrl: p.avatar_url,
+      }));
+
+      setParticipants(loadedParticipants);
       setMatches(((matchesRes.data ?? []) as MatchDbRow[]).map(mapRowToMatch));
       setBetRows((betsRes.data ?? []) as BetRow[]);
       setSubmittedDates(new Set((subsRes.data ?? []).map((s) => s.bet_date)));
@@ -545,6 +555,25 @@ function App() {
             debtDate: d.debt_date,
             createdAt: d.created_at,
           }))
+        );
+      }
+
+      if (stealsRes.error) {
+        console.error('Erro ao carregar roubos:', stealsRes.error.message);
+        setThiefSteals([]);
+      } else {
+        setThiefSteals(
+          (stealsRes.data ?? []).map((s): ThiefSteal => {
+            const thiefPart = loadedParticipants.find((p) => p.uid === s.thief_id);
+            const victimPart = loadedParticipants.find((p) => p.uid === s.victim_id);
+            return {
+              id: s.id,
+              thiefId: thiefPart?.id || s.thief_id,
+              victimId: victimPart?.id || s.victim_id,
+              roundDate: s.round_date,
+              createdAt: s.created_at,
+            };
+          })
         );
       }
 
@@ -621,6 +650,7 @@ function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'thief_steals' }, scheduleReload)
       .subscribe();
 
     // Fallback caso o Realtime caia
@@ -1154,6 +1184,40 @@ function App() {
     await loadAll(currentUser.uid, false);
   };
 
+  // Handler para realizar o roubo de ponto (Ladrão)
+  const handleExecuteSteal = async (roundDate: string, victimId: string) => {
+    if (!currentUser?.uid) return;
+    const victim = participants.find((p) => p.id === victimId);
+    if (!victim?.uid) {
+      showToast('Participante inválido.', 'error');
+      return;
+    }
+
+    try {
+      const { error: dbError } = await supabase.from('thief_steals').insert({
+        thief_id: currentUser.uid,
+        victim_id: victim.uid,
+        round_date: roundDate,
+      });
+
+      if (dbError) throw dbError;
+
+      showToast(`Você roubou 1 ponto de ${victim.name}! 🥷`, 'success');
+      await loadAll(currentUser.uid, false);
+    } catch (err: any) {
+      console.error('Erro ao roubar ponto:', err);
+      showToast(err.message || 'Não foi possível realizar o roubo.', 'error');
+    }
+  };
+
+  // Handler para dispensar notificação de roubo sofrido
+  const dismissSteal = (stealId: string) => {
+    const next = [...dismissedSteals, stealId];
+    setDismissedSteals(next);
+    localStorage.setItem('dismissed_steals', JSON.stringify(next));
+  };
+
+
   // Handler para quitar TODOS os fiados de uma vez — sempre os do PRÓPRIO usuário.
   // Ignora o userId recebido e usa o uid logado: ninguém quita o fiado de outro.
   const handleRemoveAllDebts = async (userId: string) => {
@@ -1178,8 +1242,8 @@ function App() {
 
   // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
   const standings = useMemo<ParticipantStanding[]>(() => {
-    return calculateStandings(participants, matches, bets, specials);
-  }, [participants, matches, bets, specials]);
+    return calculateStandings(participants, matches, bets, specials, thiefSteals);
+  }, [participants, matches, bets, specials, thiefSteals]);
 
   // Evolução no ranking: compara a posição atual com a posição ANTES da última
   // rodada finalizada. Valor positivo = subiu; negativo = caiu; 0 = manteve.
@@ -1193,7 +1257,7 @@ function App() {
     // Remove apenas o ÚLTIMO jogo finalizado para saber como estava o ranking exatamente antes dele
     const lastMatch = finishedMatches[finishedMatches.length - 1];
     const prevMatches = matches.filter((m) => m.id !== lastMatch.id);
-    const prev = calculateStandings(participants, prevMatches, bets, specials);
+    const prev = calculateStandings(participants, prevMatches, bets, specials, thiefSteals);
 
     const prevRank: Record<string, number> = {};
     prev.forEach((s, i) => {
@@ -1306,6 +1370,99 @@ function App() {
         {/* ABA: PARTIDAS & APOSTAS */}
         {activeTab === 'jogos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+            {/* NOTIFICAÇÕES DO LADRÃO (THIEF) */}
+            {currentUser && (() => {
+              // Calculate thief rounds
+              const thiefRounds = calculateThiefRounds(matches, betRows.map(b => ({
+                matchId: String(b.match_id),
+                participantId: b.user_id,
+                homeScore: b.home_score,
+                awayScore: b.away_score,
+                scorerId: b.scorer_id,
+                pensPick: !!b.pens_pick,
+                pensWinner: b.pens_winner as 'HOME' | 'AWAY' | null
+              })), participants);
+
+              const pendingSteals = Object.entries(thiefRounds)
+                .filter(([date, status]) => status.thiefId === currentUser.id && !thiefSteals.some(s => s.roundDate === date))
+                .map(([date, status]) => ({ date, status }));
+
+              const receivedSteals = thiefSteals.filter(s => s.victimId === currentUser.id && !dismissedSteals.includes(s.id));
+
+              const formatBrlDate = (isoDate: string) => {
+                const parts = isoDate.split('-');
+                if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                return isoDate;
+              };
+
+              return (
+                <>
+                  {/* Roubos Sofridos */}
+                  {receivedSteals.map((steal) => {
+                    const thief = participants.find(p => p.id === steal.thiefId);
+                    return (
+                      <div key={steal.id} className="thief-victim-card">
+                        <div className="thief-victim-content">
+                          <span className="thief-victim-icon">⚠️</span>
+                          <div className="thief-victim-text">
+                            <span className="thief-victim-title">PONTO ROUBADO!</span>
+                            <span className="thief-victim-desc">
+                              O participante <b>{thief?.name || steal.thiefId}</b> roubou 1 ponto seu referente à rodada de <b>{formatBrlDate(steal.roundDate)}</b>!
+                            </span>
+                          </div>
+                        </div>
+                        <button type="button" className="thief-victim-close" onClick={() => dismissSteal(steal.id)}>✕</button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Roubos Pendentes (Você é o Ladrão) */}
+                  {pendingSteals.map(({ date, status }) => {
+                    const selectedVictim = selectedVictims[date] || '';
+                    const stealOptions = participants.filter(p => p.id !== currentUser.id);
+
+                    return (
+                      <div key={date} className="thief-attacker-card">
+                        <div className="thief-attacker-glow"></div>
+                        <div className="thief-attacker-body">
+                          <div className="thief-attacker-header">
+                            <span className="thief-attacker-emoji">🥷</span>
+                            <div className="thief-attacker-title-wrap">
+                              <span className="thief-attacker-title">VOCÊ É O LADRÃO!</span>
+                              <span className="thief-attacker-desc">
+                                Você foi o maior pontuador da rodada de <b>{formatBrlDate(date)}</b> com <b>{status.pointsScored} pontos</b>! Escolha um adversário para roubar 1 ponto dele.
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="thief-attacker-action-row">
+                            <select
+                              className="thief-attacker-select"
+                              value={selectedVictim}
+                              onChange={(e) => setSelectedVictims(prev => ({ ...prev, [date]: e.target.value }))}
+                            >
+                              <option value="">Escolher adversário...</option>
+                              {stealOptions.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="thief-attacker-btn"
+                              disabled={!selectedVictim}
+                              onClick={() => handleExecuteSteal(date, selectedVictim)}
+                            >
+                              Roubar Ponto 🎯
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
 
             {/* DATE CAROUSEL (3 datas visíveis, swipeable) */}
             {dates.length > 0 && (() => {
