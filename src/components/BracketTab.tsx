@@ -82,8 +82,22 @@ const STAGE_LABEL: Record<string, string> = {
 //   Alemanha×Paraguai, México×Equador | França×Suécia, Bélgica×Senegal
 //   Suíça×Argélia, Argentina×CaboVerde | Austrália×Egito, Colômbia×Gana
 const BRACKET_ORDER: Record<string, string[]> = {
-  LAST_32: ['537417', '537418', '537423', '537424', '537419', '537420', '537421', '537426', '537415', '537425', '537416', '537422', '537429', '537427', '537428', '537430'],
-  LAST_16: ['537376', '537375', '537379', '537380', '537377', '537378', '537382', '537381'],
+  LAST_32: [
+    '537415', '537416', // Alimentam Oitavos index 0 (Match 89)
+    '537417', '537418', // Alimentam Oitavos index 1 (Match 90)
+    '537419', '537420', // Alimentam Oitavos index 2 (Match 93)
+    '537421', '537422', // Alimentam Oitavos index 3 (Match 94)
+    '537423', '537424', // Alimentam Oitavos index 4 (Match 91 - Brasil vs Japão e Costa do Marfim vs Noruega)
+    '537425', '537426', // Alimentam Oitavos index 5 (Match 92)
+    '537427', '537428', // Alimentam Oitavos index 6 (Match 95)
+    '537429', '537430', // Alimentam Oitavos index 7 (Match 96)
+  ],
+  LAST_16: [
+    '537375', '537376', // Alimentam Quartas index 0 (Match 97)
+    '537379', '537380', // Alimentam Quartas index 1 (Match 98)
+    '537377', '537378', // Alimentam Quartas index 2 (Match 99 - Onde o Brasil joga!)
+    '537381', '537382', // Alimentam Quartas index 3 (Match 100)
+  ],
   QUARTER_FINALS: ['537383', '537384', '537385', '537386'],
   SEMI_FINALS: ['537387', '537388'],
   FINAL: ['537390'],
