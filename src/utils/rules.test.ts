@@ -101,6 +101,37 @@ describe('analyzeBet', () => {
   it('placar 0x0 apostado e 0x0 real é exato', () => {
     expect(analyzeBet(makeBet(0, 0), finishedMatch(0, 0))).toEqual({ points: 3, type: 'exact' });
   });
+
+  // ---- Mata-mata decidido nos pênaltis (placar empata, mas há quem avança) ----
+  it('empate nos pênaltis: cravar o placar exato ainda vale 3', () => {
+    const m = finishedMatch(1, 1, { winner: 'AWAY_TEAM', stage: 'LAST_16' });
+    expect(analyzeBet(makeBet(1, 1), m)).toEqual({ points: 3, type: 'exact' });
+  });
+
+  it('empate nos pênaltis: prever empate (placar errado) ainda vale 2', () => {
+    const m = finishedMatch(1, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
+    expect(analyzeBet(makeBet(0, 0), m)).toEqual({ points: 2, type: 'draw' });
+  });
+
+  it('empate nos pênaltis: apostar vencedor que AVANÇOU (mandante) vale 1', () => {
+    const m = finishedMatch(1, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
+    expect(analyzeBet(makeBet(2, 1), m)).toEqual({ points: 1, type: 'winner' });
+  });
+
+  it('empate nos pênaltis: apostar vencedor que AVANÇOU (visitante) vale 1', () => {
+    const m = finishedMatch(1, 1, { winner: 'AWAY_TEAM', stage: 'LAST_16' });
+    expect(analyzeBet(makeBet(0, 2), m)).toEqual({ points: 1, type: 'winner' });
+  });
+
+  it('empate nos pênaltis: apostar no time que foi ELIMINADO vale 0', () => {
+    const m = finishedMatch(1, 1, { winner: 'AWAY_TEAM', stage: 'LAST_16' });
+    expect(analyzeBet(makeBet(2, 1), m)).toEqual({ points: 0, type: 'wrong' });
+  });
+
+  it('empate na fase de grupos (winner DRAW) não vira vitória por pênalti', () => {
+    const m = finishedMatch(1, 1, { winner: 'DRAW' });
+    expect(analyzeBet(makeBet(2, 0), m)).toEqual({ points: 0, type: 'wrong' });
+  });
 });
 
 // ---------- calculateStandings ----------

@@ -113,6 +113,8 @@ interface MatchDbRow {
   away_crest: string;
   home_score: number | null;
   away_score: number | null;
+  home_pens: number | null;
+  away_pens: number | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
   live_clock: string | null;
   goals: MatchGoal[] | null;
@@ -137,6 +139,8 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     group: groupLabel(r.stage, r.group_name),
     homeScore: r.home_score ?? null,
     awayScore: r.away_score ?? null,
+    homePens: r.home_pens ?? null,
+    awayPens: r.away_pens ?? null,
     status: r.status === 'FINISHED' ? 'finished' : 'scheduled',
     kickoff: r.utc_date,
     isoDate: bDay,
@@ -493,7 +497,7 @@ function App() {
         supabase
           .from('matches')
           .select(
-            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, winner, live_clock, goals'
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, home_pens, away_pens, winner, live_clock, goals'
           )
           .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id'),

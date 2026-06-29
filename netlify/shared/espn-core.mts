@@ -23,6 +23,8 @@ export interface EspnOverride {
   status: 'IN_PLAY' | 'FINISHED';
   homeScore: number;
   awayScore: number;
+  homePens: number | null; // gols na disputa de pênaltis (null se não houve)
+  awayPens: number | null;
   liveClock: string | null; // minuto/etapa enquanto ao vivo; null quando encerrado
   homeNorm: string;         // nome normalizado do mandante (p/ alinhar o placar)
   dateIso: string;          // dia do jogo em UTC (YYYY-MM-DD), p/ conferência
@@ -33,7 +35,7 @@ export interface EspnOverride {
 
 // ---- Formato (parcial) do scoreboard da ESPN ----
 interface EspnTeam { id?: string; displayName?: string; name?: string; }
-interface EspnCompetitor { homeAway?: string; score?: string; team?: EspnTeam; }
+interface EspnCompetitor { homeAway?: string; score?: string; shootoutScore?: string | number; team?: EspnTeam; }
 interface EspnStatusType { state?: string; completed?: boolean; shortDetail?: string; }
 interface EspnAthlete { displayName?: string; fullName?: string; }
 interface EspnDetail {
@@ -127,10 +129,22 @@ export async function fetchEspnOverrides(dateKey?: string): Promise<Map<string, 
       }
     }
 
+    // Pênaltis: a ESPN só preenche shootoutScore quando houve disputa. Vem como
+    // string/número; ausente ou vazio = não houve (null, não 0).
+    const pens = (raw: string | number | undefined): number | null => {
+      if (raw === undefined || raw === null || raw === '') return null;
+      const n = typeof raw === 'number' ? raw : parseInt(raw, 10);
+      return Number.isNaN(n) ? null : n;
+    };
+    const homePens = pens(home?.shootoutScore);
+    const awayPens = pens(away?.shootoutScore);
+
     map.set(pairKey(homeName, awayName), {
       status: isLive ? 'IN_PLAY' : 'FINISHED',
       homeScore: parseInt(home?.score ?? '0', 10) || 0,
       awayScore: parseInt(away?.score ?? '0', 10) || 0,
+      homePens,
+      awayPens,
       liveClock: isLive ? (type?.shortDetail ?? null) : null,
       homeNorm: norm(homeName),
       dateIso: (ev.date ?? '').slice(0, 10),

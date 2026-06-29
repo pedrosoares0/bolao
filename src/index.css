@@ -6645,6 +6645,17 @@ body {
 .brk2-row.lose .brk2-score {
   color: rgba(255, 255, 255, 0.45);
 }
+/* Gols dos pênaltis, menores e à direita do placar (ex.: 1 (4)) */
+.brk2-pens {
+  font-family: var(--font-family-condensed);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  padding-left: 0.2rem;
+}
+.brk2-row.lose .brk2-pens {
+  color: rgba(255, 255, 255, 0.35);
+}
 
 /* Rodapé com data · hora (quando o jogo ainda não começou) — abaixo dos times,
    para o nome usar a largura toda do card. */

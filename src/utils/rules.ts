@@ -25,6 +25,7 @@ export function analyzeBet(bet: Bet | undefined, match: Match): BetAnalysis {
 
   const { homeScore: bHome, awayScore: bAway } = bet;
   const { homeScore: mHome, awayScore: mAway } = match;
+  const betDiff = bHome - bAway;
 
   // 1. Placar Exato (3 pontos)
   if (bHome === mHome && bAway === mAway) {
@@ -36,14 +37,26 @@ export function analyzeBet(bet: Bet | undefined, match: Match): BetAnalysis {
     return { points: 2, type: 'draw' };
   }
 
-  // 3. Acertou o Vencedor, mas errou o placar exato (1 ponto)
+  // 3. Mata-mata decidido nos PÊNALTIS: o placar empatou (mHome === mAway) mas
+  // há um vencedor que AVANÇOU (winner = HOME_TEAM/AWAY_TEAM, nunca DRAW). Quem
+  // apostou um vencedor e cravou o time que avançou leva 1 ponto; quem apostou
+  // o eliminado leva 0. (Na fase de grupos o empate vem com winner = 'DRAW', que
+  // não cai aqui — segue valendo só os 2 pts do empate acima.)
+  if (mHome === mAway && (match.winner === 'HOME_TEAM' || match.winner === 'AWAY_TEAM')) {
+    const advance = match.winner === 'HOME_TEAM' ? 1 : -1;
+    if (Math.sign(betDiff) === advance) {
+      return { points: 1, type: 'winner' };
+    }
+    return { points: 0, type: 'wrong' };
+  }
+
+  // 4. Acertou o Vencedor, mas errou o placar exato (1 ponto)
   const realDiff = mHome - mAway;
-  const betDiff = bHome - bAway;
   if (Math.sign(realDiff) === Math.sign(betDiff)) {
     return { points: 1, type: 'winner' };
   }
 
-  // 4. Errou tudo (0 pontos)
+  // 5. Errou tudo (0 pontos)
   return { points: 0, type: 'wrong' };
 }
 

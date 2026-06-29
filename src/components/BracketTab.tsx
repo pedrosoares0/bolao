@@ -65,6 +65,38 @@ const STAGE_LABEL: Record<string, string> = {
   FINAL: 'Final',
 };
 
+// ---- Ordem oficial do chaveamento (FIFA Copa 2026) ----
+// Cada coluna precisa ser exibida de cima pra baixo na ordem REAL da chave, e não
+// por horário de início — os jogos não são agendados na ordem da árvore (ex.:
+// Alemanha×Paraguai é o slot 4 dos 16avos mas começa antes de Holanda×Marrocos,
+// que é o slot 3). A estrutura foi extraída da ESPN, que rotula cada vaga do
+// mata-mata com o vínculo da árvore ("Round of 32 3 Winner", "Quarterfinal 1
+// Winner" etc.). A partir desses vínculos ordenamos cada coluna em DFS a partir
+// da Final, de forma que os jogos 2k e 2k+1 SEMPRE alimentem o jogo de índice k
+// da fase seguinte — então os conectores em cotovelo (pai = floor(i/2)) ligam os
+// cards certos sem mudar a lógica de desenho. IDs = matches.id (football-data).
+//
+// 16avos, na ordem da chave (cada par alimenta os Oitavos correspondentes):
+//   SAfrica×Canadá, Holanda×Marrocos | Brasil×Japão, CostaMarfim×Noruega
+//   Portugal×Croácia, Espanha×Áustria | EUA×Bósnia, Inglaterra×CongoDR
+//   Alemanha×Paraguai, México×Equador | França×Suécia, Bélgica×Senegal
+//   Suíça×Argélia, Argentina×CaboVerde | Austrália×Egito, Colômbia×Gana
+const BRACKET_ORDER: Record<string, string[]> = {
+  LAST_32: ['537417', '537418', '537423', '537424', '537419', '537420', '537421', '537426', '537415', '537425', '537416', '537422', '537429', '537427', '537428', '537430'],
+  LAST_16: ['537376', '537375', '537379', '537380', '537377', '537378', '537382', '537381'],
+  QUARTER_FINALS: ['537383', '537384', '537385', '537386'],
+  SEMI_FINALS: ['537387', '537388'],
+  FINAL: ['537390'],
+};
+// Índice do jogo na ordem da chave (ou null se a fase/jogo não estiver mapeado —
+// aí o chamador cai no horário de início, preservando o comportamento antigo).
+const bracketIndex = (stageKey: string, id: string): number | null => {
+  const arr = BRACKET_ORDER[stageKey];
+  if (!arr) return null;
+  const i = arr.indexOf(id);
+  return i < 0 ? null : i;
+};
+
 // Ordem/nome das fases do mata-mata (inclui 3º lugar, fora da árvore principal).
 const KNOCKOUT_STAGES: { key: string; label: string }[] = [
   { key: 'LAST_32', label: STAGE_LABEL.LAST_32 },
@@ -110,12 +142,14 @@ function TeamLine({
   flag,
   name,
   score,
+  pens,
   showScore,
   state,
 }: {
   flag: string;
   name: string;
   score: number | null;
+  pens: number | null;
   showScore: boolean;
   state: 'win' | 'lose' | '';
 }) {
@@ -133,6 +167,8 @@ function TeamLine({
       />
       <span className="brk2-name">{name}</span>
       {showScore && <span className="brk2-score">{score ?? '-'}</span>}
+      {/* Gols dos pênaltis entre parênteses (ex.: 1 (4)) — só quando houve disputa */}
+      {showScore && pens !== null && <span className="brk2-pens">({pens})</span>}
     </div>
   );
 }
@@ -154,8 +190,8 @@ function KnoMatchCard({ m, badge }: { m: Match; badge?: string }) {
       title={`${homeName} x ${awayName}`}
     >
       <div className="brk2-rows">
-        <TeamLine flag={m.homeFlag} name={homeName} score={m.homeScore} showScore={showScore} state={win === 'home' ? 'win' : win === 'away' ? 'lose' : ''} />
-        <TeamLine flag={m.awayFlag} name={awayName} score={m.awayScore} showScore={showScore} state={win === 'away' ? 'win' : win === 'home' ? 'lose' : ''} />
+        <TeamLine flag={m.homeFlag} name={homeName} score={m.homeScore} pens={m.homePens ?? null} showScore={showScore} state={win === 'home' ? 'win' : win === 'away' ? 'lose' : ''} />
+        <TeamLine flag={m.awayFlag} name={awayName} score={m.awayScore} pens={m.awayPens ?? null} showScore={showScore} state={win === 'away' ? 'win' : win === 'home' ? 'lose' : ''} />
       </div>
 
       {!showScore && (
@@ -314,7 +350,16 @@ function BracketTab({ matches }: BracketTabProps) {
       games: matches
         .filter((m) => m.stage === key)
         .map(enrichKo)
-        .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff)),
+        // Ordena pela posição na chave (FIFA); jogos não mapeados (ex.: 3º lugar)
+        // caem no horário de início.
+        .sort((a, b) => {
+          const ia = bracketIndex(key, a.id);
+          const ib = bracketIndex(key, b.id);
+          if (ia !== null && ib !== null) return ia - ib;
+          if (ia !== null) return -1;
+          if (ib !== null) return 1;
+          return Date.parse(a.kickoff) - Date.parse(b.kickoff);
+        }),
     })).filter((s) => s.games.length > 0);
   }, [matches, enrichKo]);
 

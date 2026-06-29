@@ -81,6 +81,8 @@ interface MatchUpsertRow {
   away_crest: string;
   home_score: number | null;
   away_score: number | null;
+  home_pens: number | null;
+  away_pens: number | null;
   winner: string | null;
   live_clock: string | null;
   updated_at: string;
@@ -375,6 +377,8 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
     away_crest: m.awayTeam?.crest ?? '',
     home_score: m.score?.fullTime?.home ?? null,
     away_score: m.score?.fullTime?.away ?? null,
+    home_pens: null, // football-data v4 não traz pênaltis; preenchido pela ESPN abaixo
+    away_pens: null,
     winner: m.score?.winner ?? null,
     live_clock: null, // preenchido abaixo com o minuto da ESPN, quando ao vivo
     updated_at: new Date().toISOString(),
@@ -473,6 +477,8 @@ async function mergeEspnLive(rows: MatchUpsertRow[]): Promise<MatchUpsertRow[]> 
       status: ov.status,
       home_score: fdHomeIsEspnHome ? ov.homeScore : ov.awayScore,
       away_score: fdHomeIsEspnHome ? ov.awayScore : ov.homeScore,
+      home_pens: fdHomeIsEspnHome ? ov.homePens : ov.awayPens,
+      away_pens: fdHomeIsEspnHome ? ov.awayPens : ov.homePens,
       live_clock: ov.liveClock,
       homeTeamId: fdHomeIsEspnHome ? ov.homeTeamId : ov.awayTeamId,
       awayTeamId: fdHomeIsEspnHome ? ov.awayTeamId : ov.homeTeamId,
@@ -573,6 +579,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       away_crest: '',
       home_score: homeScore,
       away_score: awayScore,
+      home_pens: fdHomeIsEspnHome ? ov.homePens : ov.awayPens,
+      away_pens: fdHomeIsEspnHome ? ov.awayPens : ov.homePens,
       winner: null,
       live_clock: ov.liveClock,
       updated_at: new Date().toISOString(),
@@ -592,6 +600,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
     status: u.status,
     home_score: u.home_score,
     away_score: u.away_score,
+    home_pens: u.home_pens,
+    away_pens: u.away_pens,
     live_clock: u.live_clock,
     updated_at: u.updated_at,
   }));

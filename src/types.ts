@@ -33,6 +33,8 @@ export interface Match {
   group: string; // Ex: 'Grupo A'
   homeScore: number | null; // null se não jogou
   awayScore: number | null; // null se não jogou
+  homePens?: number | null; // gols na disputa de pênaltis (mata-mata), via ESPN
+  awayPens?: number | null;
   status: MatchStatus;
   kickoff: string; // Início do jogo em UTC (ISO 8601) — fonte da verdade p/ lockout
   isoDate: string; // Data do jogo no horário de Brasília (YYYY-MM-DD)
