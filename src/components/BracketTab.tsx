@@ -212,7 +212,7 @@ type Connection = { fromId: string; toId: string };
 type ConnPath = { d: string };
 
 function BracketTab({ matches }: BracketTabProps) {
-  const [view, setView] = useState<'grupos' | 'mata'>('grupos');
+  const [view, setView] = useState<'grupos' | 'mata'>('mata');
 
   // ---- Classificação dos grupos ----
   const groups = useMemo(() => computeGroupStandings(matches), [matches]);
