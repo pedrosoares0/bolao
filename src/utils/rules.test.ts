@@ -147,25 +147,26 @@ describe('pensBonus', () => {
     pensWinner,
   });
 
-  it('sem marcar "vai pra pênalti" vale 0', () => {
-    expect(pensBonus(betWithPens(false, null), koPens('HOME_TEAM'))).toBe(0);
+  it('errou que vai pra pênaltis (0) e errou o vencedor (-1): perde 1 ponto (-1)', () => {
+    expect(pensBonus(betWithPens(false, 'AWAY'), koPens('HOME_TEAM'))).toBe(-1);
   });
 
-  it('marcou que vai e foi, sem cravar vencedor, vale 1', () => {
-    expect(pensBonus(betWithPens(true, null), koPens('HOME_TEAM'))).toBe(1);
+  it('acertou que vai pra pênaltis (+1) mas errou o vencedor (-1): ganha 0 pontos (1 - 1 = 0)', () => {
+    expect(pensBonus(betWithPens(true, 'AWAY'), koPens('HOME_TEAM'))).toBe(0);
   });
 
-  it('marcou que vai e cravou o vencedor vale 3', () => {
-    expect(pensBonus(betWithPens(true, 'AWAY'), koPens('AWAY_TEAM'))).toBe(3);
+  it('acertou que vai pra pênaltis (+1) e acertou o vencedor (+1): ganha 2 pontos (1 + 1 = 2)', () => {
+    expect(pensBonus(betWithPens(true, 'HOME'), koPens('HOME_TEAM'))).toBe(2);
   });
 
-  it('marcou que vai mas errou o vencedor vale 1', () => {
-    expect(pensBonus(betWithPens(true, 'HOME'), koPens('AWAY_TEAM'))).toBe(1);
-  });
-
-  it('jogo decidido no tempo (não foi a pênaltis) vale 0', () => {
+  it('jogo decidido no tempo normal, usuário apostou que não ia (+1) e acertou o vencedor (+1): ganha 2 pontos (1 + 1 = 2)', () => {
     const m = finishedMatch(2, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
-    expect(pensBonus(betWithPens(true, 'HOME'), m)).toBe(0);
+    expect(pensBonus(betWithPens(false, 'HOME'), m)).toBe(2);
+  });
+
+  it('jogo decidido no tempo normal, usuário apostou que ia (0) e errou o vencedor (-1): perde 1 ponto (0 - 1 = -1)', () => {
+    const m = finishedMatch(2, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
+    expect(pensBonus(betWithPens(true, 'AWAY'), m)).toBe(-1);
   });
 
   it('jogo ainda não terminou vale 0', () => {
@@ -175,6 +176,11 @@ describe('pensBonus', () => {
 
   it('sem aposta vale 0', () => {
     expect(pensBonus(undefined, koPens('HOME_TEAM'))).toBe(0);
+  });
+
+  it('usuário não apostou empate no placar: vale 0', () => {
+    const bet = { ...makeBet(2, 1), pensPick: true, pensWinner: 'HOME' as const };
+    expect(pensBonus(bet, koPens('HOME_TEAM'))).toBe(0);
   });
 });
 

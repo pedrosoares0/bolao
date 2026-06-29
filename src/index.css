@@ -3204,16 +3204,16 @@ body {
    PALPITE DE ARTILHEIRO — SCORER PICKER (jogos do Brasil)
    ========================================================================== */
 .scorer-picker-container {
-  background-color: #ffffff;
-  border: 1px solid rgba(21, 17, 14, 0.07);
-  border-radius: 16px;
-  padding: 0.75rem 0.8rem;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0.75rem 0 0 0;
   margin-top: 0.75rem;
+  border-top: 1px solid rgba(21, 17, 14, 0.08); /* Clean divider instead of card border */
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  box-shadow: none;
 }
 
 .scorer-picker-header.clickable {
@@ -3223,6 +3223,11 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  transition: opacity 0.15s ease;
+}
+
+.scorer-picker-header.clickable:hover {
+  opacity: 0.75;
 }
 
 .scorer-picker-title-left {
@@ -3541,96 +3546,41 @@ body {
 }
 
 /* ==========================================================================
-   ORÁCULO PREDICTION PANEL
+   ORÁCULO PREDICTION PANEL (INLINE PREMIUM 3D)
    ========================================================================== */
-.oracle-card-container-p16 {
-  background-color: #ffffff; /* Almost white prediction panel */
-  border: 1px solid rgba(21, 17, 14, 0.07); /* Very sutil and weak border */
-  border-radius: 16px;
-  padding: 0.75rem 1rem;
-  margin-top: 0.75rem;
+.oracle-inline-container-p16 {
+  background-color: #FAFBF7; /* Soft light background */
+  border: 1px solid rgba(21, 17, 14, 0.08);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  margin: 0.85rem 0 0 0;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); /* Soft shadow */
 }
 
-.oracle-card-container-p16:hover {
-  background-color: #ffffff;
-  border-color: rgba(21, 17, 14, 0.15);
-}
-
-.oracle-card-header-p16 {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  width: 100%;
-}
-
-.oracle-title-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem; /* Better spacing between icon and text */
+.oracle-inline-title-p16 {
   font-family: var(--font-family);
-  font-size: 0.8rem; /* Clearer size */
-  font-weight: 800; /* Clean bold */
-  color: #000000; /* Black color for title */
-  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #8b8075; /* Muted brown */
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  margin-bottom: 0.65rem;
+  text-align: center;
 }
 
-.oracle-icon-p16,
-.oracle-icon-img-p16 {
-  width: 18px; /* Slightly larger crisp icon */
-  height: 18px;
-  flex-shrink: 0;
-  display: block;
-}
-
-.oracle-emoji-p16 {
-  font-size: 1.15rem; /* Beautiful emoji size next to uppercase text */
-  line-height: 1;
-  display: inline-block;
-}
-
-.oracle-chevron {
-  color: #000000; /* Same black color as the title */
-  opacity: 0.8;
-  transition: transform 0.2s ease;
-}
-
-/* Collapsible wrapper using CSS Grid */
-.oracle-card-content-wrapper-p16 {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out;
-  opacity: 0;
-  overflow: hidden;
-}
-
-.oracle-card-content-wrapper-p16.expanded {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
-
-.oracle-card-content-inner-p16 {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Horizontal progress bar segments */
+/* Horizontal progress bar - simple and clean flat colors */
 .oracle-progress-bar {
   display: flex;
-  height: 6px;
+  height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  margin: 0.65rem 0 0.45rem 0;
   background-color: rgba(21, 17, 14, 0.06);
   width: 100%;
+  margin: 0.45rem 0 0.55rem 0;
+  border: 1.5px solid #15110E; /* Black border around the bar */
+  box-sizing: border-box;
 }
 
 .oracle-progress-segment {
@@ -3639,7 +3589,7 @@ body {
 }
 
 .oracle-progress-segment.home {
-  background-color: var(--home-color-1, #009c3b); /* Home team primary color */
+  background-color: var(--home-color-1, #009c3b); /* Dynamic home team color */
 }
 
 .oracle-progress-segment.draw {
@@ -3647,55 +3597,31 @@ body {
 }
 
 .oracle-progress-segment.away {
-  background-color: var(--away-color-1, #ef4444); /* Away team primary color */
+  background-color: var(--away-color-1, #ef4444); /* Dynamic away team color */
 }
 
-/* Labels layout */
-.oracle-prob-labels {
+/* Simplified and less flashy text layout */
+.oracle-prob-simple-p16 {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  align-items: center;
+  gap: 0.65rem;
   font-family: var(--font-family);
   font-size: 0.72rem;
-  font-weight: 700;
-  margin-bottom: 0.65rem;
-  width: 100%;
-}
-
-.oracle-prob-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.oracle-prob-col.home {
-  text-align: left;
-  align-items: flex-start;
-}
-
-.oracle-prob-col.draw {
+  font-weight: 600;
+  color: #8b8075; /* Muted brown */
   text-align: center;
-  align-items: center;
+  margin-top: 0.1rem;
 }
 
-.oracle-prob-col.away {
-  text-align: right;
-  align-items: flex-end;
+.oracle-prob-simple-p16 strong {
+  color: #15110E; /* Slightly darker for the numbers, but not colored */
+  font-weight: 800;
 }
 
-.oracle-team-name {
-  color: #8b8075;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 90px;
-}
-
-.oracle-pct-value {
-  color: #15110E;
+.oracle-prob-sep-p16 {
+  color: rgba(21, 17, 14, 0.2);
   font-weight: 900;
-  font-size: 0.78rem;
-  margin-top: 0.05rem;
 }
 
 /* Analysis Description text */

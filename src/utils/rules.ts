@@ -17,13 +17,32 @@ export function scorerBonus(bet: Bet | undefined, match: Match): number {
 // pênalti"; +2 a mais se também cravou o vencedor da disputa (máx 3). Prever que
 // "não vai" não pontua. Contabilizado à parte do placar, igual ao artilheiro.
 export function pensBonus(bet: Bet | undefined, match: Match): number {
-  if (!bet?.pensPick) return 0;
+  if (!bet) return 0;
   if (match.status !== 'finished') return 0;
   if (match.homeScore === null || match.awayScore === null) return 0;
-  if (match.homeScore !== match.awayScore) return 0; // não foi a pênaltis
-  if (match.winner !== 'HOME_TEAM' && match.winner !== 'AWAY_TEAM') return 0;
-  const winnerSide = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
-  return bet.pensWinner === winnerSide ? 3 : 1;
+  if (match.stage === 'GROUP_STAGE') return 0;
+
+  // Só se aplica se o usuário palpitar empate no placar
+  if (bet.homeScore !== bet.awayScore) return 0;
+
+  const matchWentToPens = match.homeScore === match.awayScore;
+  const matchWinnerSide = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
+
+  let points = 0;
+
+  // 1. Palpite de ir para pênaltis (+1 se acertar, 0 se errar - sem punição)
+  if (bet.pensPick === matchWentToPens) {
+    points += 1;
+  }
+
+  // 2. Palpite de quem se classifica (+1 se acertar, -1 se errar)
+  if (bet.pensWinner === matchWinnerSide) {
+    points += 1;
+  } else {
+    points -= 1;
+  }
+
+  return points;
 }
 
 export type BetResultType = 'exact' | 'draw' | 'winner' | 'wrong' | 'pending';

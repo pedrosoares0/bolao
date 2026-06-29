@@ -344,14 +344,7 @@ function App() {
   };
 
   const [oddsMap, setOddsMap] = useState<Record<string, OddsData>>({});
-  const [expandedPredictions, setExpandedPredictions] = useState<Record<string, boolean>>({});
 
-  const togglePredictionExpanded = (matchId: string) => {
-    setExpandedPredictions((prev) => ({
-      ...prev,
-      [matchId]: !prev[matchId],
-    }));
-  };
 
   const [expandedScorers, setExpandedScorers] = useState<Record<string, boolean>>({});
 
@@ -907,13 +900,30 @@ function App() {
     return activeDateMatches.filter((m) => m.status === 'scheduled' && isBettable(m.kickoff, nowTs));
   }, [activeDateMatches, selectedDate, nowTs]);
 
-  // Habilita o lançamento sempre que houver jogos jogáveis na rodada. Todo jogo
-  // começa valendo 0×0 (o placar exibido no stepper é o palpite real), então não
-  // exigimos toque em cada um — o usuário só ajusta os que quer diferente de zero.
-  const areAllPredictionsFilled = useMemo(
-    () => playableMatches.length > 0,
-    [playableMatches]
-  );
+  // Habilita o lançamento sempre que houver jogos jogáveis na rodada.
+  // Caso o usuário palpite empate em um jogo do mata-mata, exigimos que ele selecione
+  // quem se classifica antes de permitir o lançamento.
+  const areAllPredictionsFilled = useMemo(() => {
+    if (playableMatches.length === 0) return false;
+
+    return playableMatches.every((m) => {
+      if (!isKnockoutMatch(m)) return true;
+
+      const draft = displayDrafts[m.id];
+      if (!draft) return true;
+
+      const homeVal = parseInt(draft.homeScore || '0', 10);
+      const awayVal = parseInt(draft.awayScore || '0', 10);
+      const isPredictedDraw = homeVal === awayVal;
+
+      if (isPredictedDraw) {
+        const pens = displayPens[m.id];
+        return !!(pens && (pens.winner === 'HOME' || pens.winner === 'AWAY'));
+      }
+
+      return true;
+    });
+  }, [playableMatches, displayDrafts, displayPens]);
 
   // Verifica se a aposta já foi lançada para o dia selecionado
   const isSubmittedForSelectedDate = useMemo(() => {
@@ -1035,17 +1045,23 @@ function App() {
     const payload = playableMatches.map((m) => {
       const draft = displayDrafts[m.id] ?? { homeScore: '0', awayScore: '0' };
       const scorerId = isBrazilMatch(m) ? displayScorers[m.id] || null : null;
-      // Pênaltis: só no mata-mata. Se não marcou "vai pra pênalti", o vencedor
-      // não é gravado (fica null).
-      const pens = isKnockoutMatch(m) ? (displayPens[m.id] ?? { pick: false, winner: null }) : { pick: false, winner: null };
-      // Palpite não tocado vale 0 (o stepper já exibe 0 e nunca fica abaixo disso)
+
+      const homeVal = parseInt(draft.homeScore || '0', 10);
+      const awayVal = parseInt(draft.awayScore || '0', 10);
+      const isPredictedDraw = homeVal === awayVal;
+
+      // Pênaltis/Classificação: só no mata-mata e se o palpite de placar for empate.
+      const pens = (isKnockoutMatch(m) && isPredictedDraw)
+        ? (displayPens[m.id] ?? { pick: false, winner: null })
+        : { pick: false, winner: null };
+
       return {
         match_id: Number(m.id),
-        home_score: parseInt(draft.homeScore || '0', 10),
-        away_score: parseInt(draft.awayScore || '0', 10),
+        home_score: homeVal,
+        away_score: awayVal,
         scorer_id: scorerId,
         pens_pick: pens.pick,
-        pens_winner: pens.pick ? pens.winner : null,
+        pens_winner: pens.winner, // Salva o vencedor independente de pens_pick
       };
     });
 
@@ -1591,6 +1607,32 @@ function App() {
                             </div>
                           </div>
 
+                          {/* Seção de palpite baseada somente nas odds retornadas pela ESPN */}
+                          {match.status !== 'finished' && (() => {
+                            const key = makePairKey(match.homeTeamEn, match.awayTeamEn);
+                            const matchOdds = oddsMap[key];
+                            if (!matchOdds) return null;
+
+                            return (
+                              <div className="oracle-inline-container-p16">
+                                <div className="oracle-inline-title-p16">PALPITE DA CASA</div>
+                                <div className="oracle-progress-bar">
+                                  <div className="oracle-progress-segment home" style={{ width: `${matchOdds.homePct}%` }}></div>
+                                  <div className="oracle-progress-segment draw" style={{ width: `${matchOdds.drawPct}%` }}></div>
+                                  <div className="oracle-progress-segment away" style={{ width: `${matchOdds.awayPct}%` }}></div>
+                                </div>
+
+                                <div className="oracle-prob-simple-p16">
+                                  <span>{match.homeTeam} <strong>{matchOdds.homePct}%</strong></span>
+                                  <span className="oracle-prob-sep-p16">·</span>
+                                  <span>Empate <strong>{matchOdds.drawPct}%</strong></span>
+                                  <span className="oracle-prob-sep-p16">·</span>
+                                  <span>{match.awayTeam} <strong>{matchOdds.awayPct}%</strong></span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           {/* PALPITE DE ARTILHEIRO — só em jogos do Brasil */}
                           {isBrazilMatch(match) && (() => {
                             const selectedScorer = displayScorers[match.id] || null;
@@ -1613,7 +1655,7 @@ function App() {
                                 >
                                   <div className="scorer-picker-title-left">
                                     <span className="scorer-picker-emoji">⚽</span>
-                                    <span>QUEM MARCA?</span>
+                                    <span>PARA MARCAR</span>
                                     {pickedPlayer && !isExpanded && (
                                       <span className="scorer-picker-header-selection">
                                         • {pickedPlayer.name}
@@ -1679,8 +1721,12 @@ function App() {
                             );
                           })()}
 
-                          {/* PALPITE DE PÊNALTIS — só no mata-mata */}
+                          {/* PALPITE DE PÊNALTIS — só no mata-mata e se o placar for empate */}
                           {isKnockoutMatch(match) && (() => {
+                            const draft = displayDrafts[match.id] ?? { homeScore: '', awayScore: '' };
+                            const isPredictedDraw = draft.homeScore !== '' && draft.awayScore !== '' && parseInt(draft.homeScore, 10) === parseInt(draft.awayScore, 10);
+                            if (!isPredictedDraw) return null;
+
                             const dp = displayPens[match.id] ?? { pick: false, winner: null };
                             const isExpanded = !!expandedPens[match.id];
                             // Foi à disputa? (placar empatou e há vencedor que avançou)
@@ -1692,9 +1738,9 @@ function App() {
                               if (!canEditBet) return;
                               setPensDrafts((prev) => ({ ...prev, [match.id]: next }));
                             };
-                            const headerSummary = dp.pick
-                              ? (dp.winner ? `• ${dp.winner === 'HOME' ? match.homeTeam : match.awayTeam}` : '• Vai pra pênaltis')
-                              : null;
+                            const headerSummary = dp.winner
+                              ? `• ${dp.winner === 'HOME' ? match.homeTeam : match.awayTeam}${dp.pick ? ' (Pênaltis)' : ''}`
+                              : (dp.pick ? '• Decisão nos pênaltis' : null);
 
                             return (
                               <div className="scorer-picker-container">
@@ -1703,8 +1749,8 @@ function App() {
                                   onClick={() => togglePensExpanded(match.id)}
                                 >
                                   <div className="scorer-picker-title-left">
-                                    <span className="scorer-picker-emoji">🥅</span>
-                                    <span>VAI PRA PÊNALTIS?</span>
+                                    <span className="scorer-picker-emoji">🏆</span>
+                                    <span>QUEM SE CLASSIFICA?</span>
                                     {headerSummary && !isExpanded && (
                                       <span className="scorer-picker-header-selection">{headerSummary}</span>
                                     )}
@@ -1718,109 +1764,77 @@ function App() {
 
                                 <div className={`scorer-picker-content-wrapper ${isExpanded ? 'expanded' : ''}`}>
                                   <div className="scorer-picker-content-inner">
-                                    <div className="scorer-picker-subtitle">
-                                      Acerte que vai pra pênaltis <b>(+1)</b> e quem vence a disputa <b>(+2)</b>
+                                    {/* 1. Quem se classifica */}
+                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#15110E', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <span>Selecione quem avança de fase:</span>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#8b8075' }}>
+                                        Acertou: <span style={{ color: '#009c3b', fontWeight: 700 }}>+1 pt</span>. Errou: <span style={{ color: '#dc2626', fontWeight: 700 }}>-1 pt</span>.
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="pens-winner-grid" style={{ marginTop: '0.45rem', marginBottom: '0.95rem' }}>
+                                      {(['HOME', 'AWAY'] as const).map((side) => {
+                                        const isSel = dp.winner === side;
+                                        const name = side === 'HOME' ? match.homeTeam : match.awayTeam;
+                                        const flag = side === 'HOME' ? match.homeFlag : match.awayFlag;
+                                        const isLocked = !canEditBet;
+                                        if (isLocked && !isSel) return null;
+                                        const state = isFinished && isSel ? (realWinner === side ? 'scored' : 'missed') : '';
+                                        return (
+                                          <button
+                                            key={side}
+                                            type="button"
+                                            className={`pens-winner-btn ${isSel ? 'selected' : ''} ${isLocked ? 'locked' : ''} ${state}`}
+                                            onClick={() => setPens({ pick: dp.pick, winner: isSel ? null : side })}
+                                            disabled={isLocked}
+                                          >
+                                            <img
+                                              loading="lazy"
+                                              decoding="async"
+                                              src={flagSrc(flag, 40)}
+                                              alt={name}
+                                              className="pens-winner-flag"
+                                              onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
+                                            />
+                                            <span className="pens-winner-name">{name}</span>
+                                          </button>
+                                        );
+                                      })}
                                     </div>
 
-                                    {/* Check: vai pra pênaltis? */}
-                                    <button
-                                      type="button"
-                                      className={`pens-check-btn ${dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${isFinished && dp.pick ? (wentToPens ? 'scored' : 'missed') : ''}`}
-                                      onClick={() => setPens({ pick: !dp.pick, winner: dp.pick ? null : dp.winner })}
-                                      disabled={!canEditBet}
-                                    >
-                                      <span className="pens-check-box">{dp.pick ? '☑' : '☐'}</span>
-                                      <span>Vai pra disputa de pênaltis</span>
-                                    </button>
+                                    {/* 2. Se classifica nos pênaltis? */}
+                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#15110E', display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '0.45rem' }}>
+                                      <span>A classificação será nos pênaltis?</span>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#8b8075' }}>
+                                        Acertou se haverá pênaltis: <span style={{ color: '#009c3b', fontWeight: 700 }}>+1 pt</span> (extra). Errou: <span style={{ fontWeight: 700 }}>0 pts</span>.
+                                      </span>
+                                    </div>
 
-                                    {/* Quem vence a disputa — só quando marcou o check */}
-                                    {dp.pick && (
-                                      <div className="pens-winner-grid">
-                                        {(['HOME', 'AWAY'] as const).map((side) => {
-                                          const isSel = dp.winner === side;
-                                          const name = side === 'HOME' ? match.homeTeam : match.awayTeam;
-                                          const flag = side === 'HOME' ? match.homeFlag : match.awayFlag;
-                                          const isLocked = !canEditBet;
-                                          if (isLocked && !isSel) return null;
-                                          const state = wentToPens && isSel ? (realWinner === side ? 'scored' : 'missed') : '';
-                                          return (
-                                            <button
-                                              key={side}
-                                              type="button"
-                                              className={`pens-winner-btn ${isSel ? 'selected' : ''} ${isLocked ? 'locked' : ''} ${state}`}
-                                              onClick={() => setPens({ pick: true, winner: isSel ? null : side })}
-                                              disabled={isLocked}
-                                            >
-                                              <img
-                                                loading="lazy"
-                                                decoding="async"
-                                                src={flagSrc(flag, 40)}
-                                                alt={name}
-                                                className="pens-winner-flag"
-                                                onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }}
-                                              />
-                                              <span className="pens-winner-name">{name}</span>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
+                                    <div className="pens-winner-grid" style={{ marginTop: '0.45rem' }}>
+                                      <button
+                                        type="button"
+                                        className={`pens-winner-btn ${dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${isFinished ? (wentToPens ? (dp.pick ? 'scored' : '') : (dp.pick ? 'missed' : '')) : ''}`}
+                                        onClick={() => setPens({ pick: true, winner: dp.winner })}
+                                        disabled={!canEditBet}
+                                      >
+                                        <span style={{ fontSize: '1rem' }}>🥅</span>
+                                        <span>Sim, nos pênaltis</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className={`pens-winner-btn ${!dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${isFinished ? (!wentToPens ? (!dp.pick ? 'scored' : '') : (!dp.pick ? 'missed' : '')) : ''}`}
+                                        onClick={() => setPens({ pick: false, winner: dp.winner })}
+                                        disabled={!canEditBet}
+                                      >
+                                        <span style={{ fontSize: '1.05rem' }}>⏱️</span>
+                                        <span>Não, na prorrogação</span>
+                                      </button>
+                                    </div>
+
+                                    {!canEditBet && !dp.pick && !dp.winner && (
+                                      <div className="scorer-picker-none" style={{ marginTop: '0.5rem' }}>Não palpitou classificação</div>
                                     )}
-
-                                    {!canEditBet && !dp.pick && (
-                                      <div className="scorer-picker-none">Não palpitou pênaltis</div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Seção de palpite baseada somente nas odds retornadas pela ESPN */}
-                          {match.status !== 'finished' && (() => {
-                            const key = makePairKey(match.homeTeamEn, match.awayTeamEn);
-                            const matchOdds = oddsMap[key];
-                            if (!matchOdds) return null;
-                            const isOracleExpanded = !!expandedPredictions[match.id];
-
-                            return (
-                              <div className="oracle-card-container-p16">
-                                <div
-                                  className="oracle-card-header-p16"
-                                  onClick={() => togglePredictionExpanded(match.id)}
-                                >
-                                  <div className="oracle-title-left">
-                                    <span className="oracle-emoji-p16">🎯</span>
-                                    <span>PALPITE DA CASA</span>
-                                  </div>
-                                  {isOracleExpanded ? (
-                                    <ChevronUp size={13} className="oracle-chevron" />
-                                  ) : (
-                                    <ChevronDown size={13} className="oracle-chevron" />
-                                  )}
-                                </div>
-
-                                <div className={`oracle-card-content-wrapper-p16 ${isOracleExpanded ? 'expanded' : ''}`}>
-                                  <div className="oracle-card-content-inner-p16">
-                                    <div className="oracle-progress-bar">
-                                      <div className="oracle-progress-segment home" style={{ width: `${matchOdds.homePct}%` }}></div>
-                                      <div className="oracle-progress-segment draw" style={{ width: `${matchOdds.drawPct}%` }}></div>
-                                      <div className="oracle-progress-segment away" style={{ width: `${matchOdds.awayPct}%` }}></div>
-                                    </div>
-
-                                    <div className="oracle-prob-labels">
-                                      <div className="oracle-prob-col home">
-                                        <span className="oracle-team-name">{match.homeTeam}</span>
-                                        <span className="oracle-pct-value">{matchOdds.homePct}%</span>
-                                      </div>
-                                      <div className="oracle-prob-col draw">
-                                        <span className="oracle-team-name">Empate</span>
-                                        <span className="oracle-pct-value">{matchOdds.drawPct}%</span>
-                                      </div>
-                                      <div className="oracle-prob-col away">
-                                        <span className="oracle-team-name">{match.awayTeam}</span>
-                                        <span className="oracle-pct-value">{matchOdds.awayPct}%</span>
-                                      </div>
-                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1944,16 +1958,31 @@ function App() {
                                       {pickHidden ? (
                                         <span className="inline-guess-hidden-text-p16">🔒 Oculto</span>
                                       ) : bet ? (
-                                        <div className="inline-guess-scores-container-p16">
-                                          <span className="inline-guess-score-text-p16">
-                                            {bet.homeScore} x {bet.awayScore}
-                                          </span>
-                                          {predictedWinnerFlag && (
-                                            <img loading="lazy" decoding="async"
-                                              src={flagSrc(predictedWinnerFlag, 40)}
-                                              alt="Palpite Vencedor"
-                                              className="inline-guess-winner-flag-p16"
-                                            />
+                                        <div className="inline-guess-scores-container-p16" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                            <span className="inline-guess-score-text-p16">
+                                              {bet.homeScore} x {bet.awayScore}
+                                            </span>
+                                            {predictedWinnerFlag && (
+                                              <img loading="lazy" decoding="async"
+                                                src={flagSrc(predictedWinnerFlag, 40)}
+                                                alt="Palpite Vencedor"
+                                                className="inline-guess-winner-flag-p16"
+                                              />
+                                            )}
+                                          </div>
+                                          {bet.homeScore === bet.awayScore && isKnockout && (
+                                            <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                              <span>{bet.pensPick ? '🥅 Pênaltis' : '⏱️ Sem Pên.'}</span>
+                                              {bet.pensWinner && (
+                                                <>
+                                                  <span>•</span>
+                                                  <span style={{ fontWeight: 600 }}>
+                                                    {bet.pensWinner === 'HOME' ? match.homeTeam : match.awayTeam}
+                                                  </span>
+                                                </>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                       ) : (
