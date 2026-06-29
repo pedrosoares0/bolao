@@ -634,7 +634,7 @@ describe('Ladrão (Thief) Habilidade', () => {
   const p3 = makeParticipant('user3', 'Neto');
   const parts = [p1, p2, p3];
 
-  it('elege Ladrão se apenas um participante fizer mais de 6 pontos e não for o líder', () => {
+  it('elege Ladrão se apenas um participante fizer 5 ou mais pontos e não for o líder', () => {
     // 3 partidas no mesmo dia (isoDate = '2026-06-12')
     const matches = [
       finishedMatch(2, 1, { id: 'm1', isoDate: '2026-06-12', kickoff: '2026-06-12T12:00:00Z' }),
@@ -651,7 +651,7 @@ describe('Ladrão (Thief) Habilidade', () => {
       makeBet(3, 0, 'user1', 'm3'),
 
       makeBet(1, 0, 'user2', 'm1'), // 1 pt
-      makeBet(1, 0, 'user2', 'm2'), // 1 pt
+      makeBet(2, 0, 'user2', 'm2'), // 1 pt (evita que faça placar exato de 3 pts, somando 5 no total)
       makeBet(1, 0, 'user2', 'm3'), // 1 pt
     ];
 
@@ -679,7 +679,7 @@ describe('Ladrão (Thief) Habilidade', () => {
     expect(thiefRounds['2026-06-12'].thiefId).toBeNull();
   });
 
-  it('anula a habilidade se dois ou mais participantes fizerem mais de 6 pontos na rodada', () => {
+  it('anula a habilidade se dois ou mais participantes fizerem 5 ou mais pontos na rodada', () => {
     const matches = [
       finishedMatch(2, 1, { id: 'm1', isoDate: '2026-06-12' }),
       finishedMatch(1, 0, { id: 'm2', isoDate: '2026-06-12' }),

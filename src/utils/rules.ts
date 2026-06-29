@@ -255,23 +255,23 @@ export function calculateThiefRounds(
       return { id: p.id, pts };
     });
 
-    // Filtra participantes que fizeram mais de 6 pontos (> 6)
-    const aboveSix = dayScores.filter((x) => x.pts > 6);
+    // Filtra participantes que fizeram 5 ou mais pontos (>= 5)
+    const eligibleThiefs = dayScores.filter((x) => x.pts >= 5);
 
-    if (aboveSix.length === 0) {
+    if (eligibleThiefs.length === 0) {
       result[iso] = { roundDate: iso, thiefId: null, status: 'none', pointsScored: 0 };
       return;
     }
 
-    // Se duas ou mais pessoas fizerem mais de 6 pontos, a habilidade é anulada
-    if (aboveSix.length > 1) {
-      const maxPts = Math.max(...aboveSix.map((x) => x.pts));
+    // Se duas ou mais pessoas fizerem 5 ou mais pontos, a habilidade é anulada
+    if (eligibleThiefs.length > 1) {
+      const maxPts = Math.max(...eligibleThiefs.map((x) => x.pts));
       result[iso] = { roundDate: iso, thiefId: null, status: 'annulled', pointsScored: maxPts };
       return;
     }
 
-    // Apenas um participante fez mais de 6 pontos
-    const potentialThief = aboveSix[0];
+    // Apenas um participante fez 5 ou mais pontos
+    const potentialThief = eligibleThiefs[0];
 
     // O líder do campeonato não pode ser o Ladrão.
     // Calculamos a classificação até essa data (inclusive o dia) para ver quem era o líder
