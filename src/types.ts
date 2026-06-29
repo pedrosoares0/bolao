@@ -70,6 +70,8 @@ export interface Bet {
   homeScore: number;
   awayScore: number;
   scorerId?: string | null;
+  pensPick?: boolean; // mata-mata: previu que o jogo vai pra pênaltis
+  pensWinner?: 'HOME' | 'AWAY' | null; // quem vence a disputa (só se pensPick)
 }
 
 export interface ParticipantStanding {

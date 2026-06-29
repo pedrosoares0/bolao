@@ -10,6 +10,22 @@ export function scorerBonus(bet: Bet | undefined, match: Match): number {
   return goalsByPlayer(match.goals, bet.scorerId);
 }
 
+// Bônus do palpite de PÊNALTIS (mata-mata). Só vale se o jogo REALMENTE foi à
+// disputa: placar empatado no tempo normal/prorrogação (homeScore === awayScore)
+// e um vencedor que avançou (winner HOME/AWAY — na fase de grupos o empate vem
+// com winner 'DRAW', que não cai aqui). Pontos: +1 por ter marcado "vai pra
+// pênalti"; +2 a mais se também cravou o vencedor da disputa (máx 3). Prever que
+// "não vai" não pontua. Contabilizado à parte do placar, igual ao artilheiro.
+export function pensBonus(bet: Bet | undefined, match: Match): number {
+  if (!bet?.pensPick) return 0;
+  if (match.status !== 'finished') return 0;
+  if (match.homeScore === null || match.awayScore === null) return 0;
+  if (match.homeScore !== match.awayScore) return 0; // não foi a pênaltis
+  if (match.winner !== 'HOME_TEAM' && match.winner !== 'AWAY_TEAM') return 0;
+  const winnerSide = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
+  return bet.pensWinner === winnerSide ? 3 : 1;
+}
+
 export type BetResultType = 'exact' | 'draw' | 'winner' | 'wrong' | 'pending';
 
 interface BetAnalysis {
@@ -108,6 +124,9 @@ export function calculateStandings(
         const bonus = scorerBonus(bet, match);
         points += bonus;
         scorerPoints += bonus;
+        // Bônus dos pênaltis (mata-mata): +1 acertar que foi à disputa, +2 a
+        // mais pelo vencedor. Soma no total; não muda o "type" do placar.
+        points += pensBonus(bet, match);
 
         if (analysis.type === 'exact') exactScoreCount++;
         else if (analysis.type === 'draw') correctDrawCount++;

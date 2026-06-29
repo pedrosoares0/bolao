@@ -3423,6 +3423,100 @@ body {
   font-style: italic;
 }
 
+/* ---- Palpite de pênaltis (mata-mata) ---- */
+.pens-check-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4a4136;
+  transition: all 0.15s ease;
+}
+.pens-check-btn:hover:not(.locked) {
+  background: rgba(0, 151, 57, 0.06);
+}
+.pens-check-btn.selected {
+  border-color: #009739;
+  background: rgba(0, 151, 57, 0.08);
+  color: #009739;
+}
+.pens-check-btn.locked {
+  cursor: default;
+}
+.pens-check-btn.scored {
+  border-color: #009739;
+  background: rgba(0, 151, 57, 0.12);
+}
+.pens-check-btn.missed {
+  border-color: #d62828;
+  background: rgba(214, 40, 40, 0.1);
+  color: #d62828;
+}
+.pens-check-box {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.pens-winner-grid {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.pens-winner-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0.45rem 0.5rem;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4a4136;
+  transition: all 0.15s ease;
+}
+.pens-winner-btn:hover:not(.locked) {
+  background: rgba(0, 151, 57, 0.06);
+  transform: translateY(-1px);
+}
+.pens-winner-btn.selected {
+  border-color: #009739;
+  background: rgba(0, 151, 57, 0.08);
+  color: #009739;
+}
+.pens-winner-btn.locked {
+  cursor: default;
+}
+.pens-winner-btn.scored {
+  border-color: #009739;
+  background: rgba(0, 151, 57, 0.14);
+  box-shadow: 0 0 0 2px rgba(0, 151, 57, 0.25);
+}
+.pens-winner-btn.missed {
+  border-color: #d62828;
+  background: rgba(214, 40, 40, 0.1);
+  color: #d62828;
+  box-shadow: 0 0 0 2px rgba(214, 40, 40, 0.2);
+}
+.pens-winner-flag {
+  width: 22px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
 /* Foto do artilheiro atrás/ao lado do avatar do participante nos palpites */
 .inline-guess-scorer-overlay {
   position: absolute;

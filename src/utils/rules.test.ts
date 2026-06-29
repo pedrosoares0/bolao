@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   analyzeBet,
+  pensBonus,
   calculateStandings,
   calculateFireCounts,
   calculatePeFrioCounts,
@@ -131,6 +132,49 @@ describe('analyzeBet', () => {
   it('empate na fase de grupos (winner DRAW) não vira vitória por pênalti', () => {
     const m = finishedMatch(1, 1, { winner: 'DRAW' });
     expect(analyzeBet(makeBet(2, 0), m)).toEqual({ points: 0, type: 'wrong' });
+  });
+});
+
+// ---------- pensBonus (palpite de pênaltis no mata-mata) ----------
+
+describe('pensBonus', () => {
+  // Jogo do mata-mata que foi à disputa: placar empatado + vencedor que avançou.
+  const koPens = (winner: 'HOME_TEAM' | 'AWAY_TEAM') =>
+    finishedMatch(1, 1, { winner, stage: 'LAST_16' });
+  const betWithPens = (pick: boolean, pensWinner: 'HOME' | 'AWAY' | null): Bet => ({
+    ...makeBet(0, 0),
+    pensPick: pick,
+    pensWinner,
+  });
+
+  it('sem marcar "vai pra pênalti" vale 0', () => {
+    expect(pensBonus(betWithPens(false, null), koPens('HOME_TEAM'))).toBe(0);
+  });
+
+  it('marcou que vai e foi, sem cravar vencedor, vale 1', () => {
+    expect(pensBonus(betWithPens(true, null), koPens('HOME_TEAM'))).toBe(1);
+  });
+
+  it('marcou que vai e cravou o vencedor vale 3', () => {
+    expect(pensBonus(betWithPens(true, 'AWAY'), koPens('AWAY_TEAM'))).toBe(3);
+  });
+
+  it('marcou que vai mas errou o vencedor vale 1', () => {
+    expect(pensBonus(betWithPens(true, 'HOME'), koPens('AWAY_TEAM'))).toBe(1);
+  });
+
+  it('jogo decidido no tempo (não foi a pênaltis) vale 0', () => {
+    const m = finishedMatch(2, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
+    expect(pensBonus(betWithPens(true, 'HOME'), m)).toBe(0);
+  });
+
+  it('jogo ainda não terminou vale 0', () => {
+    const m: Match = { ...baseMatch, homeScore: 1, awayScore: 1, stage: 'LAST_16', winner: 'HOME_TEAM' };
+    expect(pensBonus(betWithPens(true, 'HOME'), m)).toBe(0);
+  });
+
+  it('sem aposta vale 0', () => {
+    expect(pensBonus(undefined, koPens('HOME_TEAM'))).toBe(0);
   });
 });
 
