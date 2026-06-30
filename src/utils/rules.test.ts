@@ -3,6 +3,7 @@ import {
   analyzeBet,
   pensBonus,
   isProfeta,
+  predictedAdvancer,
   calculateStandings,
   calculateFireCounts,
   calculatePeFrioCounts,
@@ -248,6 +249,64 @@ describe('isProfeta', () => {
   it('prorrogação por gol (placar 2-1): cravar o placar exato já é Profeta', () => {
     const m = finishedMatch(2, 1, { stage: 'LAST_16', duration: 'EXTRA_TIME', winner: 'HOME_TEAM' });
     expect(isProfeta(makeBet(2, 1), m)).toBe(true);
+  });
+});
+
+// ---------- Desafio dos Molhados ----------
+
+describe('predictedAdvancer', () => {
+  const ko = (over: Partial<Match> = {}) => ({ ...baseMatch, stage: 'LAST_16', ...over });
+
+  it('palpite de vencedor: classificado é o lado que venceu no placar', () => {
+    expect(predictedAdvancer(makeBet(2, 1), ko())).toBe('HOME');
+    expect(predictedAdvancer(makeBet(0, 2), ko())).toBe('AWAY');
+  });
+
+  it('palpite de empate: usa o pensWinner escolhido', () => {
+    expect(predictedAdvancer({ ...makeBet(1, 1), pensWinner: 'AWAY' }, ko())).toBe('AWAY');
+  });
+
+  it('empate sem escolher quem passa: null', () => {
+    expect(predictedAdvancer(makeBet(1, 1), ko())).toBeNull();
+  });
+
+  it('fase de grupos: sempre null', () => {
+    expect(predictedAdvancer(makeBet(2, 1), { ...baseMatch, stage: 'GROUP_STAGE' })).toBeNull();
+  });
+});
+
+describe('calculateStandings — Desafio dos Molhados', () => {
+  const pedro = makeParticipant('pedro', 'Pedro');
+  const alex = makeParticipant('alex', 'Alex');
+
+  it('quem cravou o classificado que avançou rouba 1 ponto do outro', () => {
+    const ko = finishedMatch(1, 1, { id: 'k1', stage: 'LAST_16', winner: 'HOME_TEAM' });
+    const bets: Bet[] = [
+      { ...makeBet(1, 1, 'pedro', 'k1'), pensWinner: 'HOME' }, // cravou 1-1 (3) + classifica HOME
+      { ...makeBet(1, 1, 'alex', 'k1'), pensWinner: 'AWAY' },  // cravou 1-1 (3) + classifica AWAY
+    ];
+    const challenges = [{
+      id: 'c1', matchId: 'k1', challengerId: 'pedro', challengedId: 'alex',
+      challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, createdAt: '',
+    }];
+
+    const standings = calculateStandings([pedro, alex], [ko], bets, [], [], challenges);
+    const p = standings.find((s) => s.participantId === 'pedro')!;
+    const a = standings.find((s) => s.participantId === 'alex')!;
+    // HOME avançou: Pedro vence o desafio (3 + 1 = 4); Alex perde 1 (3 - 1 = 2).
+    expect(p.points).toBe(4);
+    expect(a.points).toBe(2);
+  });
+
+  it('jogo ainda não terminou: desafio não transfere pontos', () => {
+    const ko: Match = { ...baseMatch, id: 'k1', stage: 'LAST_16', winner: 'HOME_TEAM' }; // scheduled
+    const challenges = [{
+      id: 'c1', matchId: 'k1', challengerId: 'pedro', challengedId: 'alex',
+      challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, createdAt: '',
+    }];
+    const standings = calculateStandings([pedro, alex], [ko], [], [], [], challenges);
+    expect(standings.find((s) => s.participantId === 'pedro')!.points).toBe(0);
+    expect(standings.find((s) => s.participantId === 'alex')!.points).toBe(0);
   });
 });
 

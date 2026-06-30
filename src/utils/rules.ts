@@ -1,4 +1,4 @@
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, ThiefSteal } from '../types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, ThiefSteal, Challenge } from '../types';
 import { computeChampion, computeBrazilStage, SPECIAL_POINTS } from './specials';
 import { goalsByPlayer } from './players';
 
@@ -131,6 +131,24 @@ export function isProfeta(bet: Bet | undefined, match: Match): boolean {
   return pensBonus(bet, match) === 2;
 }
 
+// Time que o participante acha que AVANÇA num jogo de mata-mata (o "classificado"):
+// se cravou um vencedor no placar, é o lado vencedor; se apostou empate e escolheu
+// quem se classifica, é o pensWinner. Fora do mata-mata (ou sem palpite), null.
+// Base do "Desafio dos Molhados" — dois participantes com classificados diferentes.
+export function predictedAdvancer(bet: Bet | undefined, match: Match): 'HOME' | 'AWAY' | null {
+  if (!bet) return null;
+  if (match.stage === 'GROUP_STAGE') return null;
+  if (bet.homeScore !== bet.awayScore) return bet.homeScore > bet.awayScore ? 'HOME' : 'AWAY';
+  return bet.pensWinner ?? null;
+}
+
+// Quem AVANÇOU de verdade no mata-mata (coluna winner; cobre pênaltis/prorrogação).
+function matchAdvancer(match: Match): 'HOME' | 'AWAY' | null {
+  if (match.winner === 'HOME_TEAM') return 'HOME';
+  if (match.winner === 'AWAY_TEAM') return 'AWAY';
+  return null;
+}
+
 // Gera a tabela de classificação/ranking ordenada e calcula os pagamentos.
 // Os palpites especiais (campeão + até onde o Brasil vai) somam 5 pontos
 // cada quando confirmados pelos resultados reais.
@@ -142,7 +160,8 @@ export function calculateStandings(
   matches: Match[],
   bets: Bet[],
   specials: SpecialPrediction[] = [],
-  steals: ThiefSteal[] = []
+  steals: ThiefSteal[] = [],
+  challenges: Challenge[] = []
 ): ParticipantStanding[] {
   const champion = computeChampion(matches);
   const brazilStage = computeBrazilStage(matches);
@@ -227,6 +246,22 @@ export function calculateStandings(
     const victimStanding = standings.find((s) => s.participantId === steal.victimId);
     if (thiefStanding) thiefStanding.points += 1;
     if (victimStanding) victimStanding.points -= 1;
+  });
+
+  // Desafio dos Molhados: ao terminar o jogo, quem cravou o classificado que
+  // AVANÇOU rouba 1 ponto do outro (transferência de 1, igual ao Ladrão).
+  const matchById = new Map(matches.map((m) => [m.id, m]));
+  challenges.forEach((ch) => {
+    const match = matchById.get(ch.matchId);
+    if (!match || match.status !== 'finished') return;
+    const adv = matchAdvancer(match);
+    if (!adv) return; // sem vencedor definido ainda
+    const winnerId = ch.challengerPick === adv ? ch.challengerId : ch.challengedId;
+    const loserId = winnerId === ch.challengerId ? ch.challengedId : ch.challengerId;
+    const winner = standings.find((s) => s.participantId === winnerId);
+    const loser = standings.find((s) => s.participantId === loserId);
+    if (winner) winner.points += 1;
+    if (loser) loser.points -= 1;
   });
 
   // Ordena por:

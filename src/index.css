@@ -7527,3 +7527,19 @@ body {
 
 
 
+
+/* ==========================================================================
+   DESAFIO DOS MOLHADOS — botão/badge no palpite revelado (mata-mata)
+   ========================================================================== */
+.challenge-btn-p16 {
+  margin-top: 4px; padding: 4px 10px; border: none; border-radius: 8px;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6); color: #fff;
+  font-size: 0.7rem; font-weight: 800; cursor: pointer; white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(91,33,182,.3); transition: filter .15s;
+}
+.challenge-btn-p16:hover { filter: brightness(1.1); }
+.challenge-btn-p16:active { transform: translateY(1px); }
+.challenge-badge-p16 { margin-top: 4px; font-size: 0.66rem; font-weight: 800; padding: 3px 8px; border-radius: 7px; white-space: nowrap; }
+.challenge-badge-p16.active { background: #ede9fe; color: #6d28d9; }
+.challenge-badge-p16.won { background: #dcfce7; color: #15803d; }
+.challenge-badge-p16.lost { background: #fee2e2; color: #b91c1c; }

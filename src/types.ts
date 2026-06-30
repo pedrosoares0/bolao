@@ -105,4 +105,16 @@ export interface ThiefSteal {
   createdAt: string;
 }
 
+// Desafio dos Molhados: dois participantes que escolheram classificados diferentes
+// no mesmo jogo de mata-mata. Quem acertar quem avança rouba 1 ponto do outro.
+export interface Challenge {
+  id: string;
+  matchId: string;
+  challengerId: string; // username de quem desafiou
+  challengedId: string; // username do desafiado
+  challengerPick: 'HOME' | 'AWAY'; // classificado escolhido pelo desafiante
+  challengedPick: 'HOME' | 'AWAY'; // classificado escolhido pelo desafiado
+  createdAt: string;
+}
+
 

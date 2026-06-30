@@ -89,7 +89,7 @@ const stagePt: { [k: string]: string } = {
 
 // Bandeira em emoji a partir do nome em inglês. Inglaterra e Escócia usam
 // sequências especiais; o resto vira par de "regional indicators" do ISO2.
-const flagEmoji = (nameEn: string): string => {
+export const flagEmoji = (nameEn: string): string => {
   const iso = iso2Map[nameEn];
   if (!iso) return '🏳️';
   if (iso === 'gb-eng') return String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f);
@@ -102,7 +102,7 @@ const flagEmoji = (nameEn: string): string => {
   );
 };
 
-const ptName = (nameEn: string): string => teamNamesPt[nameEn] || nameEn;
+export const ptName = (nameEn: string): string => teamNamesPt[nameEn] || nameEn;
 const teamLabel = (nameEn: string): string => `${flagEmoji(nameEn)} ${ptName(nameEn)}`;
 
 const groupLabel = (stage: string | null, group: string | null): string => {
@@ -245,7 +245,7 @@ const evolutionConfigured = (): boolean =>
   !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY &&
      process.env.EVOLUTION_INSTANCE_NAME && (process.env.id_grupo || process.env.ID_GRUPO));
 
-const sendText = async (text: string): Promise<boolean> => {
+export const sendText = async (text: string): Promise<boolean> => {
   const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
   const key = process.env.EVOLUTION_API_KEY || '';
   const instance = process.env.EVOLUTION_INSTANCE_NAME || '';
@@ -374,6 +374,14 @@ const msgEnd = (m: MatchRow, scorers: ScorerLine[]): string => {
     : ['🔴 *FIM DE JOGO*', '', placarLinha];
   return [...cabecalho, '', bloco].join('\n');
 };
+
+// Campeão de um Desafio dos Molhados (anunciado no fim do jogo).
+const msgChallengeWin = (winnerName: string, loserName: string, advTeamEn: string): string => [
+  '🏆 *CAMPEÃO DO DESAFIO DOS MOLHADOS* 🌊',
+  '',
+  `${flagEmoji(advTeamEn)} *${ptName(advTeamEn)}* avançou!`,
+  `*${winnerName}* venceu *${loserName}* e leva +1 ponto. 💧`,
+].join('\n');
 
 const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
 
@@ -531,6 +539,23 @@ export async function runNotifications(
         .filter((s) => s.total > 0)
         .sort((a, b) => b.total - a.total);
       await sendOnce(supabase, `end:${m.id}`, msgEnd(m, scorers));
+
+      // Desafio dos Molhados: anuncia o campeão de cada desafio do jogo.
+      const adv: 'HOME' | 'AWAY' | null = m.winner === 'HOME_TEAM' ? 'HOME' : m.winner === 'AWAY_TEAM' ? 'AWAY' : null;
+      if (adv) {
+        const { data: chs } = await supabase
+          .from('challenges')
+          .select('id, challenger_id, challenged_id, challenger_pick')
+          .eq('match_id', m.id);
+        for (const ch of (chs ?? []) as { id: string; challenger_id: string; challenged_id: string; challenger_pick: string }[]) {
+          const winnerUid = ch.challenger_pick === adv ? ch.challenger_id : ch.challenged_id;
+          const loserUid = winnerUid === ch.challenger_id ? ch.challenged_id : ch.challenger_id;
+          const advTeam = adv === 'HOME' ? m.home_team : m.away_team;
+          await sendOnce(supabase, `challwin:${ch.id}`,
+            msgChallengeWin(nameByUid.get(winnerUid) || '??', nameByUid.get(loserUid) || '??', advTeam));
+        }
+      }
+
       finishedDatesTouched.add(isoDateOf(m.utc_date));
     }
   }

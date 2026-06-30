@@ -14,9 +14,9 @@
 // ============================================================
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Fragment } from 'react';
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network } from 'lucide-react';
-import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal, ThiefSteal } from './types';
+import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal, ThiefSteal, Challenge } from './types';
 import { BRAZIL_PLAYERS, goalsByPlayer } from './utils/players';
-import { calculateStandings, analyzeBet, pensBonus, isProfeta, calculateThiefRounds } from './utils/rules';
+import { calculateStandings, analyzeBet, pensBonus, isProfeta, predictedAdvancer, calculateThiefRounds } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
 // WebGL do Ranking (ogl) — quando o usuário abre a aba, deixando o boot mais leve.
@@ -323,6 +323,7 @@ function App() {
   >([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [thiefSteals, setThiefSteals] = useState<ThiefSteal[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [dismissedSteals, setDismissedSteals] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('dismissed_steals') || '[]');
@@ -511,7 +512,7 @@ function App() {
   const loadAll = async (uid: string, withSpinner: boolean) => {
     if (withSpinner) setLoading(true);
     try {
-      const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes, stealsRes] = await Promise.all([
+      const [partsRes, matchesRes, betsRes, subsRes, specialsRes, debtsRes, stealsRes, challengesRes] = await Promise.all([
         supabase.from('participants').select('id, username, name, avatar_url').order('username'),
         // Só as colunas que o app usa (ver MatchDbRow) — evita trafegar a linha
         // inteira a cada evento do Realtime, que recarrega ~104 jogos de uma vez.
@@ -526,6 +527,7 @@ function App() {
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
         supabase.from('debts').select('id, user_id, amount, debt_date, created_at'),
         supabase.from('thief_steals').select('id, thief_id, victim_id, round_date, created_at'),
+        supabase.from('challenges').select('id, match_id, challenger_id, challenged_id, challenger_pick, challenged_pick, created_at'),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
@@ -576,6 +578,24 @@ function App() {
               createdAt: s.created_at,
             };
           })
+        );
+      }
+
+      if (challengesRes.error) {
+        console.error('Erro ao carregar desafios:', challengesRes.error.message);
+        setChallenges([]);
+      } else {
+        const uidToUser = (uid: string) => loadedParticipants.find((p) => p.uid === uid)?.id || uid;
+        setChallenges(
+          (challengesRes.data ?? []).map((c): Challenge => ({
+            id: c.id,
+            matchId: String(c.match_id),
+            challengerId: uidToUser(c.challenger_id),
+            challengedId: uidToUser(c.challenged_id),
+            challengerPick: c.challenger_pick as 'HOME' | 'AWAY',
+            challengedPick: c.challenged_pick as 'HOME' | 'AWAY',
+            createdAt: c.created_at,
+          }))
         );
       }
 
@@ -653,6 +673,7 @@ function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'debts' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'thief_steals' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, scheduleReload)
       .subscribe();
 
     // Fallback caso o Realtime caia
@@ -1212,6 +1233,37 @@ function App() {
     }
   };
 
+  // Cria um Desafio dos Molhados contra outro participante (mata-mata).
+  const handleChallenge = async (challengedUserId: string, match: Match) => {
+    if (!currentUser?.uid) return;
+    const challenged = participants.find((p) => p.id === challengedUserId);
+    if (!challenged?.uid) {
+      showToast('Participante inválido.', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/.netlify/functions/create-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          matchId: Number(match.id),
+          challengerUid: currentUser.uid,
+          challengedUid: challenged.uid,
+        }),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) {
+        showToast(data?.error || 'Não foi possível criar o desafio.', 'error');
+        return;
+      }
+      showToast(`Desafio lançado contra ${challenged.name}! ⚔️`, 'success');
+      await loadAll(currentUser.uid, false);
+    } catch (err) {
+      console.error('Erro ao criar desafio:', err);
+      showToast('Falha de rede ao criar o desafio.', 'error');
+    }
+  };
+
   // Handler para dispensar notificação de roubo sofrido
   const dismissSteal = (stealId: string) => {
     const next = [...dismissedSteals, stealId];
@@ -1244,8 +1296,8 @@ function App() {
 
   // Calcular ranking/classificação dos participantes (inclui os +5 dos especiais)
   const standings = useMemo<ParticipantStanding[]>(() => {
-    return calculateStandings(participants, matches, bets, specials, thiefSteals);
-  }, [participants, matches, bets, specials, thiefSteals]);
+    return calculateStandings(participants, matches, bets, specials, thiefSteals, challenges);
+  }, [participants, matches, bets, specials, thiefSteals, challenges]);
 
   // Evolução no ranking: compara a posição atual com a posição ANTES da última
   // rodada finalizada. Valor positivo = subiu; negativo = caiu; 0 = manteve.
@@ -1259,7 +1311,7 @@ function App() {
     // Remove apenas o ÚLTIMO jogo finalizado para saber como estava o ranking exatamente antes dele
     const lastMatch = finishedMatches[finishedMatches.length - 1];
     const prevMatches = matches.filter((m) => m.id !== lastMatch.id);
-    const prev = calculateStandings(participants, prevMatches, bets, specials, thiefSteals);
+    const prev = calculateStandings(participants, prevMatches, bets, specials, thiefSteals, challenges);
 
     const prevRank: Record<string, number> = {};
     prev.forEach((s, i) => {
@@ -2088,6 +2140,28 @@ function App() {
                                 // Não revela o artilheiro do adversário antes do jogo (mata-mata).
                                 const showScorer = !!pickedPlayer && !pickHidden;
 
+                                // Desafio dos Molhados: só no mata-mata, com o jogo já
+                                // começado (palpites revelados) e não encerrado, contra
+                                // outro participante que escolheu classificado DIFERENTE.
+                                const myBetForCh = currentUser ? betByMatchUser.get(`${match.id}|${currentUser.id}`) : undefined;
+                                const myAdv = predictedAdvancer(myBetForCh, match);
+                                const theirAdv = predictedAdvancer(bet, match);
+                                const existingCh = challenges.find((c) => c.matchId === match.id
+                                  && ((c.challengerId === currentUser?.id && c.challengedId === p.id)
+                                    || (c.challengerId === p.id && c.challengedId === currentUser?.id)));
+                                const canChallenge = !!currentUser && p.id !== currentUser.id && isKnockout
+                                  && hasGameStarted && match.status !== 'finished'
+                                  && !!myAdv && !!theirAdv && myAdv !== theirAdv && !existingCh;
+                                // Resultado do desafio (quando o jogo terminou).
+                                const chResolved = existingCh && match.status === 'finished' && match.winner
+                                  ? (() => {
+                                    const adv = match.winner === 'HOME_TEAM' ? 'HOME' : match.winner === 'AWAY_TEAM' ? 'AWAY' : null;
+                                    if (!adv) return null;
+                                    const winnerId = existingCh.challengerPick === adv ? existingCh.challengerId : existingCh.challengedId;
+                                    return winnerId === currentUser?.id ? 'won' : (winnerId === p.id ? 'lost' : null);
+                                  })()
+                                  : null;
+
                                 return (
                                   <div key={p.id} className="inline-guess-row-p16">
                                     <div className="inline-guess-user-info-p16">
@@ -2170,6 +2244,26 @@ function App() {
                                         <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
                                           {pointsText}
                                         </div>
+                                      )}
+
+                                      {/* Desafio dos Molhados */}
+                                      {canChallenge && (
+                                        <button
+                                          type="button"
+                                          className="challenge-btn-p16"
+                                          onClick={() => handleChallenge(p.id, match)}
+                                        >
+                                          ⚔️ Desafiar
+                                        </button>
+                                      )}
+                                      {existingCh && !chResolved && (
+                                        <span className="challenge-badge-p16 active">⚔️ Em desafio</span>
+                                      )}
+                                      {chResolved === 'won' && (
+                                        <span className="challenge-badge-p16 won">⚔️ Você ganhou +1</span>
+                                      )}
+                                      {chResolved === 'lost' && (
+                                        <span className="challenge-badge-p16 lost">⚔️ Você perdeu −1</span>
                                       )}
                                     </div>
                                   </div>
