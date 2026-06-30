@@ -2169,9 +2169,14 @@ function App() {
                                 const myBetForCh = currentUser ? betByMatchUser.get(`${match.id}|${currentUser.id}`) : undefined;
                                 const myAdv = predictedAdvancer(myBetForCh, match);
                                 const theirAdv = predictedAdvancer(bet, match);
-                                const existingCh = challenges.find((c) => c.matchId === match.id
+                                // Desafios entre mim e este participante neste jogo. Pode haver
+                                // mais de um (ex.: recusei e ele me redesafiou) — priorizo o
+                                // ATIVO (pendente/aceito); só caio no recusado se não houver ativo.
+                                const pairChs = challenges.filter((c) => c.matchId === match.id
                                   && ((c.challengerId === currentUser?.id && c.challengedId === p.id)
                                     || (c.challengerId === p.id && c.challengedId === currentUser?.id)));
+                                const existingCh = pairChs.find((c) => c.status === 'pending' || c.status === 'accepted')
+                                  ?? pairChs[0];
                                 const iAmChallenger = !!existingCh && existingCh.challengerId === currentUser?.id;
                                 // 1 desafio por pessoa por jogo: quem já está num desafio
                                 // ativo (pendente/aceito) nesse jogo não pode entrar em outro.

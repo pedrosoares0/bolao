@@ -109,18 +109,15 @@ export default async (req: Request) => {
     const nameByUid = new Map((parts ?? []).map((p) => [p.id, p.name]));
     const challengerName = nameByUid.get(challengerUid) ?? 'Alguém';
     const challengedName = nameByUid.get(challengedUid) ?? 'Alguém';
-    const teamFor = (s: Side) => (s === 'HOME' ? match.home_team : match.away_team);
-    const pickLine = (name: string, s: Side) => `🌊 *${name}*: classifica ${flagEmoji(teamFor(s))} *${ptName(teamFor(s))}*`;
+    // Convite enxuto: só anuncia o desafio. Os palpites (classificados) ficam em
+    // segredo e só são revelados no grupo SE o desafio for aceito (respond-challenge).
     const msg = [
-      '⚔️ *DESAFIO ÉPICO ENTRE OS MOLHADOS* ⚔️',
+      '⚔️ *DESAFIO DOS MOLHADOS* ⚔️',
       '',
       `${flagEmoji(match.home_team)} ${ptName(match.home_team)} x ${ptName(match.away_team)} ${flagEmoji(match.away_team)}`,
       '',
-      pickLine(challengerName, challengerPick),
-      pickLine(challengedName, challengedPick),
-      '',
-      `*${challengerName}* desafiou *${challengedName}*! Quem cravar quem avança rouba *+1 ponto*.`,
-      `⏳ Agora é com você, *${challengedName}* — aceita ou amarela? 👀`,
+      `*${challengerName}* desafiou *${challengedName}*! ⏳`,
+      `Agora é com você, *${challengedName}* — aceita ou amarela? 👀`,
     ].join('\n');
     await sendText(msg);
   } catch (err) {

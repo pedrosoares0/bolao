@@ -60,13 +60,18 @@ export default async (req: Request) => {
     const challengerName = nameByUid.get(ch.challenger_id) ?? 'Alguém';
     const challengedName = nameByUid.get(ch.challenged_id) ?? 'Alguém';
     const teamFor = (s: string) => (s === 'HOME' ? match?.home_team ?? '' : match?.away_team ?? '');
+    const pickLine = (name: string, s: string) => `🌊 *${name}*: classifica ${flagEmoji(teamFor(s))} *${ptName(teamFor(s))}*`;
     const msg = accept
       ? [
         '🤝 *DESAFIO ACEITO!* ⚔️',
         '',
-        `*${challengedName}* encarou *${challengerName}* no Desafio dos Molhados.`,
-        `${flagEmoji(teamFor(ch.challenger_pick))} *${ptName(teamFor(ch.challenger_pick))}* vs ${flagEmoji(teamFor(ch.challenged_pick))} *${ptName(teamFor(ch.challenged_pick))}* — agora é pra valer! 🔥`,
-        'Quem errar quem se classifica perde *1 ponto*. 💧',
+        `${flagEmoji(match?.home_team ?? '')} ${ptName(match?.home_team ?? '')} x ${ptName(match?.away_team ?? '')} ${flagEmoji(match?.away_team ?? '')}`,
+        '',
+        `*${challengedName}* encarou *${challengerName}*! Agora vão os palpites:`,
+        pickLine(challengerName, ch.challenger_pick),
+        pickLine(challengedName, ch.challenged_pick),
+        '',
+        'Pra valer! Quem errar quem se classifica perde *1 ponto*. 💧',
       ].join('\n')
       : [
         '🐔 *DESAFIO RECUSADO!*',
