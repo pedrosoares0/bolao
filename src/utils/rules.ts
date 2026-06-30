@@ -10,12 +10,15 @@ export function scorerBonus(bet: Bet | undefined, match: Match): number {
   return goalsByPlayer(match.goals, bet.scorerId);
 }
 
-// Bônus do palpite de PÊNALTIS (mata-mata). Só vale se o jogo REALMENTE foi à
-// disputa: placar empatado no tempo normal/prorrogação (homeScore === awayScore)
-// e um vencedor que avançou (winner HOME/AWAY — na fase de grupos o empate vem
-// com winner 'DRAW', que não cai aqui). Pontos: +1 por ter marcado "vai pra
-// pênalti"; +2 a mais se também cravou o vencedor da disputa (máx 3). Prever que
-// "não vai" não pontua. Contabilizado à parte do placar, igual ao artilheiro.
+// Bônus do palpite de CLASSIFICAÇÃO no mata-mata (quem avança + se vai a pênaltis).
+// Só conta quando o jogo passou dos 90' — ou seja, foi à PRORROGAÇÃO ou aos
+// PÊNALTIS (match.duration). Decidido no tempo normal NÃO pontua nem desconta:
+// nesse caso o palpite de empate simplesmente errou o placar (tratado lá no
+// analyzeBet) e o palpite de classificação fica neutro (0). Pontos:
+//   • forma de decisão (pênaltis x prorrogação): +1 se acertar, 0 se errar.
+//   • quem avança: +1 se acertar, −1 se errar.
+// Só se aplica se o usuário palpitou EMPATE (é quando o app pede a classificação).
+// Contabilizado à parte do placar, igual ao bônus de artilheiro.
 export function pensBonus(bet: Bet | undefined, match: Match): number {
   if (!bet) return 0;
   if (match.status !== 'finished') return 0;
@@ -25,17 +28,27 @@ export function pensBonus(bet: Bet | undefined, match: Match): number {
   // Só se aplica se o usuário palpitar empate no placar
   if (bet.homeScore !== bet.awayScore) return 0;
 
-  const matchWentToPens = match.homeScore === match.awayScore;
+  // Duração do jogo. Fallback: sem a coluna `duration` (dado antigo/atrasado),
+  // a presença de pênaltis (homePens) já identifica a disputa.
+  const duration = match.duration
+    ?? (match.homePens != null && match.awayPens != null ? 'PENALTY_SHOOTOUT' : null);
+  const wasPens = duration === 'PENALTY_SHOOTOUT';
+  const wentBeyond90 = wasPens || duration === 'EXTRA_TIME';
+
+  // Decidido no tempo normal (ou duração desconhecida): classificação não conta.
+  if (!wentBeyond90) return 0;
+
   const matchWinnerSide = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
 
   let points = 0;
 
-  // 1. Palpite de ir para pênaltis (+1 se acertar, 0 se errar - sem punição)
-  if (bet.pensPick === matchWentToPens) {
+  // 1. Forma de decisão: marcou "vai pra pênaltis" e foi (ou "não vai" e foi à
+  //    prorrogação) => +1. Errar a forma não pune (0).
+  if (bet.pensPick === wasPens) {
     points += 1;
   }
 
-  // 2. Palpite de quem se classifica (+1 se acertar, -1 se errar)
+  // 2. Quem se classifica (+1 se acertar, −1 se errar).
   if (bet.pensWinner === matchWinnerSide) {
     points += 1;
   } else {
@@ -95,6 +108,29 @@ export function analyzeBet(bet: Bet | undefined, match: Match): BetAnalysis {
   return { points: 0, type: 'wrong' };
 }
 
+// Profeta = cravou o resultado por completo (vale o selo 🔮 no card e a contagem
+// de desempate). No tempo normal basta o placar exato. Mas se o jogo foi
+// decidido na PRORROGAÇÃO ou nos PÊNALTIS, só o placar não basta: é preciso
+// também cravar a forma (prorrogação x pênaltis) E quem se classifica — ou seja,
+// o bônus de classificação máximo (pensBonus === 2). Como só dá pra prever a
+// classificação quando se aposta empate (e empate decidido fora dos 90' = jogo
+// foi a pênaltis), na prática a exigência extra recai sobre os jogos de pênaltis.
+// NÃO altera os pontos do placar (ver analyzeBet) nem o ON FIRE (que é por
+// pontuação) — só define quando um acerto conta como Profeta.
+export function isProfeta(bet: Bet | undefined, match: Match): boolean {
+  if (!bet) return false;
+  if (analyzeBet(bet, match).type !== 'exact') return false;
+
+  const duration = match.duration
+    ?? (match.homePens != null && match.awayPens != null ? 'PENALTY_SHOOTOUT' : null);
+  // Só os pênaltis coincidem placar-exato (empate cravado) COM um palpite de
+  // classificação. Prorrogação decidida por gol tem placar não-empate (aposta de
+  // vencedor, sem classificação) — aí o placar exato já é o "acertou tudo".
+  if (duration !== 'PENALTY_SHOOTOUT') return true;
+
+  return pensBonus(bet, match) === 2;
+}
+
 // Gera a tabela de classificação/ranking ordenada e calcula os pagamentos.
 // Os palpites especiais (campeão + até onde o Brasil vai) somam 5 pontos
 // cada quando confirmados pelos resultados reais.
@@ -151,7 +187,9 @@ export function calculateStandings(
         // mais pelo vencedor. Soma no total; não muda o "type" do placar.
         points += pensBonus(bet, match);
 
-        if (analysis.type === 'exact') exactScoreCount++;
+        // Profeta (desempate): em jogo de pênaltis exige cravar também a forma e
+        // quem passa; no tempo normal basta o placar exato (ver isProfeta).
+        if (isProfeta(bet, match)) exactScoreCount++;
         else if (analysis.type === 'draw') correctDrawCount++;
         else if (analysis.type === 'winner') correctWinnerCount++;
         else if (analysis.type === 'wrong') wrongCount++;
@@ -475,8 +513,8 @@ export function calculateConquestTimeline(
     const analysis = analyzeBet(bet, match);
     const dateLabel = match.date; // Ex: "12/06"
 
-    // Se acertou exato: Profeta
-    if (bet && analysis.type === 'exact') {
+    // Se acertou exato: Profeta (em jogo de pênaltis, exige forma + quem passa)
+    if (isProfeta(bet, match)) {
       conquestTimeline.push({
         type: 'profeta',
         date: dateLabel,

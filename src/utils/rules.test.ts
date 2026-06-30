@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   analyzeBet,
   pensBonus,
+  isProfeta,
   calculateStandings,
   calculateFireCounts,
   calculatePeFrioCounts,
@@ -139,39 +140,56 @@ describe('analyzeBet', () => {
 // ---------- pensBonus (palpite de pênaltis no mata-mata) ----------
 
 describe('pensBonus', () => {
-  // Jogo do mata-mata que foi à disputa: placar empatado + vencedor que avançou.
+  // Jogo decidido nos PÊNALTIS: placar empatado (1-1), duração PENALTY_SHOOTOUT.
   const koPens = (winner: 'HOME_TEAM' | 'AWAY_TEAM') =>
-    finishedMatch(1, 1, { winner, stage: 'LAST_16' });
+    finishedMatch(1, 1, { winner, stage: 'LAST_16', duration: 'PENALTY_SHOOTOUT' });
+  // Jogo decidido na PRORROGAÇÃO por gol: placar 2-1, duração EXTRA_TIME.
+  const koExtra = (winner: 'HOME_TEAM' | 'AWAY_TEAM') =>
+    finishedMatch(2, 1, { winner, stage: 'LAST_16', duration: 'EXTRA_TIME' });
   const betWithPens = (pick: boolean, pensWinner: 'HOME' | 'AWAY' | null): Bet => ({
     ...makeBet(0, 0),
     pensPick: pick,
     pensWinner,
   });
 
-  it('errou que vai pra pênaltis (0) e errou o vencedor (-1): perde 1 ponto (-1)', () => {
+  it('pênaltis: errou a forma (0) e errou o vencedor (-1) => -1', () => {
     expect(pensBonus(betWithPens(false, 'AWAY'), koPens('HOME_TEAM'))).toBe(-1);
   });
 
-  it('acertou que vai pra pênaltis (+1) mas errou o vencedor (-1): ganha 0 pontos (1 - 1 = 0)', () => {
+  it('pênaltis: acertou a forma (+1) mas errou o vencedor (-1) => 0', () => {
     expect(pensBonus(betWithPens(true, 'AWAY'), koPens('HOME_TEAM'))).toBe(0);
   });
 
-  it('acertou que vai pra pênaltis (+1) e acertou o vencedor (+1): ganha 2 pontos (1 + 1 = 2)', () => {
+  it('pênaltis: acertou a forma (+1) e acertou o vencedor (+1) => 2', () => {
     expect(pensBonus(betWithPens(true, 'HOME'), koPens('HOME_TEAM'))).toBe(2);
   });
 
-  it('jogo decidido no tempo normal, usuário apostou que não ia (+1) e acertou o vencedor (+1): ganha 2 pontos (1 + 1 = 2)', () => {
-    const m = finishedMatch(2, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
-    expect(pensBonus(betWithPens(false, 'HOME'), m)).toBe(2);
+  it('prorrogação: acertou que NÃO ia a pênaltis (+1) e acertou o vencedor (+1) => 2', () => {
+    expect(pensBonus(betWithPens(false, 'HOME'), koExtra('HOME_TEAM'))).toBe(2);
   });
 
-  it('jogo decidido no tempo normal, usuário apostou que ia (0) e errou o vencedor (-1): perde 1 ponto (0 - 1 = -1)', () => {
+  it('prorrogação: disse que ia a pênaltis (forma errada, 0) e errou o vencedor (-1) => -1', () => {
+    expect(pensBonus(betWithPens(true, 'AWAY'), koExtra('HOME_TEAM'))).toBe(-1);
+  });
+
+  it('decidido no TEMPO NORMAL (REGULAR): classificação não conta, NEM desconta (0)', () => {
+    const m = finishedMatch(2, 1, { winner: 'HOME_TEAM', stage: 'LAST_16', duration: 'REGULAR' });
+    expect(pensBonus(betWithPens(false, 'HOME'), m)).toBe(0); // acertou vencedor, mas 90' não conta
+    expect(pensBonus(betWithPens(true, 'AWAY'), m)).toBe(0); // errou vencedor, mas 90' não desconta
+  });
+
+  it('duração desconhecida (dado antigo) + pênaltis preenchido: trata como pênaltis', () => {
+    const m = finishedMatch(1, 1, { winner: 'HOME_TEAM', stage: 'LAST_16', homePens: 4, awayPens: 2 });
+    expect(pensBonus(betWithPens(true, 'HOME'), m)).toBe(2);
+  });
+
+  it('duração desconhecida e sem pênaltis: não conta (0)', () => {
     const m = finishedMatch(2, 1, { winner: 'HOME_TEAM', stage: 'LAST_16' });
-    expect(pensBonus(betWithPens(true, 'AWAY'), m)).toBe(-1);
+    expect(pensBonus(betWithPens(true, 'AWAY'), m)).toBe(0);
   });
 
   it('jogo ainda não terminou vale 0', () => {
-    const m: Match = { ...baseMatch, homeScore: 1, awayScore: 1, stage: 'LAST_16', winner: 'HOME_TEAM' };
+    const m: Match = { ...baseMatch, homeScore: 1, awayScore: 1, stage: 'LAST_16', winner: 'HOME_TEAM', duration: 'PENALTY_SHOOTOUT' };
     expect(pensBonus(betWithPens(true, 'HOME'), m)).toBe(0);
   });
 
@@ -182,6 +200,54 @@ describe('pensBonus', () => {
   it('usuário não apostou empate no placar: vale 0', () => {
     const bet = { ...makeBet(2, 1), pensPick: true, pensWinner: 'HOME' as const };
     expect(pensBonus(bet, koPens('HOME_TEAM'))).toBe(0);
+  });
+});
+
+// ---------- isProfeta (selo 🔮 / contagem de desempate) ----------
+
+describe('isProfeta', () => {
+  const betWithPens = (h: number, a: number, pick: boolean, pensWinner: 'HOME' | 'AWAY' | null): Bet => ({
+    ...makeBet(h, a),
+    pensPick: pick,
+    pensWinner,
+  });
+
+  it('tempo normal: cravou o placar exato = Profeta', () => {
+    expect(isProfeta(makeBet(2, 1), finishedMatch(2, 1, { stage: 'LAST_16', duration: 'REGULAR', winner: 'HOME_TEAM' }))).toBe(true);
+  });
+
+  it('fase de grupos: empate exato (1-1) = Profeta', () => {
+    expect(isProfeta(makeBet(1, 1), finishedMatch(1, 1, { winner: 'DRAW' }))).toBe(true);
+  });
+
+  it('não cravou o placar: não é Profeta', () => {
+    expect(isProfeta(makeBet(0, 0), finishedMatch(1, 1))).toBe(false);
+  });
+
+  it('pênaltis: cravou placar + forma (pênaltis) + quem passa = Profeta', () => {
+    const m = finishedMatch(1, 1, { stage: 'LAST_16', duration: 'PENALTY_SHOOTOUT', winner: 'HOME_TEAM' });
+    expect(isProfeta(betWithPens(1, 1, true, 'HOME'), m)).toBe(true);
+  });
+
+  it('pênaltis: cravou o placar mas errou quem passa = NÃO é Profeta', () => {
+    const m = finishedMatch(1, 1, { stage: 'LAST_16', duration: 'PENALTY_SHOOTOUT', winner: 'HOME_TEAM' });
+    expect(isProfeta(betWithPens(1, 1, true, 'AWAY'), m)).toBe(false);
+  });
+
+  it('pênaltis: cravou o placar e quem passa mas disse prorrogação (forma errada) = NÃO é Profeta', () => {
+    const m = finishedMatch(1, 1, { stage: 'LAST_16', duration: 'PENALTY_SHOOTOUT', winner: 'HOME_TEAM' });
+    expect(isProfeta(betWithPens(1, 1, false, 'HOME'), m)).toBe(false);
+  });
+
+  it('pênaltis (fallback sem duration, mas com pênaltis preenchido): exige classificação', () => {
+    const m = finishedMatch(1, 1, { stage: 'LAST_16', winner: 'HOME_TEAM', homePens: 4, awayPens: 2 });
+    expect(isProfeta(betWithPens(1, 1, true, 'HOME'), m)).toBe(true);
+    expect(isProfeta(betWithPens(1, 1, true, 'AWAY'), m)).toBe(false);
+  });
+
+  it('prorrogação por gol (placar 2-1): cravar o placar exato já é Profeta', () => {
+    const m = finishedMatch(2, 1, { stage: 'LAST_16', duration: 'EXTRA_TIME', winner: 'HOME_TEAM' });
+    expect(isProfeta(makeBet(2, 1), m)).toBe(true);
   });
 });
 

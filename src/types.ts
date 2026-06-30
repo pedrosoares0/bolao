@@ -42,6 +42,7 @@ export interface Match {
   awayTeamEn: string;
   stage: string; // GROUP_STAGE | LAST_32 | LAST_16 | QUARTER_FINALS | SEMI_FINALS | THIRD_PLACE | FINAL
   winner?: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // decide pênaltis no mata-mata
+  duration?: string | null; // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT — como o jogo foi decidido
   isLive?: boolean;
   liveClock?: string | null; // minuto/etapa ao vivo vindo da ESPN (ex.: "28'", "HT")
   goals?: MatchGoal[]; // autores dos gols (para pontuar o artilheiro)

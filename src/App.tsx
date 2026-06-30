@@ -16,7 +16,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Frag
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal, ThiefSteal } from './types';
 import { BRAZIL_PLAYERS, goalsByPlayer } from './utils/players';
-import { calculateStandings, analyzeBet, pensBonus, calculateThiefRounds } from './utils/rules';
+import { calculateStandings, analyzeBet, pensBonus, isProfeta, calculateThiefRounds } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
 // WebGL do Ranking (ogl) — quando o usuário abre a aba, deixando o boot mais leve.
@@ -118,6 +118,7 @@ interface MatchDbRow {
   home_pens: number | null;
   away_pens: number | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
+  duration: string | null;
   live_clock: string | null;
   goals: MatchGoal[] | null;
 }
@@ -150,6 +151,7 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     awayTeamEn: r.away_team,
     stage: r.stage ?? 'GROUP_STAGE',
     winner: r.winner ?? null,
+    duration: r.duration ?? null,
     isLive: ['IN_PLAY', 'PAUSED', 'LIVE', 'EXTRA_TIME', 'PENALTY_SHOOTOUT'].includes(r.status?.toUpperCase() || ''),
     liveClock: r.live_clock ?? null,
     goals: r.goals ?? [],
@@ -516,7 +518,7 @@ function App() {
         supabase
           .from('matches')
           .select(
-            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, home_pens, away_pens, winner, live_clock, goals'
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, home_pens, away_pens, winner, duration, live_clock, goals'
           )
           .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id, pens_pick, pens_winner'),
@@ -1893,9 +1895,14 @@ function App() {
 
                             const dp = displayPens[match.id] ?? { pick: false, winner: null };
                             const isExpanded = !!expandedPens[match.id];
-                            // Foi à disputa? (placar empatou e há vencedor que avançou)
-                            const wentToPens = isFinished && match.homeScore !== null && match.homeScore === match.awayScore
-                              && (match.winner === 'HOME_TEAM' || match.winner === 'AWAY_TEAM');
+                            // Como o jogo foi decidido. O palpite de classificação só pontua/
+                            // desconta quando o jogo passou dos 90' (prorrogação ou pênaltis);
+                            // decidido no tempo normal fica neutro. Fallback p/ dado antigo:
+                            // pênaltis preenchido => foi a pênaltis.
+                            const duration = match.duration
+                              ?? (match.homePens != null && match.awayPens != null ? 'PENALTY_SHOOTOUT' : null);
+                            const wasPens = duration === 'PENALTY_SHOOTOUT';
+                            const wentBeyond90 = isFinished && (wasPens || duration === 'EXTRA_TIME');
                             const realWinner: 'HOME' | 'AWAY' | null =
                               match.winner === 'HOME_TEAM' ? 'HOME' : match.winner === 'AWAY_TEAM' ? 'AWAY' : null;
                             const setPens = (next: { pick: boolean; winner: 'HOME' | 'AWAY' | null }) => {
@@ -1932,7 +1939,7 @@ function App() {
                                     <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#15110E', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                       <span>Selecione quem avança de fase:</span>
                                       <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#8b8075' }}>
-                                        Acertou: <span style={{ color: '#009c3b', fontWeight: 700 }}>+1 pt</span>. Errou: <span style={{ color: '#dc2626', fontWeight: 700 }}>-1 pt</span>.
+                                        Só vale se houver prorrogação ou pênaltis — Acertou: <span style={{ color: '#009c3b', fontWeight: 700 }}>+1 pt</span>. Errou: <span style={{ color: '#dc2626', fontWeight: 700 }}>-1 pt</span>. Decidido no tempo normal: 0.
                                       </span>
                                     </div>
                                     
@@ -1943,7 +1950,9 @@ function App() {
                                         const flag = side === 'HOME' ? match.homeFlag : match.awayFlag;
                                         const isLocked = !canEditBet;
                                         if (isLocked && !isSel) return null;
-                                        const state = isFinished && isSel ? (realWinner === side ? 'scored' : 'missed') : '';
+                                        // Só pinta verde/vermelho quando a classificação contou
+                                        // (prorrogação/pênaltis). Decidido no tempo normal: neutro.
+                                        const state = wentBeyond90 && isSel ? (realWinner === side ? 'scored' : 'missed') : '';
                                         return (
                                           <button
                                             key={side}
@@ -1977,7 +1986,7 @@ function App() {
                                     <div className="pens-winner-grid" style={{ marginTop: '0.45rem' }}>
                                       <button
                                         type="button"
-                                        className={`pens-winner-btn ${dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${isFinished ? (wentToPens ? (dp.pick ? 'scored' : '') : (dp.pick ? 'missed' : '')) : ''}`}
+                                        className={`pens-winner-btn ${dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${wentBeyond90 && dp.pick ? (wasPens ? 'scored' : 'missed') : ''}`}
                                         onClick={() => setPens({ pick: true, winner: dp.winner })}
                                         disabled={!canEditBet}
                                       >
@@ -1987,7 +1996,7 @@ function App() {
 
                                       <button
                                         type="button"
-                                        className={`pens-winner-btn ${!dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${isFinished ? (!wentToPens ? (!dp.pick ? 'scored' : '') : (!dp.pick ? 'missed' : '')) : ''}`}
+                                        className={`pens-winner-btn ${!dp.pick ? 'selected' : ''} ${!canEditBet ? 'locked' : ''} ${wentBeyond90 && !dp.pick ? (!wasPens ? 'scored' : 'missed') : ''}`}
                                         onClick={() => setPens({ pick: false, winner: dp.winner })}
                                         disabled={!canEditBet}
                                       >
@@ -2031,8 +2040,9 @@ function App() {
                                 const isOwnPick = !!currentUser && p.id === currentUser.id;
                                 const pickHidden = hideOpponentPicks && !isOwnPick;
 
-                                // Mini-títulos do jogo
-                                const isProfeta = finishedTitles && analysis.type === 'exact';
+                                // Mini-títulos do jogo. Profeta: em jogo de pênaltis
+                                // exige cravar placar + forma + quem passa (ver isProfeta).
+                                const isProfetaPick = !!finishedTitles && isProfeta(bet, match);
                                 const isPeFrio = p.id === peFrioId;
 
                                 // Lógica do Badge de Pontos. Inclui o bônus de
@@ -2104,7 +2114,7 @@ function App() {
                                         )}
                                       </div>
                                       <div className="inline-guess-name-col-p16">
-                                        {isProfeta && (
+                                        {isProfetaPick && (
                                           <span className="inline-guess-title-p16 profeta">🔮 Profeta</span>
                                         )}
                                         {isPeFrio && (

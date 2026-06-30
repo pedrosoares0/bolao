@@ -133,6 +133,7 @@ interface MatchUpsertRow {
   home_pens: number | null;
   away_pens: number | null;
   winner: string | null;
+  duration: string | null; // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT (football-data)
   live_clock: string | null;
   updated_at: string;
   homeTeamId?: string;
@@ -431,6 +432,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
       home_pens, // football-data v4 traz penalties; a ESPN ainda pode sobrescrever abaixo
       away_pens,
       winner: m.score?.winner ?? null,
+      duration: m.score?.duration ?? null, // como o jogo foi decidido (90'/prorrog./pênaltis)
       live_clock: null, // preenchido abaixo com o minuto da ESPN, quando ao vivo
       updated_at: new Date().toISOString(),
     };
@@ -547,10 +549,13 @@ interface LiveDbRow {
   id: number;
   utc_date: string;
   status: string;
+  stage: string | null;
   home_team: string;
   away_team: string;
   home_score: number | null;
   away_score: number | null;
+  winner: string | null;
+  duration: string | null;
   live_clock: string | null;
 }
 
@@ -591,7 +596,7 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
 
   const { data: dbRows } = await supabase
     .from('matches')
-    .select('id, utc_date, status, home_team, away_team, home_score, away_score, live_clock');
+    .select('id, utc_date, status, stage, home_team, away_team, home_score, away_score, winner, duration, live_clock');
   if (!dbRows || dbRows.length === 0) return { skipped: false, count: 0 };
 
   const prevById = new Map<number, PrevState>();
@@ -621,7 +626,10 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       id: r.id,
       utc_date: r.utc_date,
       status: ov.status,
-      stage: null,
+      // stage/winner/duration são repassados do banco (não entram no dbUpdates,
+      // então não sobrescrevem nada) só para as notificações terem contexto de
+      // mata-mata/pênaltis/prorrogação ao montar a mensagem de fim de jogo.
+      stage: r.stage,
       group_name: null,
       home_team: r.home_team,
       away_team: r.away_team,
@@ -633,7 +641,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       away_score: awayScore,
       home_pens: fdHomeIsEspnHome ? ov.homePens : ov.awayPens,
       away_pens: fdHomeIsEspnHome ? ov.awayPens : ov.homePens,
-      winner: null,
+      winner: r.winner,
+      duration: r.duration,
       live_clock: ov.liveClock,
       updated_at: new Date().toISOString(),
       // transitórios (notificações) — removidos antes do upsert por toDbRow

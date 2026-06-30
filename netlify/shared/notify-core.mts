@@ -31,6 +31,10 @@ interface MatchRow {
   away_team: string;
   home_score: number | null;
   away_score: number | null;
+  home_pens?: number | null;
+  away_pens?: number | null;
+  winner?: string | null;
+  duration?: string | null; // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
   homeTeamId?: string;
   awayTeamId?: string;
   goalsDetail?: EspnGoalDetail[];
@@ -113,6 +117,28 @@ const scoreLine = (m: MatchRow): string => {
   return `${flagEmoji(m.home_team)} *${ptName(m.home_team)}*  ${h} x ${a}  *${ptName(m.away_team)}* ${flagEmoji(m.away_team)}`;
 };
 
+// Linha extra do mata-mata quando o jogo passou dos 90': pênaltis ou prorrogação.
+// Devolve null no tempo normal. Detecta pênaltis pelos gols da disputa (vêm tanto
+// da ESPN quanto da football-data); prorrogação pela duração (só football-data).
+// O time que avança é deduzido (winner, ou o placar dos pênaltis se ainda não veio).
+const decisionLine = (m: MatchRow): string | null => {
+  const side = koWinnerSide(m);
+  const advEn = side === 'HOME' ? m.home_team : side === 'AWAY' ? m.away_team : null;
+  const adv = advEn ? ` — *${ptName(advEn)}* se classifica` : '';
+
+  // Pênaltis: o placar principal é o tempo normal (empate); aqui vai a disputa.
+  if (m.home_pens != null && m.away_pens != null) {
+    return `🥅 *Pênaltis:* ${flagEmoji(m.home_team)} ${m.home_pens} x ${m.away_pens} ${flagEmoji(m.away_team)}${adv}`;
+  }
+  // Prorrogação decidida por gol: o placar principal já é o resultado final.
+  if (m.duration === 'EXTRA_TIME') {
+    return advEn
+      ? `⏱️ *${ptName(advEn)}* venceu na prorrogação`
+      : '⏱️ Decidido na prorrogação';
+  }
+  return null;
+};
+
 // ============================================================
 // Datas/horas no fuso de Brasília
 // ============================================================
@@ -136,15 +162,73 @@ const dmFromIso = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 // ============================================================
 
 type ResultType = 'exact' | 'draw' | 'winner' | 'wrong' | 'pending';
-interface BetRow { user_id: string; match_id?: number; home_score: number; away_score: number; scorer_id?: string | null; }
+interface BetRow {
+  user_id: string;
+  match_id?: number;
+  home_score: number;
+  away_score: number;
+  scorer_id?: string | null;
+  pens_pick?: boolean | null;
+  pens_winner?: 'HOME' | 'AWAY' | null;
+}
+
+// Quem avançou de fase. Usa `winner` (football-data); se ainda não veio (ex.: o
+// sync AO VIVO da ESPN marcou o fim antes do football-data), cai no placar dos
+// pênaltis e, por fim, no placar (prorrogação por gol). null = não dá pra saber
+// (ex.: empate de fase de grupos, que não tem quem avança).
+const koWinnerSide = (m: MatchRow): 'HOME' | 'AWAY' | null => {
+  if (m.winner === 'HOME_TEAM') return 'HOME';
+  if (m.winner === 'AWAY_TEAM') return 'AWAY';
+  if (m.home_pens != null && m.away_pens != null) return m.home_pens > m.away_pens ? 'HOME' : 'AWAY';
+  if (m.home_score != null && m.away_score != null && m.home_score !== m.away_score) {
+    return m.home_score > m.away_score ? 'HOME' : 'AWAY';
+  }
+  return null;
+};
 
 const analyze = (bet: BetRow | undefined, m: MatchRow): { points: number; type: ResultType } => {
   if (!bet || m.home_score === null || m.away_score === null) return { points: 0, type: 'pending' };
   const bH = bet.home_score, bA = bet.away_score, mH = m.home_score, mA = m.away_score;
   if (bH === mH && bA === mA) return { points: 3, type: 'exact' };
   if (mH === mA && bH === bA) return { points: 2, type: 'draw' };
+  // Mata-mata de placar empatado (pênaltis): quem cravou no placar o time que
+  // AVANÇOU leva 1; quem apostou o eliminado, 0. (Grupo: koSide = null.)
+  if (mH === mA) {
+    const koSide = koWinnerSide(m);
+    if (koSide) {
+      const advance = koSide === 'HOME' ? 1 : -1;
+      return Math.sign(bH - bA) === advance ? { points: 1, type: 'winner' } : { points: 0, type: 'wrong' };
+    }
+  }
   if (Math.sign(mH - mA) === Math.sign(bH - bA)) return { points: 1, type: 'winner' };
   return { points: 0, type: 'wrong' };
+};
+
+// Bônus do palpite de classificação (espelha rules.pensBonus): só quando o
+// usuário apostou empate e o jogo passou dos 90' (prorrogação ou pênaltis).
+// +1 acertar a forma, +1/−1 quem avança. Fora dos 90' (ou fase de grupos, que
+// nunca passa dos 90') dá 0 — então não precisa do `stage`, que às vezes não
+// vem no objeto do sync ao vivo.
+const pensBonusN = (bet: BetRow | undefined, m: MatchRow): number => {
+  if (!bet) return 0;
+  if (m.status !== 'FINISHED') return 0;
+  if (m.home_score === null || m.away_score === null) return 0;
+  if (bet.home_score !== bet.away_score) return 0;
+
+  const duration = m.duration
+    ?? (m.home_pens != null && m.away_pens != null ? 'PENALTY_SHOOTOUT' : null);
+  const wasPens = duration === 'PENALTY_SHOOTOUT';
+  const wentBeyond90 = wasPens || duration === 'EXTRA_TIME';
+  if (!wentBeyond90) return 0;
+
+  const winnerSide = koWinnerSide(m);
+  if (!winnerSide) return 0;
+
+  let points = 0;
+  if ((bet.pens_pick ?? false) === wasPens) points += 1;
+  if ((bet.pens_winner ?? null) === winnerSide) points += 1;
+  else points -= 1;
+  return points;
 };
 
 const typeLabel: { [k in ResultType]?: string } = {
@@ -260,15 +344,17 @@ interface ScorerLine {
   name: string;
   points: number;      // pontos do PLACAR
   type: ResultType;
+  pensPts: number;     // bônus de classificação (mata-mata): +1 forma, +1/−1 quem avança
   scorerGoals: number; // gols do artilheiro escolhido (+1 cada)
   scorerLabel: string | null; // nome do artilheiro escolhido
-  total: number;       // placar + artilheiro
+  total: number;       // placar + classificação + artilheiro
 }
 
 const msgEnd = (m: MatchRow, scorers: ScorerLine[]): string => {
   const lineFor = (s: ScorerLine): string => {
     const partes: string[] = [];
     if (s.points > 0) partes.push(`${typeLabel[s.type] || ''} +${s.points}`);
+    if (s.pensPts !== 0) partes.push(`🏆 classificação ${s.pensPts > 0 ? '+' : ''}${s.pensPts}`);
     if (s.scorerGoals > 0) {
       const golTxt = s.scorerGoals === 1 ? 'gol' : 'gols';
       partes.push(`⚽ ${s.scorerLabel ?? 'artilheiro'} ${s.scorerGoals} ${golTxt} +${s.scorerGoals}`);
@@ -278,7 +364,15 @@ const msgEnd = (m: MatchRow, scorers: ScorerLine[]): string => {
   const bloco = scorers.length
     ? ['🎯 *Pontuou nesse jogo:*', ...scorers.map(lineFor)].join('\n')
     : '😬 Ninguém pontuou nesse jogo.';
-  return ['🔴 *FIM DE JOGO*', '', scoreLine(m), '', bloco].join('\n');
+  // Linha de placar + (se houve) a linha de pênaltis/prorrogação, antes do bloco.
+  // Nos pênaltis, o placar principal é o tempo normal (empate) — deixamos explícito.
+  const decision = decisionLine(m);
+  const isPens = m.home_pens != null && m.away_pens != null;
+  const placarLinha = isPens ? `${scoreLine(m)}  _(tempo normal)_` : scoreLine(m);
+  const cabecalho = decision
+    ? ['🔴 *FIM DE JOGO*', '', placarLinha, decision]
+    : ['🔴 *FIM DE JOGO*', '', placarLinha];
+  return [...cabecalho, '', bloco].join('\n');
 };
 
 const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
@@ -416,20 +510,22 @@ export async function runNotifications(
     if (m.status === 'FINISHED' && prev.status !== 'FINISHED') {
       const { data: betRows } = await supabase
         .from('bets')
-        .select('user_id, home_score, away_score, scorer_id')
+        .select('user_id, home_score, away_score, scorer_id, pens_pick, pens_winner')
         .eq('match_id', m.id);
       const scorers = ((betRows ?? []) as BetRow[])
         .map((b) => {
           const a = analyze(b, m);
+          const pensPts = pensBonusN(b, m);
           // Bônus do artilheiro: +1 por gol do jogador escolhido (jogos do Brasil).
           const scorerGoals = countScorerGoals(m.goalsDetail, b.scorer_id);
           return {
             name: nameByUid.get(b.user_id) || '??',
             points: a.points,
             type: a.type,
+            pensPts,
             scorerGoals,
             scorerLabel: scorerGoals > 0 ? scorerName(b.scorer_id) : null,
-            total: a.points + scorerGoals,
+            total: a.points + pensPts + scorerGoals,
           };
         })
         .filter((s) => s.total > 0)
@@ -448,7 +544,7 @@ export async function runNotifications(
     if (!(await reserve(supabase, key))) continue;
 
     // todas as apostas (para somar rodada + geral) — inclui o artilheiro escolhido
-    const { data: allBets } = await supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id');
+    const { data: allBets } = await supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id, pens_pick, pens_winner');
     const betsByKey = new Map<string, BetRow>();
     ((allBets ?? []) as BetRow[]).forEach((b) => betsByKey.set(`${b.user_id}_${b.match_id}`, b));
 
@@ -471,8 +567,9 @@ export async function runNotifications(
       matches.reduce((acc, mm) => {
         const bet = betsByKey.get(`${uid}_${mm.id}`);
         const placar = analyze(bet, mm).points;
+        const pens = pensBonusN(bet, mm);
         const bonus = countScorerGoals(goalsByMatch.get(mm.id), bet?.scorer_id);
-        return acc + placar + bonus;
+        return acc + placar + pens + bonus;
       }, 0);
 
     const dayScores = participants
