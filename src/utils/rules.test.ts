@@ -640,6 +640,25 @@ describe('Cálculo de Conquistas e Estatísticas', () => {
     expect(mvpCounts['user2']).toBe(1);
   });
 
+  it('MVP da rodada inclui o bônus de classificação (pênaltis), não só o placar', () => {
+    // Um único jogo no dia, decidido nos pênaltis (1-1, casa avança).
+    const matches = [
+      finishedMatch(1, 1, { id: 'k1', isoDate: '2026-07-01', stage: 'LAST_16', duration: 'PENALTY_SHOOTOUT', winner: 'HOME_TEAM' }),
+    ];
+    // Ambos cravam 1-1 (placar exato = 3). user1 também acerta a classificação
+    // (pênaltis + casa) => +2; user2 não palpitou classificação => -1 (errou quem passa).
+    const bets: Bet[] = [
+      { ...makeBet(1, 1, 'user1', 'k1'), pensPick: true, pensWinner: 'HOME' },
+      { ...makeBet(1, 1, 'user2', 'k1'), pensPick: false, pensWinner: null },
+    ];
+
+    const mvpCounts = calculateMvpCounts(matches, bets, participants);
+
+    // Sem o bônus seriam 3 x 3 (empate, ambos MVP). Com o bônus: user1 = 5, user2 = 2.
+    expect(mvpCounts['user1']).toBe(1);
+    expect(mvpCounts['user2']).toBe(0);
+  });
+
   it('gera linha do tempo de conquistas cronológica reversa', () => {
     const matches = [
       finishedMatch(1, 0, { id: 'm0', date: '12/06', kickoff: '2026-06-12T15:00:00Z', homeTeam: 'A', awayTeam: 'B' }),

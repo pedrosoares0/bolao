@@ -5,7 +5,7 @@
 // ============================================================
 import React, { useMemo, useState } from 'react';
 import type { Match, Bet, Participant, SpecialPrediction, BrazilStage } from '../types';
-import { analyzeBet } from '../utils/rules';
+import { analyzeBet, pensBonus, scorerBonus } from '../utils/rules';
 import {
   computeChampion,
   computeBrazilStage,
@@ -96,7 +96,8 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
       }
       day.matches.push(m);
       const bet = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
-      day.points += analyzeBet(bet, m).points;
+      // Pontos do dia = placar + artilheiro + classificação (pênaltis/prorrogação).
+      day.points += analyzeBet(bet, m).points + scorerBonus(bet, m) + pensBonus(bet, m);
     });
     return days;
   }, [matches, bets, currentUser.id, nowTs]);
@@ -215,12 +216,19 @@ export const PalpitesTab: React.FC<PalpitesTabProps> = ({
                   const bet = bets.find((b) => b.matchId === m.id && b.participantId === currentUser.id);
                   const analysis = analyzeBet(bet, m);
 
+                  // Inclui o bônus de classificação (pênaltis/prorrogação) no número,
+                  // pra bater com o total do dia e com o ranking.
                   let badgeClass = 'wrong';
                   let badgeText = '0 pts';
-                  if (analysis.type === 'exact') { badgeClass = 'exact'; badgeText = '+3 pts'; }
-                  else if (analysis.type === 'draw') { badgeClass = 'draw'; badgeText = '+2 pts'; }
-                  else if (analysis.type === 'winner') { badgeClass = 'winner'; badgeText = '+1 pt'; }
-                  else if (analysis.type === 'pending') { badgeClass = 'pending'; badgeText = 'Pendente'; }
+                  if (analysis.type === 'pending') { badgeClass = 'pending'; badgeText = 'Pendente'; }
+                  else {
+                    const total = analysis.points + pensBonus(bet, m) + scorerBonus(bet, m);
+                    if (total >= 3) badgeClass = 'exact';
+                    else if (total === 2) badgeClass = 'draw';
+                    else if (total >= 1) badgeClass = 'winner';
+                    else badgeClass = 'wrong';
+                    badgeText = `${total > 0 ? '+' : ''}${total} ${Math.abs(total) === 1 ? 'pt' : 'pts'}`;
+                  }
 
                   const realScore = `${m.homeScore ?? '-'} x ${m.awayScore ?? '-'}`;
 

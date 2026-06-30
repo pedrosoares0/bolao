@@ -450,8 +450,10 @@ export function calculateMvpCounts(
         dayMatches.forEach((m) => {
           const bet = betIndex.get(`${p.id}|${m.id}`);
           const a = analyzeBet(bet, m);
-          pts += a.points;
-          if (a.type === 'exact') exacts++;
+          // Total da rodada = placar + bônus de artilheiro + bônus de classificação
+          // (pênaltis/prorrogação), igual ao ranking geral e ao Ladrão.
+          pts += a.points + scorerBonus(bet, m) + pensBonus(bet, m);
+          if (isProfeta(bet, m)) exacts++;
         });
         return { id: p.id, pts, exacts };
       })
@@ -591,8 +593,8 @@ export function calculateConquestTimeline(
         dayMatches.forEach((m) => {
           const bet = betIndex.get(`${p.id}|${m.id}`);
           const a = analyzeBet(bet, m);
-          pts += a.points;
-          if (a.type === 'exact') exacts++;
+          pts += a.points + scorerBonus(bet, m) + pensBonus(bet, m);
+          if (isProfeta(bet, m)) exacts++;
         });
         return { id: p.id, pts, exacts };
       })

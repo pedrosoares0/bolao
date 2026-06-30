@@ -6,7 +6,7 @@
 // ============================================================
 import React from 'react';
 import type { ParticipantStanding, Match, Bet } from '../types';
-import { analyzeBet, calculateFireCounts } from '../utils/rules';
+import { analyzeBet, pensBonus, scorerBonus, isProfeta, calculateFireCounts } from '../utils/rules';
 import { shareRanking } from '../utils/shareRanking';
 import LightRays from './LightRays';
 import Aurora from './Aurora';
@@ -238,8 +238,10 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({ standings, match
           dayMatches.forEach((m) => {
             const bet = bets.find((b) => b.matchId === m.id && b.participantId === s.participantId);
             const a = analyzeBet(bet, m);
-            pts += a.points;
-            if (a.type === 'exact') exacts++;
+            // Total da rodada = placar + artilheiro + classificação (pênaltis/
+            // prorrogação), igual ao ranking geral.
+            pts += a.points + scorerBonus(bet, m) + pensBonus(bet, m);
+            if (isProfeta(bet, m)) exacts++;
           });
           return { standing: s, pts, exacts };
         })
