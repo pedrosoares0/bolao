@@ -16,7 +16,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Frag
 import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal, ThiefSteal } from './types';
 import { BRAZIL_PLAYERS, goalsByPlayer } from './utils/players';
-import { calculateStandings, analyzeBet, calculateThiefRounds } from './utils/rules';
+import { calculateStandings, analyzeBet, pensBonus, calculateThiefRounds } from './utils/rules';
 import { calcAccumulatedPot } from './utils/pot';
 // Abas carregadas sob demanda (code-splitting): só baixam o JS — inclusive o
 // WebGL do Ranking (ogl) — quando o usuário abre a aba, deixando o boot mais leve.
@@ -1578,9 +1578,14 @@ function App() {
 
                     // Determinar vencedor para destaque visual
                     const isFinished = match.status === 'finished';
-                    const homeFinalWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore;
-                    const awayFinalWinner = isFinished && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore;
-                    const isFinalDraw = isFinished && match.homeScore !== null && match.awayScore !== null && match.homeScore === match.awayScore;
+                    // Jogo decidido nos pênaltis (mata-mata): a ESPN preenche os dois
+                    // placares de pênaltis. O placar normal continua empatado.
+                    const wentToPens = isFinished && match.homePens != null && match.awayPens != null;
+                    const homePensWinner = wentToPens && (match.homePens ?? 0) > (match.awayPens ?? 0);
+                    const awayPensWinner = wentToPens && (match.awayPens ?? 0) > (match.homePens ?? 0);
+                    const homeFinalWinner = isFinished && ((match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore) || homePensWinner);
+                    const awayFinalWinner = isFinished && ((match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore) || awayPensWinner);
+                    const isFinalDraw = isFinished && !wentToPens && match.homeScore !== null && match.awayScore !== null && match.homeScore === match.awayScore;
 
                     // Vencedor parcial em tempo real (jogo acontecendo)
                     const isLiveGame = hasGameStarted && !isFinished;
@@ -1711,6 +1716,7 @@ function App() {
                               ) : (
                                 <div className="score-display-box-p16">
                                   {hasGameStarted ? (match.homeScore !== null ? match.homeScore : '-') : (displayDrafts[match.id]?.homeScore || '-')}
+                                  {wentToPens && <span className="score-pens-p16">({match.homePens})</span>}
                                 </div>
                               )}
 
@@ -1742,6 +1748,7 @@ function App() {
                               ) : (
                                 <div className="score-display-box-p16">
                                   {hasGameStarted ? (match.awayScore !== null ? match.awayScore : '-') : (displayDrafts[match.id]?.awayScore || '-')}
+                                  {wentToPens && <span className="score-pens-p16">({match.awayPens})</span>}
                                 </div>
                               )}
                             </div>
@@ -2028,21 +2035,24 @@ function App() {
                                 const isProfeta = finishedTitles && analysis.type === 'exact';
                                 const isPeFrio = p.id === peFrioId;
 
-                                // Lógica do Badge de Pontos
+                                // Lógica do Badge de Pontos. Inclui o bônus de
+                                // pênaltis/classificação (mata-mata) para o número
+                                // exibido bater com o que entra no ranking — antes
+                                // o card mostrava só o placar e ignorava o ±1 de
+                                // quem avança / +1 de acertar a forma de decisão.
                                 let pointsBadgeClass = 'wrong';
                                 let pointsText = '0 pts';
-                                if (analysis.type === 'exact') {
-                                  pointsBadgeClass = 'exact';
-                                  pointsText = '+3 pts';
-                                } else if (analysis.type === 'draw') {
-                                  pointsBadgeClass = 'draw';
-                                  pointsText = '+2 pts';
-                                } else if (analysis.type === 'winner') {
-                                  pointsBadgeClass = 'winner';
-                                  pointsText = '+1 pt';
-                                } else if (analysis.type === 'pending') {
+                                if (analysis.type === 'pending') {
                                   pointsBadgeClass = 'pending';
                                   pointsText = 'Pendente';
+                                } else {
+                                  const totalPoints = analysis.points + pensBonus(bet, match);
+                                  if (totalPoints >= 3) pointsBadgeClass = 'exact';
+                                  else if (totalPoints === 2) pointsBadgeClass = 'draw';
+                                  else if (totalPoints >= 1) pointsBadgeClass = 'winner';
+                                  else pointsBadgeClass = 'wrong';
+                                  const unit = Math.abs(totalPoints) === 1 ? 'pt' : 'pts';
+                                  pointsText = `${totalPoints > 0 ? '+' : ''}${totalPoints} ${unit}`;
                                 }
 
                                 // Lógica da bandeira de quem o participante achou que ia vencer
@@ -2129,12 +2139,12 @@ function App() {
                                             )}
                                           </div>
                                           {bet.homeScore === bet.awayScore && isKnockout && (
-                                            <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                            <div style={{ fontSize: '0.72rem', color: '#15110E', fontWeight: 600, marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }}>
                                               <span>{bet.pensPick ? '🥅 Pênaltis' : '⏱️ Sem Pên.'}</span>
                                               {bet.pensWinner && (
                                                 <>
-                                                  <span>•</span>
-                                                  <span style={{ fontWeight: 600 }}>
+                                                  <span style={{ color: '#8b8075' }}>•</span>
+                                                  <span style={{ fontWeight: 700 }}>
                                                     {bet.pensWinner === 'HOME' ? match.homeTeam : match.awayTeam}
                                                   </span>
                                                 </>

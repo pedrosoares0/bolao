@@ -693,6 +693,18 @@ body {
   text-align: center;
 }
 
+/* Gols dos pênaltis entre parênteses, ao lado do placar normal (ex.: 1 (4)).
+   Só aparece nos jogos de mata-mata decididos nos pênaltis. */
+.score-pens-p16 {
+  font-family: var(--font-family-condensed);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #d97706;
+  line-height: 1;
+  margin-left: 2px;
+  align-self: flex-start;
+}
+
 /* Winner/loser/draw highlights for the horizontal layout */
 .team-col-p16.winner-highlight .score-display-box-p16,
 .team-col-p16.winner-highlight .score-stepper-value {

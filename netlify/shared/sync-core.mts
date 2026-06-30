@@ -18,9 +18,58 @@ interface ApiMatch {
   homeTeam?: ApiTeam | null;
   awayTeam?: ApiTeam | null;
   score?: {
+    // ATENÇÃO: em jogo decidido nos pênaltis, a football-data SOMA tempo normal +
+    // pênaltis no fullTime (ex.: regular 1-1 + pênaltis 3-4 => fullTime 4-5). O
+    // placar "de verdade" (o empate que levou à disputa) é regularTime + extraTime,
+    // e os gols da disputa ficam em penalties. Ver o parsing em syncMatches.
     fullTime?: { home?: number | null; away?: number | null } | null;
+    regularTime?: { home?: number | null; away?: number | null } | null;
+    extraTime?: { home?: number | null; away?: number | null } | null;
+    penalties?: { home?: number | null; away?: number | null } | null;
+    duration?: string | null;
     winner?: string | null;
   } | null;
+}
+
+// Separa o placar "de verdade" dos gols da disputa de pênaltis.
+//
+// Pegadinha da football-data v4: num jogo decidido nos pênaltis, o `fullTime`
+// vem SOMADO (tempo normal/prorrogação + pênaltis). Ex.: regular 1-1 + pênaltis
+// 3-4 => fullTime 4-5. Se gravássemos o fullTime em home_score/away_score, a
+// regra de pontuação acharia que foi 4-5 no tempo normal (vitória simples), não
+// 1-1 decidido nos pênaltis — quebrando o cálculo e o "1 (4)" do card.
+//
+// Solução: quando há `penalties`, o placar é regularTime + extraTime (o empate
+// ao fim dos 120') e a disputa vai para home_pens/away_pens. Sem `penalties`
+// (jogo normal ou decidido na prorrogação por gol), o fullTime já é o correto.
+export function splitScoreAndPens(score: ApiMatch['score']): {
+  home_score: number | null;
+  away_score: number | null;
+  home_pens: number | null;
+  away_pens: number | null;
+} {
+  let home_score = score?.fullTime?.home ?? null;
+  let away_score = score?.fullTime?.away ?? null;
+  let home_pens: number | null = null;
+  let away_pens: number | null = null;
+
+  const pens = score?.penalties;
+  if (pens?.home != null && pens?.away != null) {
+    home_pens = pens.home;
+    away_pens = pens.away;
+    const rh = score?.regularTime?.home;
+    const ra = score?.regularTime?.away;
+    if (rh != null && ra != null) {
+      home_score = rh + (score?.extraTime?.home ?? 0);
+      away_score = ra + (score?.extraTime?.away ?? 0);
+    } else if (home_score != null && away_score != null) {
+      // Fallback (sem regularTime): fullTime - pênaltis.
+      home_score = home_score - pens.home;
+      away_score = away_score - pens.away;
+    }
+  }
+
+  return { home_score, away_score, home_pens, away_pens };
 }
 
 // ---- Estado anterior de um jogo (para detectar transições e notificar) ----
@@ -363,26 +412,29 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
   }
 
   const data = (await res.json()) as { matches?: ApiMatch[] };
-  const rows: MatchUpsertRow[] = (data.matches ?? []).map((m): MatchUpsertRow => ({
-    id: m.id,
-    utc_date: m.utcDate,
-    status: m.status,
-    stage: m.stage ?? null,
-    group_name: m.group ?? null,
-    home_team: m.homeTeam?.name ?? 'A definir',
-    away_team: m.awayTeam?.name ?? 'A definir',
-    home_tla: m.homeTeam?.tla ?? '',
-    away_tla: m.awayTeam?.tla ?? '',
-    home_crest: m.homeTeam?.crest ?? '',
-    away_crest: m.awayTeam?.crest ?? '',
-    home_score: m.score?.fullTime?.home ?? null,
-    away_score: m.score?.fullTime?.away ?? null,
-    home_pens: null, // football-data v4 não traz pênaltis; preenchido pela ESPN abaixo
-    away_pens: null,
-    winner: m.score?.winner ?? null,
-    live_clock: null, // preenchido abaixo com o minuto da ESPN, quando ao vivo
-    updated_at: new Date().toISOString(),
-  }));
+  const rows: MatchUpsertRow[] = (data.matches ?? []).map((m): MatchUpsertRow => {
+    const { home_score, away_score, home_pens, away_pens } = splitScoreAndPens(m.score);
+    return {
+      id: m.id,
+      utc_date: m.utcDate,
+      status: m.status,
+      stage: m.stage ?? null,
+      group_name: m.group ?? null,
+      home_team: m.homeTeam?.name ?? 'A definir',
+      away_team: m.awayTeam?.name ?? 'A definir',
+      home_tla: m.homeTeam?.tla ?? '',
+      away_tla: m.awayTeam?.tla ?? '',
+      home_crest: m.homeTeam?.crest ?? '',
+      away_crest: m.awayTeam?.crest ?? '',
+      home_score,
+      away_score,
+      home_pens, // football-data v4 traz penalties; a ESPN ainda pode sobrescrever abaixo
+      away_pens,
+      winner: m.score?.winner ?? null,
+      live_clock: null, // preenchido abaixo com o minuto da ESPN, quando ao vivo
+      updated_at: new Date().toISOString(),
+    };
+  });
 
   // ---- AO VIVO via ESPN (best-effort, com fallback no football-data) ----
   // Buscamos o placar/tempo ao vivo na ESPN (mais rápida) e sobrescrevemos as
