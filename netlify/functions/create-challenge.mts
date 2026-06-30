@@ -70,15 +70,20 @@ export default async (req: Request) => {
     return Response.json({ error: 'Vocês escolheram o mesmo classificado — sem desafio.' }, { status: 400 });
   }
 
-  // Já existe desafio entre os dois nesse jogo (qualquer direção)?
-  const { data: existing } = await supabase
+  // 1 desafio por pessoa por jogo: bloqueia se o desafiante OU o desafiado já
+  // estiver em algum desafio ATIVO (pendente/aceito) nesse jogo. Recusado libera.
+  const { data: active } = await supabase
     .from('challenges')
-    .select('id')
+    .select('challenger_id, challenged_id')
     .eq('match_id', matchId)
-    .or(`and(challenger_id.eq.${challengerUid},challenged_id.eq.${challengedUid}),and(challenger_id.eq.${challengedUid},challenged_id.eq.${challengerUid})`)
-    .limit(1);
-  if (existing && existing.length > 0) {
-    return Response.json({ error: 'Já existe um desafio entre vocês nesse jogo.' }, { status: 409 });
+    .in('status', ['pending', 'accepted']);
+  const busy = new Set<string>();
+  (active ?? []).forEach((c) => { busy.add(c.challenger_id); busy.add(c.challenged_id); });
+  if (busy.has(challengerUid)) {
+    return Response.json({ error: 'Você já tem um desafio nesse jogo.' }, { status: 409 });
+  }
+  if (busy.has(challengedUid)) {
+    return Response.json({ error: 'Esse participante já está em um desafio nesse jogo.' }, { status: 409 });
   }
 
   const { data: inserted, error: insErr } = await supabase
@@ -114,7 +119,8 @@ export default async (req: Request) => {
       pickLine(challengerName, challengerPick),
       pickLine(challengedName, challengedPick),
       '',
-      'Quem cravar quem avança rouba *+1 ponto* do outro! 🏆',
+      `*${challengerName}* desafiou *${challengedName}*! Quem cravar quem avança rouba *+1 ponto*.`,
+      `⏳ Agora é com você, *${challengedName}* — aceita ou amarela? 👀`,
     ].join('\n');
     await sendText(msg);
   } catch (err) {

@@ -252,6 +252,7 @@ export function calculateStandings(
   // AVANÇOU rouba 1 ponto do outro (transferência de 1, igual ao Ladrão).
   const matchById = new Map(matches.map((m) => [m.id, m]));
   challenges.forEach((ch) => {
+    if (ch.status !== 'accepted') return; // pendente/recusado não vale ponto
     const match = matchById.get(ch.matchId);
     if (!match || match.status !== 'finished') return;
     const adv = matchAdvancer(match);

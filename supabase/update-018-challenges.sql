@@ -18,6 +18,8 @@ create table if not exists public.challenges (
   challenged_id   uuid   not null references public.participants (id) on delete cascade,
   challenger_pick text   not null check (challenger_pick in ('HOME', 'AWAY')),
   challenged_pick text   not null check (challenged_pick in ('HOME', 'AWAY')),
+  -- pending = aguardando o desafiado; accepted = vale ponto; declined = recusado.
+  status          text   not null default 'pending' check (status in ('pending', 'accepted', 'declined')),
   created_at      timestamptz not null default now(),
   constraint challenge_no_self   check (challenger_id <> challenged_id),
   constraint challenge_diff_pick check (challenger_pick <> challenged_pick),

@@ -114,6 +114,7 @@ export interface Challenge {
   challengedId: string; // username do desafiado
   challengerPick: 'HOME' | 'AWAY'; // classificado escolhido pelo desafiante
   challengedPick: 'HOME' | 'AWAY'; // classificado escolhido pelo desafiado
+  status: 'pending' | 'accepted' | 'declined'; // só 'accepted' transfere ponto
   createdAt: string;
 }
 

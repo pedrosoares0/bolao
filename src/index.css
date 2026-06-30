@@ -7543,3 +7543,13 @@ body {
 .challenge-badge-p16.active { background: #ede9fe; color: #6d28d9; }
 .challenge-badge-p16.won { background: #dcfce7; color: #15803d; }
 .challenge-badge-p16.lost { background: #fee2e2; color: #b91c1c; }
+.challenge-badge-p16.declined { background: #fef3c7; color: #b45309; }
+
+.challenge-respond-p16 { display: flex; gap: 5px; margin-top: 4px; }
+.challenge-accept-p16, .challenge-decline-p16 {
+  padding: 4px 9px; border: none; border-radius: 8px; font-size: 0.68rem; font-weight: 800; cursor: pointer; white-space: nowrap; transition: filter .15s;
+}
+.challenge-accept-p16 { background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; box-shadow: 0 2px 5px rgba(21,128,61,.3); }
+.challenge-decline-p16 { background: #f1ece6; color: #8b8075; }
+.challenge-accept-p16:hover { filter: brightness(1.1); }
+.challenge-decline-p16:hover { background: #e7e0d8; }

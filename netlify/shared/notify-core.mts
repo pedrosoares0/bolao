@@ -546,7 +546,8 @@ export async function runNotifications(
         const { data: chs } = await supabase
           .from('challenges')
           .select('id, challenger_id, challenged_id, challenger_pick')
-          .eq('match_id', m.id);
+          .eq('match_id', m.id)
+          .eq('status', 'accepted');
         for (const ch of (chs ?? []) as { id: string; challenger_id: string; challenged_id: string; challenger_pick: string }[]) {
           const winnerUid = ch.challenger_pick === adv ? ch.challenger_id : ch.challenged_id;
           const loserUid = winnerUid === ch.challenger_id ? ch.challenged_id : ch.challenger_id;

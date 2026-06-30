@@ -527,7 +527,7 @@ function App() {
         supabase.from('special_predictions').select('user_id, champion_team, brazil_stage'),
         supabase.from('debts').select('id, user_id, amount, debt_date, created_at'),
         supabase.from('thief_steals').select('id, thief_id, victim_id, round_date, created_at'),
-        supabase.from('challenges').select('id, match_id, challenger_id, challenged_id, challenger_pick, challenged_pick, created_at'),
+        supabase.from('challenges').select('id, match_id, challenger_id, challenged_id, challenger_pick, challenged_pick, status, created_at'),
       ]);
 
       const firstError = partsRes.error || matchesRes.error || betsRes.error || subsRes.error;
@@ -594,6 +594,7 @@ function App() {
             challengedId: uidToUser(c.challenged_id),
             challengerPick: c.challenger_pick as 'HOME' | 'AWAY',
             challengedPick: c.challenged_pick as 'HOME' | 'AWAY',
+            status: (c.status as 'pending' | 'accepted' | 'declined') ?? 'pending',
             createdAt: c.created_at,
           }))
         );
@@ -1261,6 +1262,28 @@ function App() {
     } catch (err) {
       console.error('Erro ao criar desafio:', err);
       showToast('Falha de rede ao criar o desafio.', 'error');
+    }
+  };
+
+  // Aceita ou recusa um desafio recebido (só o desafiado).
+  const handleRespondChallenge = async (challengeId: string, accept: boolean) => {
+    if (!currentUser?.uid) return;
+    try {
+      const res = await fetch('/.netlify/functions/respond-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId, uid: currentUser.uid, accept }),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) {
+        showToast(data?.error || 'Não foi possível responder ao desafio.', 'error');
+        return;
+      }
+      showToast(accept ? 'Desafio aceito! ⚔️' : 'Desafio recusado.', 'success');
+      await loadAll(currentUser.uid, false);
+    } catch (err) {
+      console.error('Erro ao responder desafio:', err);
+      showToast('Falha de rede ao responder o desafio.', 'error');
     }
   };
 
@@ -2149,11 +2172,21 @@ function App() {
                                 const existingCh = challenges.find((c) => c.matchId === match.id
                                   && ((c.challengerId === currentUser?.id && c.challengedId === p.id)
                                     || (c.challengerId === p.id && c.challengedId === currentUser?.id)));
+                                const iAmChallenger = !!existingCh && existingCh.challengerId === currentUser?.id;
+                                // 1 desafio por pessoa por jogo: quem já está num desafio
+                                // ativo (pendente/aceito) nesse jogo não pode entrar em outro.
+                                const isEngaged = (uid: string | undefined) => !!uid && challenges.some((c) =>
+                                  c.matchId === match.id && (c.status === 'pending' || c.status === 'accepted')
+                                  && (c.challengerId === uid || c.challengedId === uid));
                                 const canChallenge = !!currentUser && p.id !== currentUser.id && isKnockout
                                   && hasGameStarted && match.status !== 'finished'
-                                  && !!myAdv && !!theirAdv && myAdv !== theirAdv && !existingCh;
-                                // Resultado do desafio (quando o jogo terminou).
-                                const chResolved = existingCh && match.status === 'finished' && match.winner
+                                  && !!myAdv && !!theirAdv && myAdv !== theirAdv
+                                  && !isEngaged(currentUser.id) && !isEngaged(p.id);
+                                // Não aceito até o fim do jogo = expirado (não vale nada).
+                                const chExpired = !!existingCh && existingCh.status === 'pending' && match.status === 'finished';
+                                // Resultado do desafio (só conta se foi ACEITO e o jogo terminou).
+                                const chResolved = existingCh && existingCh.status === 'accepted'
+                                  && match.status === 'finished' && match.winner
                                   ? (() => {
                                     const adv = match.winner === 'HOME_TEAM' ? 'HOME' : match.winner === 'AWAY_TEAM' ? 'AWAY' : null;
                                     if (!adv) return null;
@@ -2256,9 +2289,35 @@ function App() {
                                           ⚔️ Desafiar
                                         </button>
                                       )}
-                                      {existingCh && !chResolved && (
-                                        <span className="challenge-badge-p16 active">⚔️ Em desafio</span>
+
+                                      {/* Expirado: pendente que não foi aceito até o fim do jogo */}
+                                      {chExpired && (
+                                        <span className="challenge-badge-p16 declined">⌛ Desafio expirou (sem aceite)</span>
                                       )}
+
+                                      {/* Pendente (jogo rolando): desafiado responde; desafiante aguarda */}
+                                      {existingCh && existingCh.status === 'pending' && !chExpired && !iAmChallenger && (
+                                        <div className="challenge-respond-p16">
+                                          <button type="button" className="challenge-accept-p16" onClick={() => handleRespondChallenge(existingCh.id, true)}>Aceitar ⚔️</button>
+                                          <button type="button" className="challenge-decline-p16" onClick={() => handleRespondChallenge(existingCh.id, false)}>Recusar</button>
+                                        </div>
+                                      )}
+                                      {existingCh && existingCh.status === 'pending' && !chExpired && iAmChallenger && (
+                                        <span className="challenge-badge-p16 active">⏳ Aguardando resposta</span>
+                                      )}
+
+                                      {/* Aceito, jogo rolando */}
+                                      {existingCh && existingCh.status === 'accepted' && !chResolved && (
+                                        <span className="challenge-badge-p16 active">⚔️ Desafio aceito</span>
+                                      )}
+
+                                      {/* Recusado */}
+                                      {existingCh && existingCh.status === 'declined' && (
+                                        <span className="challenge-badge-p16 declined">
+                                          🐔 {iAmChallenger ? `${p.name.split(' ')[0]} amarelou` : 'Você recusou'}
+                                        </span>
+                                      )}
+
                                       {chResolved === 'won' && (
                                         <span className="challenge-badge-p16 won">⚔️ Você ganhou +1</span>
                                       )}

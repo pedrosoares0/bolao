@@ -287,7 +287,7 @@ describe('calculateStandings — Desafio dos Molhados', () => {
     ];
     const challenges = [{
       id: 'c1', matchId: 'k1', challengerId: 'pedro', challengedId: 'alex',
-      challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, createdAt: '',
+      challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, status: 'accepted' as const, createdAt: '',
     }];
 
     const standings = calculateStandings([pedro, alex], [ko], bets, [], [], challenges);
@@ -302,11 +302,26 @@ describe('calculateStandings — Desafio dos Molhados', () => {
     const ko: Match = { ...baseMatch, id: 'k1', stage: 'LAST_16', winner: 'HOME_TEAM' }; // scheduled
     const challenges = [{
       id: 'c1', matchId: 'k1', challengerId: 'pedro', challengedId: 'alex',
-      challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, createdAt: '',
+      challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, status: 'accepted' as const, createdAt: '',
     }];
     const standings = calculateStandings([pedro, alex], [ko], [], [], [], challenges);
     expect(standings.find((s) => s.participantId === 'pedro')!.points).toBe(0);
     expect(standings.find((s) => s.participantId === 'alex')!.points).toBe(0);
+  });
+
+  it('desafio pendente ou recusado NÃO transfere pontos', () => {
+    const ko = finishedMatch(1, 1, { id: 'k1', stage: 'LAST_16', winner: 'HOME_TEAM' });
+    const bets: Bet[] = [
+      { ...makeBet(1, 1, 'pedro', 'k1'), pensWinner: 'HOME' },
+      { ...makeBet(1, 1, 'alex', 'k1'), pensWinner: 'AWAY' },
+    ];
+    const base = { id: 'c1', matchId: 'k1', challengerId: 'pedro', challengedId: 'alex', challengerPick: 'HOME' as const, challengedPick: 'AWAY' as const, createdAt: '' };
+    for (const status of ['pending', 'declined'] as const) {
+      const standings = calculateStandings([pedro, alex], [ko], bets, [], [], [{ ...base, status }]);
+      // Sem o desafio valer: ambos só os 3 do placar exato.
+      expect(standings.find((s) => s.participantId === 'pedro')!.points).toBe(3);
+      expect(standings.find((s) => s.participantId === 'alex')!.points).toBe(3);
+    }
   });
 });
 

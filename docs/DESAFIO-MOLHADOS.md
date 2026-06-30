@@ -2,12 +2,15 @@
 
 Documento de tudo que foi implementado em torno do **Desafio dos Molhados**: uma aposta paralela entre dois participantes, no mata-mata, sobre **quem se classifica**. São camadas independentes:
 
-1. **Regra de pontuação** — ao terminar o jogo, quem cravou o classificado que avançou rouba 1 ponto do outro (transferência de 1, igual à habilidade Ladrão).
-2. **Criação do desafio** — uma função que valida os palpites, grava e avisa no grupo do WhatsApp.
-3. **Resolução / campeão** — no fim do jogo, o WhatsApp anuncia o vencedor do desafio.
-4. **UI** — botão "⚔️ Desafiar" e os selos de estado/resultado nas linhas de palpite.
+1. **Criação do desafio** — uma função valida os palpites, grava como **pendente** e avisa no grupo do WhatsApp.
+2. **Aceite / recusa** — o **desafiado** precisa entrar no app e aceitar ou recusar. O WhatsApp avisa cada caso (recusa = "fraco, bunda mole"). Só desafio **aceito** vale ponto.
+3. **Regra de pontuação** — ao terminar o jogo, quem cravou o classificado que avançou rouba 1 ponto do outro (transferência de 1, igual à habilidade Ladrão).
+4. **Resolução / campeão** — no fim do jogo, o WhatsApp anuncia o vencedor do desafio.
+5. **UI** — botão "⚔️ Desafiar", botões Aceitar/Recusar e os selos de estado/resultado nas linhas de palpite.
 
-> **Conceito (decisão do dono do bolão):** quando dois participantes escolhem **classificados diferentes** para o mesmo jogo de mata-mata, um pode desafiar o outro. Se o classificado do **desafiante** avançar, ele rouba 1 ponto do adversário. Se o classificado do **desafiado** avançar, o desafiante perde 1 ponto, transferido para o desafiado. Ou seja: **quem cravar quem avança ganha +1; o outro perde −1** (saldo zero, transferência de 1 ponto).
+> **Conceito (decisão do dono do bolão):** quando dois participantes escolhem **classificados diferentes** para o mesmo jogo de mata-mata, um pode desafiar o outro. O desafiado **aceita ou recusa** no sistema. Se aceitar e o classificado do **desafiante** avançar, ele rouba 1 ponto do adversário; se o do **desafiado** avançar, o desafiante perde 1 ponto, transferido para o desafiado. Ou seja: **quem cravar quem avança ganha +1; o outro perde −1** (transferência de 1 ponto). Desafio **pendente** ou **recusado** não move pontos.
+>
+> **Limites:** (1) **um desafio por pessoa por jogo** — quem já está num desafio ativo (pendente ou aceito) naquele jogo não pode criar nem receber outro (recusado libera a vaga). (2) **expira no fim do jogo** — se o desafiado não aceitar até o jogo terminar, o desafio vira **expirado** (não vale ponto; a função de resposta bloqueia aceite após o `FINISHED`).
 
 ---
 
@@ -15,8 +18,9 @@ Documento de tudo que foi implementado em torno do **Desafio dos Molhados**: uma
 
 | Passo | O que faz | Por que antes |
 |-------|-----------|---------------|
-| [`supabase/update-018-challenges.sql`](../supabase/update-018-challenges.sql) | Cria `public.challenges` (+ RLS + realtime) | O front faz `SELECT` em `challenges` no boot e a função `create-challenge` faz `INSERT`. Sem a tabela → erro e a feature não carrega. |
-| Deploy do front + Netlify functions | Sobe a UI, a função `create-challenge` e o aviso de campeão no `notify-core` | A UI chama `/.netlify/functions/create-challenge`; sem deploy não existe. |
+| [`supabase/update-018-challenges.sql`](../supabase/update-018-challenges.sql) | Cria `public.challenges` (já com a coluna `status`, + RLS + realtime) | O front faz `SELECT` em `challenges` no boot e a função `create-challenge` faz `INSERT`. Sem a tabela → erro e a feature não carrega. |
+| [`supabase/update-019-challenge-status.sql`](../supabase/update-019-challenge-status.sql) | Adiciona a coluna `status` | **Só** se você já tinha rodado o 018 ANTES dele ganhar `status`. Se rodar o 018 atual, isto vira no-op. |
+| Deploy do front + Netlify functions | Sobe a UI, as funções `create-challenge` e `respond-challenge`, e o aviso de campeão no `notify-core` | A UI chama `/.netlify/functions/create-challenge` e `/respond-challenge`; sem deploy não existem. |
 
 Como rodar a migration: Supabase Dashboard → SQL Editor → New query → cole o arquivo → Run. É idempotente (`create table if not exists`, `drop policy if exists`, `add table` protegido por bloco `do $$`).
 
@@ -38,10 +42,10 @@ A mesma lógica está replicada no servidor, dentro de [`netlify/functions/creat
 
 ## 1) Regra de pontuação
 
-Em [`src/utils/rules.ts`](../src/utils/rules.ts), dentro de **`calculateStandings`** (novo parâmetro opcional `challenges: Challenge[] = []`). Aplicada **depois** dos roubos do Ladrão:
+Em [`src/utils/rules.ts`](../src/utils/rules.ts), dentro de **`calculateStandings`** (novo parâmetro opcional `challenges: Challenge[] = []`). Aplicada **depois** dos roubos do Ladrão e **só para desafios `accepted`**:
 
 ```
-para cada challenge cujo jogo terminou (status === 'finished') e tem vencedor:
+para cada challenge ACEITO cujo jogo terminou (status === 'finished') e tem vencedor:
   adv = lado que avançou (matchAdvancer → coluna winner, cobre pênaltis/prorrogação)
   vencedor do desafio = quem escolheu adv (challengerPick === adv ? challenger : challenged)
   vencedor.points += 1
@@ -71,9 +75,9 @@ Validações (tudo no servidor, com a **service role**):
 - jogo existe, é mata-mata (`stage !== 'GROUP_STAGE'`) e **não** está `FINISHED`;
 - desafiante ≠ desafiado;
 - ambos têm classificado (palpite) e eles são **diferentes**;
-- ainda **não** existe desafio entre os dois nesse jogo (checa as **duas direções** com `.or(and(...),and(...))`).
+- **um desafio por pessoa por jogo**: nenhum dos dois pode já estar em desafio **ativo** (`status in ('pending','accepted')`) nesse jogo (busca os ativos do jogo e checa os dois uids).
 
-Se passar: `INSERT` em `challenges` (com `challenger_pick`/`challenged_pick` deduzidos) e envia no WhatsApp (best-effort, não derruba a criação):
+Se passar: `INSERT` em `challenges` com `status = 'pending'` (e `challenger_pick`/`challenged_pick` deduzidos) e envia no WhatsApp (best-effort, não derruba a criação):
 
 ```
 ⚔️ *DESAFIO ÉPICO ENTRE OS MOLHADOS* ⚔️
@@ -83,10 +87,29 @@ Se passar: `INSERT` em `challenges` (com `challenger_pick`/`challenged_pick` ded
 🌊 *Pedro*: classifica 🇳🇱 *Holanda*
 🌊 *Alex*: classifica 🇲🇦 *Marrocos*
 
-Quem cravar quem avança rouba *+1 ponto* do outro! 🏆
+*Pedro* desafiou *Alex*! Quem cravar quem avança rouba *+1 ponto*.
+⏳ Agora é com você, *Alex* — aceita ou amarela? 👀
 ```
 
 Reutiliza `sendText`, `ptName` e `flagEmoji` (agora **exportados** de [`netlify/shared/notify-core.mts`](../netlify/shared/notify-core.mts)).
+
+---
+
+## 2.5) Aceite / recusa
+
+Função Netlify [`netlify/functions/respond-challenge.mts`](../netlify/functions/respond-challenge.mts):
+
+`POST /.netlify/functions/respond-challenge`
+```json
+{ "challengeId": "<uuid>", "uid": "<uuid>", "accept": true }
+```
+
+Validações: o desafio existe, está `pending`, quem responde é o **desafiado** (`challenged_id === uid`) e o jogo ainda não terminou. O `UPDATE` é condicionado a `status = 'pending'` (trava contra resposta dupla concorrente). Avisa no WhatsApp:
+
+- **Aceitou:** `🤝 *DESAFIO ACEITO!* … agora é pra valer! 🔥`
+- **Recusou:** `🐔 *DESAFIO RECUSADO!* … Fraco, bunda mole! 😂💧`
+
+Só depois de **aceito** o desafio entra na pontuação e na resolução do fim de jogo.
 
 ---
 
@@ -95,7 +118,7 @@ Reutiliza `sendText`, `ptName` e `flagEmoji` (agora **exportados** de [`netlify/
 Em [`netlify/shared/notify-core.mts`](../netlify/shared/notify-core.mts), dentro do bloco **"fim de jogo"** (`status === 'FINISHED' && prev.status !== 'FINISHED'`), logo após a mensagem de fim de jogo:
 
 - calcula `adv` pela coluna `winner`;
-- busca os `challenges` daquele `match_id`;
+- busca os `challenges` **aceitos** (`status = 'accepted'`) daquele `match_id`;
 - para cada um, decide o vencedor e envia (com dedup `challwin:{id}` em `sent_notifications`):
 
 ```
@@ -116,25 +139,29 @@ Builder: `msgChallengeWin(winnerName, loserName, advTeamEn)`.
 Na lista **inline de palpites** (que só aparece com o jogo já começado — `hideOpponentPicks`), em cada linha de adversário:
 
 - **Botão `⚔️ Desafiar`** quando: mata-mata, jogo começado e não encerrado, contra outro participante, ambos com classificado **diferente**, e sem desafio existente entre os dois.
-- **Selo `⚔️ Em desafio`** enquanto pendente.
-- **Selo `⚔️ Você ganhou +1` / `Você perdeu −1`** quando o jogo termina (resultado calculado pela coluna `winner`).
+- **Pendente:** o **desafiado** vê **Aceitar / Recusar**; o **desafiante** vê `⏳ Aguardando resposta`.
+- **Aceito (jogo rolando):** selo `⚔️ Desafio aceito`.
+- **Recusado:** selo `🐔 {fulano} amarelou` (visto pelo desafiante) / `🐔 Você recusou` (visto pelo desafiado).
+- **Expirado** (pendente + jogo terminou): selo `⌛ Desafio expirou (sem aceite)` — não vale ponto.
+- **Encerrado (aceito):** `⚔️ Você ganhou +1` / `Você perdeu −1` (resultado pela coluna `winner`).
 
 Estado e dados:
-- `challenges` (estado) carregado no `loadAll` (mapeando `uuid → username`, igual aos roubos);
-- assinatura Realtime na tabela `challenges` (recarrega ao inserir);
-- handler `handleChallenge(challengedUserId, match)` → `fetch` para a função → `loadAll`.
+- `challenges` (estado) carregado no `loadAll` (mapeando `uuid → username`, igual aos roubos; inclui `status`);
+- assinatura Realtime na tabela `challenges` (recarrega ao inserir/responder);
+- handlers `handleChallenge(challengedUserId, match)` (cria) e `handleRespondChallenge(challengeId, accept)` (responde) → `fetch` → `loadAll`.
 
-Estilos: classes `.challenge-btn-p16` e `.challenge-badge-p16` (`.active` / `.won` / `.lost`) em [`src/index.css`](../src/index.css).
+Estilos em [`src/index.css`](../src/index.css): `.challenge-btn-p16`, `.challenge-badge-p16` (`.active` / `.won` / `.lost` / `.declined`), `.challenge-respond-p16` + `.challenge-accept-p16` / `.challenge-decline-p16`.
 
 ---
 
 ## Persistência
 
 [`supabase/update-018-challenges.sql`](../supabase/update-018-challenges.sql):
-- `challenges` com `match_id` (→ `matches`), `challenger_id`/`challenged_id` (→ `participants`, uuid), `challenger_pick`/`challenged_pick` (`'HOME'|'AWAY'`).
+- `challenges` com `match_id` (→ `matches`), `challenger_id`/`challenged_id` (→ `participants`, uuid), `challenger_pick`/`challenged_pick` (`'HOME'|'AWAY'`), `status` (`'pending'|'accepted'|'declined'`, default `'pending'`).
 - Constraints: `challenge_no_self` (não desafia a si mesmo), `challenge_diff_pick` (picks diferentes), `unique(match_id, challenger_id, challenged_id)` (a direção reversa é barrada na função).
-- RLS: `select` para qualquer autenticado; `insert` só com `challenger_id = auth.uid()`.
+- RLS: `select` para qualquer autenticado; `insert` só com `challenger_id = auth.uid()`. A resposta (aceite/recusa) é feita pela função `respond-challenge` com a service role (não precisa de policy de `update`).
 - Adicionada à publicação `supabase_realtime`.
+- [`supabase/update-019-challenge-status.sql`](../supabase/update-019-challenge-status.sql): só para quem rodou o 018 antes da coluna `status` existir.
 
 Tipo no front: `Challenge` em [`src/types.ts`](../src/types.ts).
 
@@ -144,7 +171,7 @@ Tipo no front: `Challenge` em [`src/types.ts`](../src/types.ts).
 
 Em [`src/utils/rules.test.ts`](../src/utils/rules.test.ts):
 - `predictedAdvancer` — 4 casos (vencedor cravado, empate com `pensWinner`, empate sem escolha = `null`, fase de grupos = `null`).
-- `calculateStandings — Desafio dos Molhados` — 2 casos (transferência de +1/−1 quando o jogo termina; jogo não encerrado = sem transferência).
+- `calculateStandings — Desafio dos Molhados` — 3 casos (transferência de +1/−1 quando aceito e o jogo termina; jogo não encerrado = sem transferência; pendente/recusado = sem transferência).
 
 Rodar:
 ```bash
@@ -165,8 +192,9 @@ npm run build
 
 ## Checklist para o próximo dev
 
-- [ ] Rodar `update-018-challenges.sql` no Supabase.
+- [ ] Rodar `update-018-challenges.sql` no Supabase (ou `update-019` se o 018 já estava rodado sem `status`).
 - [ ] Deploy do front + Netlify functions.
-- [ ] Validar em um jogo de mata-mata ao vivo: dois usuários com classificados diferentes → botão "Desafiar" aparece → cria → cai a mensagem no WhatsApp.
-- [ ] Ao encerrar: o ranking transfere +1/−1 e o WhatsApp anuncia o campeão; o card mostra o selo de resultado.
+- [ ] Validar em um jogo de mata-mata ao vivo: dois usuários com classificados diferentes → "Desafiar" → cai a mensagem de desafio no WhatsApp.
+- [ ] O desafiado entra no app → **Aceitar** (cai "aceito") ou **Recusar** (cai "fraco, bunda mole").
+- [ ] Ao encerrar (só se aceito): o ranking transfere +1/−1 e o WhatsApp anuncia o campeão; o card mostra o selo de resultado.
 - [ ] (Opcional) Decidir se o ranking do WhatsApp passa a incluir desafios e roubos.
