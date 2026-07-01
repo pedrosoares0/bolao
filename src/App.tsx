@@ -84,11 +84,6 @@ const formatBrlDate = (isoDate: string): string => {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}` : isoDate;
 };
 
-// 🧪 TESTE TEMPORÁRIO — usuário e marcador de rodada fictícia do Ladrão (ver
-// DEBUG_THIEF_ROUND). Trocar DEBUG_FORCE_THIEF_FOR para null desliga o teste.
-const DEBUG_FORCE_THIEF_FOR: string | null = 'rodrigo';
-const DEBUG_THIEF_ROUND = '__debug__';
-
 // Traduz o relógio/etapa ao vivo vindo da ESPN para PT-BR.
 // Ex.: "HT"/"Halftime" -> "Intervalo"; demais valores ("28'", etc.) ficam como vieram.
 const formatLiveClock = (clock?: string | null): string | null => {
@@ -355,12 +350,6 @@ function App() {
     }
   })();
   const [selectedVictims, setSelectedVictims] = useState<Record<string, string>>({});
-
-  // 🧪 TESTE TEMPORÁRIO — ninguém é Ladrão de verdade ainda; força o modal
-  // aparecer só pro Rodrigo pra validarmos o visual. O clique NÃO grava nada no
-  // banco (ver DEBUG_THIEF_ROUND abaixo) — só fecha o modal localmente.
-  // REMOVER esse bloco (e a constante) quando alguém virar Ladrão de verdade.
-  const [debugThiefDismissed, setDebugThiefDismissed] = useState(false);
 
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
   const [showPixModal, setShowPixModal] = useState(false);
@@ -1398,22 +1387,10 @@ function App() {
   // Rodadas em que EU sou o Ladrão e ainda não usei a vez (escolher vítima ou "Ninguém").
   const pendingSteals = useMemo(() => {
     if (!currentUser) return [];
-    const real = Object.entries(thiefRounds)
+    return Object.entries(thiefRounds)
       .filter(([date, status]) => status.thiefId === currentUser.id && !thiefSteals.some((s) => s.roundDate === date))
       .map(([date, status]) => ({ date, status }));
-    if (real.length > 0) return real;
-
-    // 🧪 TESTE TEMPORÁRIO: ninguém é Ladrão de verdade ainda — injeta uma rodada
-    // fictícia só pro usuário de debug ver o modal. O botão de confirmar, nesse
-    // caso, NÃO chama handleExecuteSteal (não grava nada no banco).
-    if (DEBUG_FORCE_THIEF_FOR && currentUser.id === DEBUG_FORCE_THIEF_FOR && !debugThiefDismissed) {
-      return [{
-        date: DEBUG_THIEF_ROUND,
-        status: { roundDate: DEBUG_THIEF_ROUND, thiefId: currentUser.id, status: 'active' as const, pointsScored: 6 },
-      }];
-    }
-    return real;
-  }, [thiefRounds, thiefSteals, currentUser, debugThiefDismissed]);
+  }, [thiefRounds, thiefSteals, currentUser]);
 
   // Roubos que EU sofri e ainda não dispensei (banner dismissível na aba Jogos).
   const receivedSteals = useMemo(() => {
@@ -1854,8 +1831,6 @@ function App() {
           ============================================ */}
       {currentUser && !hasBlockingChallengeModal && pendingSteals.length > 0 && (() => {
         const { date, status } = pendingSteals[0];
-        const isDebugRound = date === DEBUG_THIEF_ROUND; // 🧪 teste — remover com DEBUG_FORCE_THIEF_FOR
-        const roundLabel = isDebugRound ? 'TESTE 🧪' : formatBrlDate(date);
         const selectedVictim = selectedVictims[date] || '';
         const stealOptions = participants.filter((p) => p.id !== currentUser.id);
         const myAvatar = `/imagens/ranking ${currentUser.id}.webp`;
@@ -1892,15 +1867,13 @@ function App() {
 
                 {/* Estatística da rodada */}
                 <div className="thief-modal-stat">
-                  <span className="thief-modal-stat-label">Rodada de {roundLabel}</span>
+                  <span className="thief-modal-stat-label">Rodada de {formatBrlDate(date)}</span>
                   <span className="thief-modal-stat-value">{status.pointsScored} pontos</span>
                 </div>
 
                 {/* Regra */}
                 <div className="thief-modal-rule">
-                  {isDebugRound
-                    ? <>🧪 Modo teste — este clique <strong>não grava nada</strong> no banco, só fecha o modal.</>
-                    : <>Você foi o maior pontuador da rodada! Escolha um adversário para roubar <strong>1 ponto</strong>, ou opte por não roubar ninguém.</>}
+                  Você foi o maior pontuador da rodada! Escolha um adversário para roubar <strong>1 ponto</strong>, ou opte por não roubar ninguém.
                 </div>
 
                 {/* Seleção do alvo */}
@@ -1924,15 +1897,7 @@ function App() {
                     type="button"
                     className="thief-modal-btn accept"
                     disabled={!selectedVictim}
-                    onClick={() => {
-                      // 🧪 Rodada de teste: só fecha o modal, sem gravar no banco.
-                      if (isDebugRound) {
-                        setDebugThiefDismissed(true);
-                        showToast('Modo teste: nada foi salvo no banco. 🧪', 'success');
-                        return;
-                      }
-                      handleExecuteSteal(date, selectedVictim);
-                    }}
+                    onClick={() => handleExecuteSteal(date, selectedVictim)}
                   >
                     <span className="thief-modal-btn-inner"></span>
                     <span className="thief-btn-text">
