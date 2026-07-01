@@ -303,18 +303,31 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                     const bet = c.bet;
                     const isProfeta = c.type === 'profeta';
                     const badgeClass = isProfeta ? 'profeta-badge' : 'pe-frio-badge';
-                    const badgeText = isProfeta ? '🔮 PROFETA' : 'PÉ FRIO';
 
                     return (
                       <div key={idx} className="history-row">
                         <div className="history-row-header">
                           <span className="history-date">{m.group} · {c.date}</span>
-                          <div className={`inline-guess-badge-p16 ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {!isProfeta && (
+                          <div 
+                            className={`inline-guess-badge-p16 ${badgeClass}`} 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '50%', 
+                              padding: 0, 
+                              minWidth: '28px',
+                              minHeight: '28px'
+                            }}
+                          >
+                            {isProfeta ? (
+                              <span style={{ fontSize: '14px', lineHeight: 1 }}>🔮</span>
+                            ) : (
                               <img loading="lazy" decoding="async" src={PE_FRIO_IMG} alt="Pé Frio"
-                                style={{ width: '12px', height: '12px', objectFit: 'contain' }} />
+                                style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
                             )}
-                            <span>{badgeText}</span>
                           </div>
                         </div>
                         <div className="history-matchup">
@@ -348,10 +361,22 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                       <div key={idx} className="history-row">
                         <div className="history-row-header">
                           <span className="history-date">Rodada · {c.date}</span>
-                          <div className="inline-guess-badge-p16 mvp-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div 
+                            className="inline-guess-badge-p16 mvp-badge" 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '50%', 
+                              padding: 0, 
+                              minWidth: '28px',
+                              minHeight: '28px'
+                            }}
+                          >
                             <img loading="lazy" decoding="async" src="/imagens/coroa-mvp.png" alt="MVP"
-                              style={{ width: '12px', height: '12px', objectFit: 'contain' }} />
-                            <span>MVP DA RODADA</span>
+                              style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
                           </div>
                         </div>
                         <div className="mvp-timeline-body">
@@ -377,9 +402,21 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                       <div key={idx} className="history-row">
                         <div className="history-row-header">
                           <span className="history-date">Rodada · {c.date}</span>
-                          <div className="inline-guess-badge-p16 onfire-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '10px' }}>🔥</span>
-                            <span>ON FIRE!</span>
+                          <div 
+                            className="inline-guess-badge-p16 onfire-badge" 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '50%', 
+                              padding: 0, 
+                              minWidth: '28px',
+                              minHeight: '28px'
+                            }}
+                          >
+                            <span style={{ fontSize: '14px', lineHeight: 1 }}>🔥</span>
                           </div>
                         </div>
                         <div style={{ padding: '0.4rem 0', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'center' }}>
