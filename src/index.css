@@ -8901,3 +8901,21 @@ body {
   color: rgba(242, 236, 221, 0.45);
 }
 
+/* Transição de Altura Suave em CSS (Navegação Flexível) */
+.profile-collapsible-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  width: 100%;
+  overflow: hidden;
+}
+
+.profile-collapsible-wrapper.expanded {
+  grid-template-rows: 1fr;
+}
+
+.profile-collapsible-inner {
+  min-height: 0;
+}
+
+

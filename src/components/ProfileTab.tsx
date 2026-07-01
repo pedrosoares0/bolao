@@ -146,6 +146,697 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     }
   };
 
+  const renderConquistas = () => {
+    return (
+      <>
+        {/* SECTION TITLE: CONQUISTAS */}
+        <div className="profile-section-header" style={{ marginTop: '1.5rem' }}>
+          <Award size={18} className="profile-section-icon" />
+          <h3 className="profile-section-title">CONQUISTAS</h3>
+        </div>
+
+        {/* LISTA DE CONQUISTAS RETANGULARES (MAIS LIMPO E CONDICENTE) */}
+        <div className="achievement-list-rect">
+          {/* CONQUISTA: ON FIRE */}
+          <div className="achievement-card-rect on-fire">
+            <Aurora
+              colorStops={["#ff4d1c", "#ff8c00", "#e11d48"]}
+              blend={0.65}
+              amplitude={1.0}
+              speed={0.45}
+            />
+            <div className="card-particles">
+              <div className="particle p1"></div>
+              <div className="particle p2"></div>
+              <div className="particle p3"></div>
+              <div className="particle p4"></div>
+              <div className="particle p5"></div>
+            </div>
+            <div className="achievement-rect-left">
+              <span className="achievement-rect-emoji animate-pulse">🔥</span>
+            </div>
+            <div className="achievement-rect-middle">
+              <span className="achievement-rect-title">ON FIRE</span>
+              <span className="achievement-rect-desc">Pontuou em 5 jogos seguidos ou acertou 3 placares exatos em sequência.</span>
+              <div className="onfire-progress">
+                <div className="onfire-progress-track">
+                  <div
+                    className="onfire-progress-fill"
+                    style={{ width: `${(Math.min(userFire.currentStreak, 5) / 5) * 100}%` }}
+                  />
+                  {Math.min(userFire.currentStreak, 5) < 5 && (
+                    <div className="onfire-progress-milestone-dot" />
+                  )}
+                </div>
+                <span className="onfire-progress-label">{Math.min(userFire.currentStreak, 5)}/5</span>
+              </div>
+            </div>
+            <div className="achievement-rect-right">
+              <span className="achievement-rect-count">{userFire.fires}</span>
+            </div>
+          </div>
+
+          {/* CONQUISTA: PROFETA */}
+          <div className="achievement-card-rect profeta">
+            <Aurora
+              colorStops={["#c084fc", "#8a2be2", "#6b21a8"]}
+              blend={0.65}
+              amplitude={1.0}
+              speed={0.45}
+            />
+            <div className="card-particles">
+              <div className="particle p1"></div>
+              <div className="particle p2"></div>
+              <div className="particle p3"></div>
+              <div className="particle p4"></div>
+              <div className="particle p5"></div>
+            </div>
+            <div className="achievement-rect-left">
+              <span className="achievement-rect-emoji">🔮</span>
+            </div>
+            <div className="achievement-rect-middle">
+              <span className="achievement-rect-title">PROFETA</span>
+              <span className="achievement-rect-desc">Cravou o placar exato.</span>
+            </div>
+            <div className="achievement-rect-right">
+              <span className="achievement-rect-count">{userProfeta}</span>
+            </div>
+          </div>
+
+          {/* CONQUISTA: PÉ FRIO */}
+          <div className="achievement-card-rect pe-frio">
+            <Aurora
+              colorStops={["#94a3b8", "#64748b", "#334155"]}
+              blend={0.65}
+              amplitude={1.0}
+              speed={0.45}
+            />
+            <div className="achievement-rect-left">
+              <img loading="lazy" decoding="async"
+                src={PE_FRIO_IMG}
+                alt="Pé Frio"
+                className="achievement-rect-img"
+              />
+            </div>
+            <div className="achievement-rect-middle">
+              <span className="achievement-rect-title">PÉ FRIO</span>
+              <span className="achievement-rect-desc">Foi o único a não pontuar em um jogo.</span>
+            </div>
+            <div className="achievement-rect-right">
+              <span className="achievement-rect-count">{userPeFrio}</span>
+            </div>
+          </div>
+
+          {/* CONQUISTA: MVP */}
+          <div className="achievement-card-rect mvp">
+            <Aurora
+              colorStops={["#ffe066", "#f5b300", "#c58c00"]}
+              blend={0.65}
+              amplitude={1.0}
+              speed={0.45}
+            />
+            <div className="achievement-rect-left">
+              <img loading="lazy" decoding="async"
+                src="/imagens/coroa-mvp.png"
+                alt="MVP"
+                className="achievement-rect-img"
+              />
+            </div>
+            <div className="achievement-rect-middle">
+              <span className="achievement-rect-title">MVP DA RODADA</span>
+              <span className="achievement-rect-desc">O que mais pontuou no dia.</span>
+            </div>
+            <div className="achievement-rect-right">
+              <span className="achievement-rect-count">{userMvp}</span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderTimeline = () => {
+    return (
+      <>
+        {/* SECTION TITLE: HISTÓRICO DE CONQUISTAS */}
+        <div 
+          className="profile-section-header"
+          onClick={() => setTimelineExpanded(!timelineExpanded)}
+          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none', marginTop: '1.25rem' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Calendar size={18} className="profile-section-icon" />
+            <h3 className="profile-section-title">HISTÓRICO DE CONQUISTAS</h3>
+          </div>
+          {timelineExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
+        </div>
+
+        <div className={`profile-collapsible-wrapper ${timelineExpanded ? 'expanded' : ''}`}>
+          <div className="profile-collapsible-inner">
+            <div className="profile-timeline-list-p16" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '0.5rem' }}>
+              {timeline.length > 0 ? (
+                timeline.map((c, idx) => {
+                  const hasMatch = !!c.match;
+
+                  if (hasMatch && c.match) {
+                    const m = c.match;
+                    const bet = c.bet;
+                    const isProfeta = c.type === 'profeta';
+                    const badgeClass = isProfeta ? 'profeta-badge' : 'pe-frio-badge';
+                    const badgeText = isProfeta ? '🔮 PROFETA' : 'PÉ FRIO';
+
+                    return (
+                      <div key={idx} className="history-row">
+                        <div className="history-row-header">
+                          <span className="history-date">{m.group} · {c.date}</span>
+                          <div className={`inline-guess-badge-p16 ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {!isProfeta && (
+                              <img loading="lazy" decoding="async" src={PE_FRIO_IMG} alt="Pé Frio"
+                                style={{ width: '12px', height: '12px', objectFit: 'contain' }} />
+                            )}
+                            <span>{badgeText}</span>
+                          </div>
+                        </div>
+                        <div className="history-matchup">
+                          <div className="history-team home">
+                            <span className="history-team-name">{m.homeTeam}</span>
+                            <img loading="lazy" decoding="async" src={flagSrc(m.homeFlag, 40)} alt={m.homeTeam}
+                              className="history-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                          </div>
+                          <div className="history-score-badge">{m.homeScore} x {m.awayScore}</div>
+                          <div className="history-team away">
+                            <img loading="lazy" decoding="async" src={flagSrc(m.awayFlag, 40)} alt={m.awayTeam}
+                              className="history-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
+                            <span className="history-team-name">{m.awayTeam}</span>
+                          </div>
+                        </div>
+                        {bet && (
+                          <div className="history-bet-row" style={{
+                            background: isProfeta ? 'rgba(74, 222, 128, 0.04)' : 'rgba(148, 163, 184, 0.05)',
+                            borderColor: isProfeta ? 'rgba(74, 222, 128, 0.12)' : 'rgba(148, 163, 184, 0.15)'
+                          }}>
+                            <span className="history-bet-label">Seu palpite:</span>
+                            <span className="history-bet-value" style={{ color: isProfeta ? '#4ade80' : '#94a3b8' }}>
+                              {bet.homeScore} x {bet.awayScore}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  } else if (c.type === 'mvp') {
+                    return (
+                      <div key={idx} className="history-row">
+                        <div className="history-row-header">
+                          <span className="history-date">Rodada · {c.date}</span>
+                          <div className="inline-guess-badge-p16 mvp-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <img loading="lazy" decoding="async" src="/imagens/coroa-mvp.png" alt="MVP"
+                              style={{ width: '12px', height: '12px', objectFit: 'contain' }} />
+                            <span>MVP DA RODADA</span>
+                          </div>
+                        </div>
+                        <div className="mvp-timeline-body">
+                          <h4 className="mvp-timeline-title">🏆 MELHOR DESEMPENHO DO DIA</h4>
+                          <div className="mvp-timeline-stats">
+                            <div className="mvp-timeline-stat-box">
+                              <span className="stat-value">{c.points ?? 0}</span>
+                              <span className="stat-label">Pontos</span>
+                            </div>
+                            <div className="mvp-timeline-stat-box">
+                              <span className="stat-value">{c.exacts ?? 0}</span>
+                              <span className="stat-label">{c.exacts === 1 ? 'Placar Exato' : 'Placares Exatos'}</span>
+                            </div>
+                          </div>
+                          <div className="mvp-timeline-desc">
+                            Você foi o participante que mais pontuou nesta rodada!
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div key={idx} className="history-row">
+                        <div className="history-row-header">
+                          <span className="history-date">Rodada · {c.date}</span>
+                          <div className="inline-guess-badge-p16 onfire-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '10px' }}>🔥</span>
+                            <span>ON FIRE!</span>
+                          </div>
+                        </div>
+                        <div style={{ padding: '0.4rem 0', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#F2ECDD' }}>
+                            {c.title}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>
+                            {c.description}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                })
+              ) : (
+                <div className="profile-timeline-empty">
+                  Nenhuma conquista registrada ainda. Os palpites e resultados dos jogos criarão conquistas em tempo real!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderDesafios = () => {
+    return (
+      <>
+        {/* SECTION TITLE: DESAFIOS */}
+        <div 
+          className="profile-section-header"
+          onClick={() => setChallengesExpanded(!challengesExpanded)}
+          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none', marginTop: '1.25rem' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Swords size={18} className="profile-section-icon" />
+            <h3 className="profile-section-title">DESAFIOS</h3>
+          </div>
+          {challengesExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
+        </div>
+
+        <div className={`profile-collapsible-wrapper ${challengesExpanded ? 'expanded' : ''}`}>
+          <div className="profile-collapsible-inner">
+            <div className="challenge-history-list" style={{ paddingBottom: '0.5rem' }}>
+              {(() => {
+                const userChallenges = (challenges || []).filter(
+                  (c) => c.challengerId === selectedUserId || c.challengedId === selectedUserId
+                );
+
+                if (userChallenges.length === 0) {
+                  return (
+                    <div className="challenge-history-empty">
+                      Nenhum desafio registrado para este participante ainda. ⚔️
+                    </div>
+                  );
+                }
+
+                // Sort by date, latest first
+                const sortedChallenges = [...userChallenges].sort(
+                  (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+
+                return sortedChallenges.map((c) => {
+                  const isChallenger = c.challengerId === selectedUserId;
+                  const opponentId = isChallenger ? c.challengedId : c.challengerId;
+                  const opponent = participants.find((p) => p.id === opponentId);
+                  const match = matches.find((m) => m.id === c.matchId);
+                  if (!match) return null;
+
+                  const myPick = isChallenger ? c.challengerPick : c.challengedPick;
+                  const oppPick = isChallenger ? c.challengedPick : c.challengerPick;
+
+                  const myTeamName = myPick === 'HOME' ? match.homeTeam : match.awayTeam;
+                  const oppTeamName = oppPick === 'HOME' ? match.homeTeam : match.awayTeam;
+                  const myTeamFlag = myPick === 'HOME' ? match.homeFlag : match.awayFlag;
+                  const oppTeamFlag = oppPick === 'HOME' ? match.awayFlag : match.awayFlag;
+
+                  // Determinar o status/resultado
+                  let resultBadge = null;
+                  if (c.status === 'declined') {
+                    resultBadge = <span className="ch-badge status-declined">Recusado 🐔</span>;
+                  } else if (c.status === 'pending') {
+                    const isMatchFinished = match.status === 'finished';
+                    if (isMatchFinished) {
+                      resultBadge = <span className="ch-badge status-expired">Expirado ⌛</span>;
+                    } else {
+                      resultBadge = <span className="ch-badge status-pending">Pendente ⏳</span>;
+                    }
+                  } else if (c.status === 'accepted') {
+                    if (match.status !== 'finished') {
+                      resultBadge = <span className="ch-badge status-active">Aceito ⚔️</span>;
+                    } else {
+                      const matchWinner = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
+                      const iWon = myPick === matchWinner;
+                      if (iWon) {
+                        resultBadge = <span className="ch-badge status-won">Ganhou +1 🏆</span>;
+                      } else {
+                        resultBadge = <span className="ch-badge status-lost">Perdeu -1 💀</span>;
+                      }
+                    }
+                  }
+
+                  return (
+                    <div key={c.id} className={`challenge-history-item ${isChallenger ? 'sent' : 'received'}`}>
+                      <div className="ch-history-header">
+                        <span className="ch-history-vs">
+                          {isChallenger ? '⚔️ Desafiou' : '🛡️ Desafiado por'} <strong>{opponent?.name || opponentId}</strong>
+                        </span>
+                        {resultBadge}
+                      </div>
+                      <div className="ch-history-match">
+                        <img src={flagSrc(match.homeFlag, 40)} alt="" className="ch-history-flag" />
+                        <span>{match.homeTeam} x {match.awayTeam}</span>
+                        <img src={flagSrc(match.awayFlag, 40)} alt="" className="ch-history-flag" />
+                      </div>
+                      <div className="ch-history-picks">
+                        <div className="ch-history-pick mine">
+                          <span className="ch-pick-label">{isChallenger ? 'Você escolheu' : 'Desafiado escolheu'}:</span>
+                          <span className="ch-pick-value">
+                            <img src={flagSrc(myTeamFlag, 40)} alt="" className="ch-pick-flag" />
+                            {myTeamName}
+                          </span>
+                        </div>
+                        <div className="ch-history-pick opp">
+                          <span className="ch-pick-label">Adversário:</span>
+                          <span className="ch-pick-value">
+                            <img src={flagSrc(oppTeamFlag, 40)} alt="" className="ch-pick-flag" />
+                            {oppTeamName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderRoubos = () => {
+    return (
+      <>
+        {/* SECTION TITLE: ROUBOS */}
+        <div 
+          className="profile-section-header"
+          onClick={() => setStealsExpanded(!stealsExpanded)}
+          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none', marginTop: '1.25rem' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Skull size={18} className="profile-section-icon" style={{ color: '#f87171' }} />
+            <h3 className="profile-section-title">ROUBOS</h3>
+          </div>
+          {stealsExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
+        </div>
+
+        <div className={`profile-collapsible-wrapper ${stealsExpanded ? 'expanded' : ''}`}>
+          <div className="profile-collapsible-inner">
+            <div className="thief-history-list" style={{ paddingBottom: '0.5rem' }}>
+              {(() => {
+                const userSteals = (thiefSteals || []).filter(
+                  (s) => s.thiefId === selectedUserId || s.victimId === selectedUserId
+                );
+
+                if (userSteals.length === 0) {
+                  return (
+                    <div className="thief-history-empty">
+                      Nenhum roubo registrado para este participante ainda. 🥷
+                    </div>
+                  );
+                }
+
+                // Sort by creation date or round date, latest first
+                const sortedSteals = [...userSteals].sort(
+                  (a, b) => new Date(b.createdAt || b.roundDate).getTime() - new Date(a.createdAt || a.roundDate).getTime()
+                );
+
+                const formatBrlDateLocal = (isoDate: string): string => {
+                  const parts = isoDate.split('-');
+                  return parts.length === 3 ? `${parts[2]}/${parts[1]}` : isoDate;
+                };
+
+                return sortedSteals.map((s) => {
+                  const isThief = s.thiefId === selectedUserId;
+                  const opponentId = isThief ? s.victimId : s.thiefId;
+                  const opponent = opponentId ? participants.find((p) => p.id === opponentId) : null;
+
+                  let actionText = '';
+                  let badgeType = '';
+                  let badgeText = '';
+
+                  if (isThief) {
+                    if (opponent) {
+                      actionText = `Roubou 1 ponto de ${opponent.name}`;
+                      badgeType = 'steal';
+                      badgeText = '+1 Ponto';
+                    } else {
+                      actionText = `Escolheu não roubar ninguém`;
+                      badgeType = 'none';
+                      badgeText = '0 Pontos';
+                    }
+                  } else {
+                    actionText = `Teve 1 ponto roubado por ${opponent?.name || 'Ladrão'}`;
+                    badgeType = 'victim';
+                    badgeText = '-1 Ponto';
+                  }
+
+                  // Definir avatar para a linha do histórico
+                  const displayAvatar = opponent 
+                    ? `/imagens/ranking ${opponent.id}.webp` 
+                    : '/imagens/ladrao.webp';
+
+                  return (
+                    <div key={s.id} className={`thief-history-item ${isThief ? 'robbed-someone' : 'was-robbed'}`}>
+                      <div className="thief-history-avatar-wrap">
+                        <img 
+                          src={displayAvatar} 
+                          alt="" 
+                          className="thief-history-avatar" 
+                          onError={(e) => { 
+                            if (opponent) {
+                              e.currentTarget.src = opponent.avatarUrl || '/imagens/default-avatar.png';
+                            } else {
+                              e.currentTarget.src = '/imagens/default-avatar.png';
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="thief-history-info">
+                        <span className="thief-history-action">{actionText}</span>
+                        <span className="thief-history-date">Rodada de {formatBrlDateLocal(s.roundDate)}</span>
+                      </div>
+                      <span className={`thief-history-badge ${badgeType}`}>{badgeText}</span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderCompararPerfis = () => {
+    return (
+      <>
+        <div className="profile-section-header" style={{ marginTop: '1.5rem' }}>
+          <Award size={18} className="profile-section-icon" />
+          <h3 className="profile-section-title">COMPARAR PERFIS</h3>
+        </div>
+
+        <div className="compare-card-dark" id="compare-card-to-share">
+          <div className="compare-picker-row">
+            <div className="compare-picker-user">
+              <img
+                loading="lazy" decoding="async"
+                src={getAvatarUrl(currentUser.id)}
+                alt={currentUser.name}
+                className="compare-picker-avatar"
+                onError={(e) => { e.currentTarget.src = currentUser.avatarUrl; }}
+              />
+              <span className="compare-picker-name">{currentUser.name}</span>
+            </div>
+
+            <span 
+              className="compare-picker-x" 
+              style={{ cursor: 'pointer' }} 
+              onClick={() => setCompareProfileId(null)}
+              title="Limpar Comparação"
+            >✕</span>
+
+            <div className="compare-picker-select-wrap">
+              <select
+                className="compare-picker-select"
+                value={compareProfileId || ''}
+                onChange={(e) => setCompareProfileId(e.target.value || null)}
+              >
+                <option value="">Selecionar...</option>
+                {comparisonOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <span className="compare-picker-caret">▾</span>
+            </div>
+          </div>
+
+          {comparedUser && comparedStanding && (() => {
+            const overallWinner = myPoints > comparedPoints ? 'home' : comparedPoints > myPoints ? 'away' : 'draw';
+
+            return (
+              <div className="compare-body-dark">
+                <div className="compare-vs-strip">
+                  <div className={`compare-vs-side ${overallWinner === 'home' ? 'overall-winner' : ''}`}>
+                    <div className="avatar-container-with-sparks">
+                      <img loading="lazy" decoding="async"
+                        src={getAvatarUrl(currentUser.id)}
+                        alt={currentUser.name}
+                        className="compare-vs-avatar"
+                        onError={(e) => { e.currentTarget.src = currentUser.avatarUrl; }}
+                      />
+                      {overallWinner === 'home' && (
+                        <div className="card-particles winner-particles">
+                          <div className="particle p1"></div>
+                          <div className="particle p2"></div>
+                          <div className="particle p3"></div>
+                          <div className="particle p4"></div>
+                          <div className="particle p5"></div>
+                        </div>
+                      )}
+                    </div>
+                    <span className="compare-vs-name">Você</span>
+                  </div>
+                  <span className="compare-vs-x">VS</span>
+                  <div className={`compare-vs-side ${overallWinner === 'away' ? 'overall-winner' : ''}`}>
+                    <div className="avatar-container-with-sparks">
+                      <img loading="lazy" decoding="async"
+                        src={getAvatarUrl(comparedUser.id)}
+                        alt={comparedUser.name}
+                        className="compare-vs-avatar"
+                        onError={(e) => { e.currentTarget.src = comparedUser.avatarUrl; }}
+                      />
+                      {overallWinner === 'away' && (
+                        <div className="card-particles winner-particles">
+                          <div className="particle p1"></div>
+                          <div className="particle p2"></div>
+                          <div className="particle p3"></div>
+                          <div className="particle p4"></div>
+                          <div className="particle p5"></div>
+                        </div>
+                      )}
+                    </div>
+                    <span className="compare-vs-name">{comparedUser.name}</span>
+                  </div>
+                </div>
+
+                <div className="compare-stats-dark">
+                  {[
+                    { label: 'Pontos', a: myPoints, b: comparedPoints, higher: true },
+                    { label: 'Posição', a: myRank, b: comparedRank, higher: false },
+                    { label: 'Placares Exatos', a: myExacts, b: comparedExacts, higher: true },
+                    { label: 'Empates', a: myDraws, b: comparedDraws, higher: true },
+                    { label: 'Vencedor', a: myWinners, b: comparedWinners, higher: true },
+                    { label: 'Não Pontuado', a: myWrongs, b: comparedWrongs, higher: false, isBad: true },
+                  ].map(({ label, a, b, higher, isBad }) => {
+                    let aClass = '';
+                    let bClass = '';
+                    if (isBad) {
+                      if (a > b) aClass = 'bad-highlight';
+                      if (b > a) bClass = 'bad-highlight';
+                    } else {
+                      const aWins = higher ? a > b : a < b;
+                      const bWins = higher ? b > a : b < a;
+                      aClass = aWins ? 'win' : bWins ? 'lose' : '';
+                      bClass = bWins ? 'win' : aWins ? 'lose' : '';
+                    }
+                    return (
+                      <div key={label} className="compare-stat-row-dark">
+                        <span className={`compare-stat-val ${aClass}`}>
+                          {label === 'Posição' ? `${a}º` : a}
+                        </span>
+                        <span className="compare-stat-label">{label}</span>
+                        <span className={`compare-stat-val ${bClass}`}>
+                          {label === 'Posição' ? `${b}º` : b}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Conquistas */}
+                  {[
+                    { label: 'On Fire', icon: '🔥', a: myFires, b: comparedFires, higher: true },
+                    { label: 'Profeta', icon: '🔮', a: myExacts, b: comparedExacts, higher: true },
+                    { label: 'Pé Frio', icon: 'pefrio', a: myPeFrio, b: comparedPeFrio, higher: false, isBad: true },
+                    { label: 'MVP', icon: 'mvp', a: myMvp, b: comparedMvp, higher: true },
+                  ].map(({ label, icon, a, b, higher, isBad }) => {
+                    let aClass = '';
+                    let bClass = '';
+                    if (isBad) {
+                      if (a > b) aClass = 'bad-highlight';
+                      if (b > a) bClass = 'bad-highlight';
+                    } else {
+                      const aWins = higher ? a > b : a < b;
+                      const bWins = higher ? b > a : b < a;
+                      aClass = aWins ? 'win' : bWins ? 'lose' : '';
+                      bClass = bWins ? 'win' : aWins ? 'lose' : '';
+                    }
+                    return (
+                      <div key={label} className="compare-stat-row-dark conquest">
+                        <span className={`compare-stat-val ${aClass}`}>{a}</span>
+                        <span className="compare-stat-label conquest-label">
+                          {icon === 'pefrio' ? (
+                            <img loading="lazy" src={PE_FRIO_IMG} alt="Pé Frio" className="compare-conquest-icon" />
+                          ) : icon === 'mvp' ? (
+                            <img loading="lazy" src="/imagens/coroa-mvp.png" alt="MVP" className="compare-conquest-icon" />
+                          ) : (
+                            <span className="compare-conquest-emoji">{icon}</span>
+                          )}
+                          {label}
+                        </span>
+                        <span className={`compare-stat-val ${bClass}`}>{b}</span>
+                      </div>
+                    );
+                  })}
+
+                  <div className="compare-stat-row-dark">
+                    <span className="compare-stat-special">
+                      {mySpecial ? (
+                        <>
+                          <img loading="lazy" src={flagSrc(flagOf(mySpecial.championTeam, ''), 20)} alt="" className="compare-mini-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w20/un.png'; }} />
+                          {translateTeam(mySpecial.championTeam)}
+                        </>
+                      ) : '—'}
+                    </span>
+                    <span className="compare-stat-label">Campeão</span>
+                    <span className="compare-stat-special">
+                      {comparedSpecial ? (
+                        <>
+                          <img loading="lazy" src={flagSrc(flagOf(comparedSpecial.championTeam, ''), 20)} alt="" className="compare-mini-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w20/un.png'; }} />
+                          {translateTeam(comparedSpecial.championTeam)}
+                        </>
+                      ) : '—'}
+                    </span>
+                  </div>
+
+                  <div className="compare-stat-row-dark">
+                    <span className="compare-stat-special">
+                      {mySpecial ? BRAZIL_STAGE_LABELS[mySpecial.brazilStage] : '—'}
+                    </span>
+                    <span className="compare-stat-label">Brasil vai até</span>
+                    <span className="compare-stat-special">
+                      {comparedSpecial ? BRAZIL_STAGE_LABELS[comparedSpecial.brazilStage] : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="compare-btns-dark compare-share-btn-container">
+                  <button 
+                    type="button" 
+                    className="compare-btn-dark primary"
+                    style={{ width: '100%' }}
+                    onClick={handleShare}
+                  >
+                    Compartilhar Comparação 📲
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="profile-tab-container-p16">
 
@@ -243,6 +934,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                 </span>
               </div>
             </div>
+
             <div className="profile-special-item">
               <div className="profile-special-flag-wrap">
                 <img loading="lazy" decoding="async"
@@ -262,667 +954,20 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         </div>
       </div>
 
-      {/* SECTION TITLE: HISTÓRICO DE DESAFIOS */}
-      <div 
-        className="profile-section-header"
-        onClick={() => setChallengesExpanded(!challengesExpanded)}
-        style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Swords size={18} className="profile-section-icon" />
-          <h3 className="profile-section-title">HISTÓRICO DE DESAFIOS</h3>
-        </div>
-        {challengesExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
-      </div>
+      {/* CONQUISTAS */}
+      {renderConquistas()}
 
-      {challengesExpanded && (
-        <div className="challenge-history-list">
-          {(() => {
-            const userChallenges = (challenges || []).filter(
-              (c) => c.challengerId === selectedUserId || c.challengedId === selectedUserId
-            );
+      {/* HISTÓRICO DE CONQUISTAS */}
+      {renderTimeline()}
 
-            if (userChallenges.length === 0) {
-              return (
-                <div className="challenge-history-empty">
-                  Nenhum desafio registrado para este participante ainda. ⚔️
-                </div>
-              );
-            }
+      {/* DESAFIOS */}
+      {renderDesafios()}
 
-            // Sort by date, latest first
-            const sortedChallenges = [...userChallenges].sort(
-              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
+      {/* ROUBOS */}
+      {renderRoubos()}
 
-            return sortedChallenges.map((c) => {
-              const isChallenger = c.challengerId === selectedUserId;
-              const opponentId = isChallenger ? c.challengedId : c.challengerId;
-              const opponent = participants.find((p) => p.id === opponentId);
-              const match = matches.find((m) => m.id === c.matchId);
-              if (!match) return null;
-
-              const myPick = isChallenger ? c.challengerPick : c.challengedPick;
-              const oppPick = isChallenger ? c.challengedPick : c.challengerPick;
-
-              const myTeamName = myPick === 'HOME' ? match.homeTeam : match.awayTeam;
-              const oppTeamName = oppPick === 'HOME' ? match.homeTeam : match.awayTeam;
-              const myTeamFlag = myPick === 'HOME' ? match.homeFlag : match.awayFlag;
-              const oppTeamFlag = oppPick === 'HOME' ? match.homeFlag : match.awayFlag;
-
-              // Determinar o status/resultado
-              let resultBadge = null;
-              if (c.status === 'declined') {
-                resultBadge = <span className="ch-badge status-declined">Recusado 🐔</span>;
-              } else if (c.status === 'pending') {
-                const isMatchFinished = match.status === 'finished';
-                if (isMatchFinished) {
-                  resultBadge = <span className="ch-badge status-expired">Expirado ⌛</span>;
-                } else {
-                  resultBadge = <span className="ch-badge status-pending">Pendente ⏳</span>;
-                }
-              } else if (c.status === 'accepted') {
-                if (match.status !== 'finished') {
-                  resultBadge = <span className="ch-badge status-active">Aceito ⚔️</span>;
-                } else {
-                  const matchWinner = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
-                  const iWon = myPick === matchWinner;
-                  if (iWon) {
-                    resultBadge = <span className="ch-badge status-won">Ganhou +1 🏆</span>;
-                  } else {
-                    resultBadge = <span className="ch-badge status-lost">Perdeu -1 💀</span>;
-                  }
-                }
-              }
-
-              return (
-                <div key={c.id} className={`challenge-history-item ${isChallenger ? 'sent' : 'received'}`}>
-                  <div className="ch-history-header">
-                    <span className="ch-history-vs">
-                      {isChallenger ? '⚔️ Desafiou' : '🛡️ Desafiado por'} <strong>{opponent?.name || opponentId}</strong>
-                    </span>
-                    {resultBadge}
-                  </div>
-                  <div className="ch-history-match">
-                    <img src={flagSrc(match.homeFlag, 40)} alt="" className="ch-history-flag" />
-                    <span>{match.homeTeam} x {match.awayTeam}</span>
-                    <img src={flagSrc(match.awayFlag, 40)} alt="" className="ch-history-flag" />
-                  </div>
-                  <div className="ch-history-picks">
-                    <div className="ch-history-pick mine">
-                      <span className="ch-pick-label">{isChallenger ? 'Você escolheu' : 'Desafiado escolheu'}:</span>
-                      <span className="ch-pick-value">
-                        <img src={flagSrc(myTeamFlag, 40)} alt="" className="ch-pick-flag" />
-                        {myTeamName}
-                      </span>
-                    </div>
-                    <div className="ch-history-pick opp">
-                      <span className="ch-pick-label">Adversário:</span>
-                      <span className="ch-pick-value">
-                        <img src={flagSrc(oppTeamFlag, 40)} alt="" className="ch-pick-flag" />
-                        {oppTeamName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            });
-          })()}
-        </div>
-      )}
-
-      {/* SECTION TITLE: HISTÓRICO DE ROUBOS */}
-      <div 
-        className="profile-section-header"
-        onClick={() => setStealsExpanded(!stealsExpanded)}
-        style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none', marginTop: '1.25rem' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Skull size={18} className="profile-section-icon" style={{ color: '#f87171' }} />
-          <h3 className="profile-section-title">HISTÓRICO DE ROUBOS</h3>
-        </div>
-        {stealsExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
-      </div>
-
-      {stealsExpanded && (
-        <div className="thief-history-list">
-          {(() => {
-            const userSteals = (thiefSteals || []).filter(
-              (s) => s.thiefId === selectedUserId || s.victimId === selectedUserId
-            );
-
-            if (userSteals.length === 0) {
-              return (
-                <div className="thief-history-empty">
-                  Nenhum roubo registrado para este participante ainda. 🥷
-                </div>
-              );
-            }
-
-            // Sort by creation date or round date, latest first
-            const sortedSteals = [...userSteals].sort(
-              (a, b) => new Date(b.createdAt || b.roundDate).getTime() - new Date(a.createdAt || a.roundDate).getTime()
-            );
-
-            const formatBrlDateLocal = (isoDate: string): string => {
-              const parts = isoDate.split('-');
-              return parts.length === 3 ? `${parts[2]}/${parts[1]}` : isoDate;
-            };
-
-            return sortedSteals.map((s) => {
-              const isThief = s.thiefId === selectedUserId;
-              const opponentId = isThief ? s.victimId : s.thiefId;
-              const opponent = opponentId ? participants.find((p) => p.id === opponentId) : null;
-
-              let actionText = '';
-              let badgeType = '';
-              let badgeText = '';
-
-              if (isThief) {
-                if (opponent) {
-                  actionText = `Roubou 1 ponto de ${opponent.name}`;
-                  badgeType = 'steal';
-                  badgeText = '+1 Ponto';
-                } else {
-                  actionText = `Escolheu não roubar ninguém`;
-                  badgeType = 'none';
-                  badgeText = '0 Pontos';
-                }
-              } else {
-                actionText = `Teve 1 ponto roubado por ${opponent?.name || 'Ladrão'}`;
-                badgeType = 'victim';
-                badgeText = '-1 Ponto';
-              }
-
-              // Definir avatar para a linha do histórico
-              const displayAvatar = opponent 
-                ? `/imagens/ranking ${opponent.id}.webp` 
-                : '/imagens/ladrao.webp';
-
-              return (
-                <div key={s.id} className={`thief-history-item ${isThief ? 'robbed-someone' : 'was-robbed'}`}>
-                  <div className="thief-history-avatar-wrap">
-                    <img 
-                      src={displayAvatar} 
-                      alt="" 
-                      className="thief-history-avatar" 
-                      onError={(e) => { 
-                        if (opponent) {
-                          e.currentTarget.src = opponent.avatarUrl || '/imagens/default-avatar.png';
-                        } else {
-                          e.currentTarget.src = '/imagens/default-avatar.png';
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="thief-history-info">
-                    <span className="thief-history-action">{actionText}</span>
-                    <span className="thief-history-date">Rodada de {formatBrlDateLocal(s.roundDate)}</span>
-                  </div>
-                  <span className={`thief-history-badge ${badgeType}`}>{badgeText}</span>
-                </div>
-              );
-            });
-          })()}
-        </div>
-      )}
-
-      {/* SECTION TITLE: CONQUISTAS */}
-      <div className="profile-section-header">
-        <Award size={18} className="profile-section-icon" />
-        <h3 className="profile-section-title">CONQUISTAS</h3>
-      </div>
-
-      {/* LISTA DE CONQUISTAS RETANGULARES (MAIS LIMPO E CONDICENTE) */}
-      <div className="achievement-list-rect">
-
-        {/* CONQUISTA: ON FIRE */}
-        <div className="achievement-card-rect on-fire">
-          <Aurora
-            colorStops={["#ff4d1c", "#ff8c00", "#e11d48"]}
-            blend={0.65}
-            amplitude={1.0}
-            speed={0.45}
-          />
-          <div className="card-particles">
-            <div className="particle p1"></div>
-            <div className="particle p2"></div>
-            <div className="particle p3"></div>
-            <div className="particle p4"></div>
-            <div className="particle p5"></div>
-          </div>
-          <div className="achievement-rect-left">
-            <span className="achievement-rect-emoji animate-pulse">🔥</span>
-          </div>
-          <div className="achievement-rect-middle">
-            <span className="achievement-rect-title">ON FIRE</span>
-            <span className="achievement-rect-desc">Pontuou em 5 jogos seguidos ou acertou 3 placares exatos em sequência.</span>
-            {/* Progresso rumo ao próximo fogo pela regra dos 5 jogos pontuando */}
-            <div className="onfire-progress">
-              <div className="onfire-progress-track">
-                <div
-                  className="onfire-progress-fill"
-                  style={{ width: `${(Math.min(userFire.currentStreak, 5) / 5) * 100}%` }}
-                />
-                {Math.min(userFire.currentStreak, 5) < 5 && (
-                  <div className="onfire-progress-milestone-dot" />
-                )}
-              </div>
-              <span className="onfire-progress-label">{Math.min(userFire.currentStreak, 5)}/5</span>
-            </div>
-          </div>
-          <div className="achievement-rect-right">
-            <span className="achievement-rect-count">{userFire.fires}</span>
-          </div>
-        </div>
-
-        {/* CONQUISTA: PROFETA */}
-        <div className="achievement-card-rect profeta">
-          <Aurora
-            colorStops={["#c084fc", "#8a2be2", "#6b21a8"]}
-            blend={0.65}
-            amplitude={1.0}
-            speed={0.45}
-          />
-          <div className="card-particles">
-            <div className="particle p1"></div>
-            <div className="particle p2"></div>
-            <div className="particle p3"></div>
-            <div className="particle p4"></div>
-            <div className="particle p5"></div>
-          </div>
-          <div className="achievement-rect-left">
-            <span className="achievement-rect-emoji">🔮</span>
-          </div>
-          <div className="achievement-rect-middle">
-            <span className="achievement-rect-title">PROFETA</span>
-            <span className="achievement-rect-desc">Cravou o placar exato.</span>
-          </div>
-          <div className="achievement-rect-right">
-            <span className="achievement-rect-count">{userProfeta}</span>
-          </div>
-        </div>
-
-        {/* CONQUISTA: PÉ FRIO */}
-        <div className="achievement-card-rect pe-frio">
-          <Aurora
-            colorStops={["#94a3b8", "#64748b", "#334155"]}
-            blend={0.65}
-            amplitude={1.0}
-            speed={0.45}
-          />
-          <div className="achievement-rect-left">
-            <img loading="lazy" decoding="async"
-              src={PE_FRIO_IMG}
-              alt="Pé Frio"
-              className="achievement-rect-img"
-            />
-          </div>
-          <div className="achievement-rect-middle">
-            <span className="achievement-rect-title">PÉ FRIO</span>
-            <span className="achievement-rect-desc">Foi o único a não pontuar em um jogo.</span>
-          </div>
-          <div className="achievement-rect-right">
-            <span className="achievement-rect-count">{userPeFrio}</span>
-          </div>
-        </div>
-
-        {/* CONQUISTA: MVP */}
-        <div className="achievement-card-rect mvp">
-          <Aurora
-            colorStops={["#ffe066", "#f5b300", "#c58c00"]}
-            blend={0.65}
-            amplitude={1.0}
-            speed={0.45}
-          />
-          <div className="achievement-rect-left">
-            <img loading="lazy" decoding="async"
-              src="/imagens/coroa-mvp.png"
-              alt="MVP"
-              className="achievement-rect-img"
-            />
-          </div>
-          <div className="achievement-rect-middle">
-            <span className="achievement-rect-title">MVP DA RODADA</span>
-            <span className="achievement-rect-desc">O que mais pontuou no dia.</span>
-          </div>
-          <div className="achievement-rect-right">
-            <span className="achievement-rect-count">{userMvp}</span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* SEÇÃO: COMPARAR PERFIS */}
-      <div className="profile-section-header">
-        <Award size={18} className="profile-section-icon" />
-        <h3 className="profile-section-title">COMPARAR PERFIS</h3>
-      </div>
-
-      <div className="compare-card-dark" id="compare-card-to-share">
-        <div className="compare-picker-row">
-          <div className="compare-picker-user">
-            <img
-              loading="lazy" decoding="async"
-              src={getAvatarUrl(currentUser.id)}
-              alt={currentUser.name}
-              className="compare-picker-avatar"
-              onError={(e) => { e.currentTarget.src = currentUser.avatarUrl; }}
-            />
-            <span className="compare-picker-name">{currentUser.name}</span>
-          </div>
-
-          <span 
-            className="compare-picker-x" 
-            style={{ cursor: 'pointer' }} 
-            onClick={() => setCompareProfileId(null)}
-            title="Limpar Comparação"
-          >✕</span>
-
-          <div className="compare-picker-select-wrap">
-            <select
-              className="compare-picker-select"
-              value={compareProfileId || ''}
-              onChange={(e) => setCompareProfileId(e.target.value || null)}
-            >
-              <option value="">Selecionar...</option>
-              {comparisonOptions.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <span className="compare-picker-caret">▾</span>
-          </div>
-        </div>
-
-        {comparedUser && comparedStanding && (() => {
-          const overallWinner = myPoints > comparedPoints ? 'home' : comparedPoints > myPoints ? 'away' : 'draw';
-
-          return (
-            <div className="compare-body-dark">
-              <div className="compare-vs-strip">
-                <div className={`compare-vs-side ${overallWinner === 'home' ? 'overall-winner' : ''}`}>
-                  <div className="avatar-container-with-sparks">
-                    <img loading="lazy" decoding="async"
-                      src={getAvatarUrl(currentUser.id)}
-                      alt={currentUser.name}
-                      className="compare-vs-avatar"
-                      onError={(e) => { e.currentTarget.src = currentUser.avatarUrl; }}
-                    />
-                    {overallWinner === 'home' && (
-                      <div className="card-particles winner-particles">
-                        <div className="particle p1"></div>
-                        <div className="particle p2"></div>
-                        <div className="particle p3"></div>
-                        <div className="particle p4"></div>
-                        <div className="particle p5"></div>
-                      </div>
-                    )}
-                  </div>
-                  <span className="compare-vs-name">Você</span>
-                </div>
-                <span className="compare-vs-x">VS</span>
-                <div className={`compare-vs-side ${overallWinner === 'away' ? 'overall-winner' : ''}`}>
-                  <div className="avatar-container-with-sparks">
-                    <img loading="lazy" decoding="async"
-                      src={getAvatarUrl(comparedUser.id)}
-                      alt={comparedUser.name}
-                      className="compare-vs-avatar"
-                      onError={(e) => { e.currentTarget.src = comparedUser.avatarUrl; }}
-                    />
-                    {overallWinner === 'away' && (
-                      <div className="card-particles winner-particles">
-                        <div className="particle p1"></div>
-                        <div className="particle p2"></div>
-                        <div className="particle p3"></div>
-                        <div className="particle p4"></div>
-                        <div className="particle p5"></div>
-                      </div>
-                    )}
-                  </div>
-                  <span className="compare-vs-name">{comparedUser.name}</span>
-                </div>
-              </div>
-
-            <div className="compare-stats-dark">
-              {[
-                { label: 'Pontos', a: myPoints, b: comparedPoints, higher: true },
-                { label: 'Posição', a: myRank, b: comparedRank, higher: false },
-                { label: 'Placares Exatos', a: myExacts, b: comparedExacts, higher: true },
-                { label: 'Empates', a: myDraws, b: comparedDraws, higher: true },
-                { label: 'Vencedor', a: myWinners, b: comparedWinners, higher: true },
-                { label: 'Não Pontuado', a: myWrongs, b: comparedWrongs, higher: false, isBad: true },
-              ].map(({ label, a, b, higher, isBad }) => {
-                let aClass = '';
-                let bClass = '';
-                if (isBad) {
-                  if (a > b) aClass = 'bad-highlight';
-                  if (b > a) bClass = 'bad-highlight';
-                } else {
-                  const aWins = higher ? a > b : a < b;
-                  const bWins = higher ? b > a : b < a;
-                  aClass = aWins ? 'win' : bWins ? 'lose' : '';
-                  bClass = bWins ? 'win' : aWins ? 'lose' : '';
-                }
-                return (
-                  <div key={label} className="compare-stat-row-dark">
-                    <span className={`compare-stat-val ${aClass}`}>
-                      {label === 'Posição' ? `${a}º` : a}
-                    </span>
-                    <span className="compare-stat-label">{label}</span>
-                    <span className={`compare-stat-val ${bClass}`}>
-                      {label === 'Posição' ? `${b}º` : b}
-                    </span>
-                  </div>
-                );
-              })}
-
-              {/* Conquistas */}
-              {[
-                { label: 'On Fire', icon: '🔥', a: myFires, b: comparedFires, higher: true },
-                { label: 'Profeta', icon: '🔮', a: myExacts, b: comparedExacts, higher: true },
-                { label: 'Pé Frio', icon: 'pefrio', a: myPeFrio, b: comparedPeFrio, higher: false, isBad: true },
-                { label: 'MVP', icon: 'mvp', a: myMvp, b: comparedMvp, higher: true },
-              ].map(({ label, icon, a, b, higher, isBad }) => {
-                let aClass = '';
-                let bClass = '';
-                if (isBad) {
-                  // Pé Frio: quem tiver MAIS é destacado em vermelho
-                  if (a > b) aClass = 'bad-highlight';
-                  if (b > a) bClass = 'bad-highlight';
-                } else {
-                  const aWins = higher ? a > b : a < b;
-                  const bWins = higher ? b > a : b < a;
-                  aClass = aWins ? 'win' : bWins ? 'lose' : '';
-                  bClass = bWins ? 'win' : aWins ? 'lose' : '';
-                }
-                return (
-                  <div key={label} className="compare-stat-row-dark conquest">
-                    <span className={`compare-stat-val ${aClass}`}>{a}</span>
-                    <span className="compare-stat-label conquest-label">
-                      {icon === 'pefrio' ? (
-                        <img loading="lazy" src={PE_FRIO_IMG} alt="Pé Frio" className="compare-conquest-icon" />
-                      ) : icon === 'mvp' ? (
-                        <img loading="lazy" src="/imagens/coroa-mvp.png" alt="MVP" className="compare-conquest-icon" />
-                      ) : (
-                        <span className="compare-conquest-emoji">{icon}</span>
-                      )}
-                      {label}
-                    </span>
-                    <span className={`compare-stat-val ${bClass}`}>{b}</span>
-                  </div>
-                );
-              })}
-
-              <div className="compare-stat-row-dark">
-                <span className="compare-stat-special">
-                  {mySpecial ? (
-                    <>
-                      <img loading="lazy" src={flagSrc(flagOf(mySpecial.championTeam, ''), 20)} alt="" className="compare-mini-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w20/un.png'; }} />
-                      {translateTeam(mySpecial.championTeam)}
-                    </>
-                  ) : '—'}
-                </span>
-                <span className="compare-stat-label">Campeão</span>
-                <span className="compare-stat-special">
-                  {comparedSpecial ? (
-                    <>
-                      <img loading="lazy" src={flagSrc(flagOf(comparedSpecial.championTeam, ''), 20)} alt="" className="compare-mini-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w20/un.png'; }} />
-                      {translateTeam(comparedSpecial.championTeam)}
-                    </>
-                  ) : '—'}
-                </span>
-              </div>
-
-              <div className="compare-stat-row-dark">
-                <span className="compare-stat-special">
-                  {mySpecial ? BRAZIL_STAGE_LABELS[mySpecial.brazilStage] : '—'}
-                </span>
-                <span className="compare-stat-label">Brasil vai até</span>
-                <span className="compare-stat-special">
-                  {comparedSpecial ? BRAZIL_STAGE_LABELS[comparedSpecial.brazilStage] : '—'}
-                </span>
-              </div>
-            </div>
-
-            <div className="compare-btns-dark compare-share-btn-container">
-              <button 
-                type="button" 
-                className="compare-btn-dark primary"
-                style={{ width: '100%' }}
-                onClick={handleShare}
-              >
-                Compartilhar Comparação 📲
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-    </div>
-
-      {/* SECTION TITLE: LINHA DO TEMPO DE CONQUISTAS */}
-      <div 
-        className="profile-section-header"
-        onClick={() => setTimelineExpanded(!timelineExpanded)}
-        style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Calendar size={18} className="profile-section-icon" />
-          <h3 className="profile-section-title">LINHA DO TEMPO DE CONQUISTAS</h3>
-        </div>
-        {timelineExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
-      </div>
-
-      {/* HISTÓRICO DE EVENTOS */}
-      {timelineExpanded && (
-        <div className="profile-timeline-list-p16" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {timeline.length > 0 ? (
-            timeline.map((c, idx) => {
-              const hasMatch = !!c.match;
-
-              if (hasMatch && c.match) {
-                const m = c.match;
-                const bet = c.bet;
-                const isProfeta = c.type === 'profeta';
-                const badgeClass = isProfeta ? 'profeta-badge' : 'pe-frio-badge';
-                const badgeText = isProfeta ? '🔮 PROFETA' : 'PÉ FRIO';
-
-                return (
-                  <div key={idx} className="history-row">
-                    <div className="history-row-header">
-                      <span className="history-date">{m.group} · {c.date}</span>
-                      <div className={`inline-guess-badge-p16 ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {!isProfeta && (
-                          <img loading="lazy" decoding="async" src={PE_FRIO_IMG} alt="Pé Frio"
-                            style={{ width: '12px', height: '12px', objectFit: 'contain' }} />
-                        )}
-                        <span>{badgeText}</span>
-                      </div>
-                    </div>
-                    <div className="history-matchup">
-                      <div className="history-team home">
-                        <span className="history-team-name">{m.homeTeam}</span>
-                        <img loading="lazy" decoding="async" src={flagSrc(m.homeFlag, 40)} alt={m.homeTeam}
-                          className="history-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
-                      </div>
-                      <div className="history-score-badge">{m.homeScore} x {m.awayScore}</div>
-                      <div className="history-team away">
-                        <img loading="lazy" decoding="async" src={flagSrc(m.awayFlag, 40)} alt={m.awayTeam}
-                          className="history-flag" onError={(e) => { e.currentTarget.src = 'https://flagcdn.com/w40/un.png'; }} />
-                        <span className="history-team-name">{m.awayTeam}</span>
-                      </div>
-                    </div>
-                    {bet && (
-                      <div className="history-bet-row" style={{
-                        background: isProfeta ? 'rgba(74, 222, 128, 0.04)' : 'rgba(148, 163, 184, 0.05)',
-                        borderColor: isProfeta ? 'rgba(74, 222, 128, 0.12)' : 'rgba(148, 163, 184, 0.15)'
-                      }}>
-                        <span className="history-bet-label">Seu palpite:</span>
-                        <span className="history-bet-value" style={{ color: isProfeta ? '#4ade80' : '#94a3b8' }}>
-                          {bet.homeScore} x {bet.awayScore}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              } else if (c.type === 'mvp') {
-                return (
-                  <div key={idx} className="history-row">
-                    <div className="history-row-header">
-                      <span className="history-date">Rodada · {c.date}</span>
-                      <div className="inline-guess-badge-p16 mvp-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <img loading="lazy" decoding="async" src="/imagens/coroa-mvp.png" alt="MVP"
-                          style={{ width: '12px', height: '12px', objectFit: 'contain' }} />
-                        <span>MVP DA RODADA</span>
-                      </div>
-                    </div>
-                    <div className="mvp-timeline-body">
-                      <h4 className="mvp-timeline-title">🏆 MELHOR DESEMPENHO DO DIA</h4>
-                      <div className="mvp-timeline-stats">
-                        <div className="mvp-timeline-stat-box">
-                          <span className="stat-value">{c.points ?? 0}</span>
-                          <span className="stat-label">Pontos</span>
-                        </div>
-                        <div className="mvp-timeline-stat-box">
-                          <span className="stat-value">{c.exacts ?? 0}</span>
-                          <span className="stat-label">{c.exacts === 1 ? 'Placar Exato' : 'Placares Exatos'}</span>
-                        </div>
-                      </div>
-                      <div className="mvp-timeline-desc">
-                        Você foi o participante que mais pontuou nesta rodada!
-                      </div>
-                    </div>
-                  </div>
-                );
-              } else {
-                return (
-                  <div key={idx} className="history-row">
-                    <div className="history-row-header">
-                      <span className="history-date">Rodada · {c.date}</span>
-                      <div className="inline-guess-badge-p16 onfire-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '10px' }}>🔥</span>
-                        <span>ON FIRE!</span>
-                      </div>
-                    </div>
-                    <div style={{ padding: '0.4rem 0', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#F2ECDD' }}>
-                        {c.title}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>
-                        {c.description}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-            })
-          ) : (
-            <div className="profile-timeline-empty">
-              Nenhuma conquista registrada ainda. Os palpites e resultados dos jogos criarão conquistas em tempo real!
-            </div>
-          )}
-        </div>
-      )}
-
+      {/* COMPARAR PERFIS */}
+      {renderCompararPerfis()}
     </div>
   );
 };
