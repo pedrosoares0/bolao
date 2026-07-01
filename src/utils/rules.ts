@@ -75,6 +75,20 @@ export function analyzeBet(bet: Bet | undefined, match: Match): BetAnalysis {
   const { homeScore: mHome, awayScore: mAway } = match;
   const betDiff = bHome - bAway;
 
+  // 0. Mata-mata decidido na PRORROGAÇÃO por gol: o jogo empatou aos 90' (por
+  // isso foi à prorrogação), mas guardamos o placar FINAL, com o gol da
+  // prorrogação (ex.: 2-2 aos 90' -> 3-2). Quem apostou EMPATE acertou o
+  // resultado dos 90' -> +2, igual aos pênaltis. Palpites de vencedor seguem
+  // normalmente pelo placar final (exato/vencedor nas regras abaixo).
+  if (
+    match.stage !== 'GROUP_STAGE' &&
+    match.duration === 'EXTRA_TIME' &&
+    mHome !== mAway &&
+    bHome === bAway
+  ) {
+    return { points: 2, type: 'draw' };
+  }
+
   // 1. Placar Exato (3 pontos)
   if (bHome === mHome && bAway === mAway) {
     return { points: 3, type: 'exact' };

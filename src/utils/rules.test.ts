@@ -204,6 +204,24 @@ describe('pensBonus', () => {
   });
 });
 
+// ---------- analyzeBet: empate no mata-mata decidido na prorrogação ----------
+describe('analyzeBet — prorrogacao por gol conta como empate dos 90 min', () => {
+  // 2-2 aos 90' -> gol na prorrogação -> 3-2 final (EXTRA_TIME, casa avança).
+  const koExtra = finishedMatch(3, 2, { stage: 'LAST_16', duration: 'EXTRA_TIME', winner: 'HOME_TEAM' });
+
+  it('apostou EMPATE => +2 (acertou o empate dos 90\'), mesmo o final sendo 3-2', () => {
+    expect(analyzeBet(makeBet(1, 1), koExtra)).toEqual({ points: 2, type: 'draw' });
+  });
+
+  it('apostou VENCEDOR (placar final) => segue normal: +1 vencedor', () => {
+    expect(analyzeBet(makeBet(2, 0), koExtra)).toEqual({ points: 1, type: 'winner' });
+  });
+
+  it('cravou o placar FINAL (3-2) => +3 exato (inalterado)', () => {
+    expect(analyzeBet(makeBet(3, 2), koExtra)).toEqual({ points: 3, type: 'exact' });
+  });
+});
+
 // ---------- isProfeta (selo 🔮 / contagem de desempate) ----------
 
 describe('isProfeta', () => {
