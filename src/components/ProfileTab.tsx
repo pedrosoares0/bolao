@@ -6,7 +6,7 @@ import {
   calculateMvpCounts,
   calculateConquestTimeline
 } from '../utils/rules';
-import { User, Calendar, Award, ChevronDown, ChevronUp, Swords, Skull } from 'lucide-react';
+import { User, Calendar, Award, ChevronDown, ChevronUp, Swords, Ghost } from 'lucide-react';
 import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 import { BRAZIL_STAGE_LABELS } from '../utils/specials';
 import Aurora from './Aurora';
@@ -533,7 +533,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none', marginTop: '1.25rem' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Skull size={18} className="profile-section-icon" style={{ color: '#f87171' }} />
+            <Ghost size={18} className="profile-section-icon" />
             <h3 className="profile-section-title">ROUBOS</h3>
           </div>
           {stealsExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
@@ -957,6 +957,9 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
       {/* CONQUISTAS */}
       {renderConquistas()}
 
+      {/* COMPARAR PERFIS */}
+      {renderCompararPerfis()}
+
       {/* HISTÓRICO DE CONQUISTAS */}
       {renderTimeline()}
 
@@ -965,9 +968,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
       {/* ROUBOS */}
       {renderRoubos()}
-
-      {/* COMPARAR PERFIS */}
-      {renderCompararPerfis()}
     </div>
   );
 };
