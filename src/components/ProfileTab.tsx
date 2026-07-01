@@ -1,12 +1,12 @@
 import React from 'react';
-import type { Participant, Match, Bet, ParticipantStanding, SpecialPrediction } from '../types';
+import type { Participant, Match, Bet, ParticipantStanding, SpecialPrediction, Challenge } from '../types';
 import {
   calculateFireCounts,
   calculatePeFrioCounts,
   calculateMvpCounts,
   calculateConquestTimeline
 } from '../utils/rules';
-import { User, Calendar, Award, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, Calendar, Award, ChevronDown, ChevronUp, Swords } from 'lucide-react';
 import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 import { BRAZIL_STAGE_LABELS } from '../utils/specials';
 import Aurora from './Aurora';
@@ -20,6 +20,7 @@ interface ProfileTabProps {
   bets: Bet[];
   specials: SpecialPrediction[];
   standings: ParticipantStanding[];
+  challenges: Challenge[];
 }
 
 const PE_FRIO_IMG = "https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75";
@@ -31,10 +32,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   bets,
   specials,
   standings,
+  challenges,
 }) => {
   const [selectedProfileId, setSelectedProfileId] = useState<string>(currentUser.id);
   const [compareProfileId, setCompareProfileId] = useState<string | null>(null);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const [challengesExpanded, setChallengesExpanded] = useState(false);
 
   const selectedUserId = selectedProfileId;
   const selectedUser = participants.find((p) => p.id === selectedProfileId) || currentUser;
@@ -255,6 +258,115 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* SECTION TITLE: HISTÓRICO DE DESAFIOS */}
+      <div 
+        className="profile-section-header"
+        onClick={() => setChallengesExpanded(!challengesExpanded)}
+        style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Swords size={18} className="profile-section-icon" />
+          <h3 className="profile-section-title">HISTÓRICO DE DESAFIOS</h3>
+        </div>
+        {challengesExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
+      </div>
+
+      {challengesExpanded && (
+        <div className="challenge-history-list">
+          {(() => {
+            const userChallenges = (challenges || []).filter(
+              (c) => c.challengerId === selectedUserId || c.challengedId === selectedUserId
+            );
+
+            if (userChallenges.length === 0) {
+              return (
+                <div className="challenge-history-empty">
+                  Nenhum desafio registrado para este participante ainda. ⚔️
+                </div>
+              );
+            }
+
+            // Sort by date, latest first
+            const sortedChallenges = [...userChallenges].sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+
+            return sortedChallenges.map((c) => {
+              const isChallenger = c.challengerId === selectedUserId;
+              const opponentId = isChallenger ? c.challengedId : c.challengerId;
+              const opponent = participants.find((p) => p.id === opponentId);
+              const match = matches.find((m) => m.id === c.matchId);
+              if (!match) return null;
+
+              const myPick = isChallenger ? c.challengerPick : c.challengedPick;
+              const oppPick = isChallenger ? c.challengedPick : c.challengerPick;
+
+              const myTeamName = myPick === 'HOME' ? match.homeTeam : match.awayTeam;
+              const oppTeamName = oppPick === 'HOME' ? match.homeTeam : match.awayTeam;
+              const myTeamFlag = myPick === 'HOME' ? match.homeFlag : match.awayFlag;
+              const oppTeamFlag = oppPick === 'HOME' ? match.homeFlag : match.awayFlag;
+
+              // Determinar o status/resultado
+              let resultBadge = null;
+              if (c.status === 'declined') {
+                resultBadge = <span className="ch-badge status-declined">Recusado 🐔</span>;
+              } else if (c.status === 'pending') {
+                const isMatchFinished = match.status === 'finished';
+                if (isMatchFinished) {
+                  resultBadge = <span className="ch-badge status-expired">Expirado ⌛</span>;
+                } else {
+                  resultBadge = <span className="ch-badge status-pending">Pendente ⏳</span>;
+                }
+              } else if (c.status === 'accepted') {
+                if (match.status !== 'finished') {
+                  resultBadge = <span className="ch-badge status-active">Aceito ⚔️</span>;
+                } else {
+                  const matchWinner = match.winner === 'HOME_TEAM' ? 'HOME' : 'AWAY';
+                  const iWon = myPick === matchWinner;
+                  if (iWon) {
+                    resultBadge = <span className="ch-badge status-won">Ganhou +1 🏆</span>;
+                  } else {
+                    resultBadge = <span className="ch-badge status-lost">Perdeu -1 💀</span>;
+                  }
+                }
+              }
+
+              return (
+                <div key={c.id} className={`challenge-history-item ${isChallenger ? 'sent' : 'received'}`}>
+                  <div className="ch-history-header">
+                    <span className="ch-history-vs">
+                      {isChallenger ? '⚔️ Desafiou' : '🛡️ Desafiado por'} <strong>{opponent?.name || opponentId}</strong>
+                    </span>
+                    {resultBadge}
+                  </div>
+                  <div className="ch-history-match">
+                    <img src={flagSrc(match.homeFlag, 40)} alt="" className="ch-history-flag" />
+                    <span>{match.homeTeam} x {match.awayTeam}</span>
+                    <img src={flagSrc(match.awayFlag, 40)} alt="" className="ch-history-flag" />
+                  </div>
+                  <div className="ch-history-picks">
+                    <div className="ch-history-pick mine">
+                      <span className="ch-pick-label">{isChallenger ? 'Você escolheu' : 'Desafiado escolheu'}:</span>
+                      <span className="ch-pick-value">
+                        <img src={flagSrc(myTeamFlag, 40)} alt="" className="ch-pick-flag" />
+                        {myTeamName}
+                      </span>
+                    </div>
+                    <div className="ch-history-pick opp">
+                      <span className="ch-pick-label">Adversário:</span>
+                      <span className="ch-pick-value">
+                        <img src={flagSrc(oppTeamFlag, 40)} alt="" className="ch-pick-flag" />
+                        {oppTeamName}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
 
       {/* SECTION TITLE: CONQUISTAS */}
       <div className="profile-section-header">

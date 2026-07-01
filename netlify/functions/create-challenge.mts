@@ -111,13 +111,16 @@ export default async (req: Request) => {
     const challengedName = nameByUid.get(challengedUid) ?? 'Alguém';
     // Convite enxuto: só anuncia o desafio. Os palpites (classificados) ficam em
     // segredo e só são revelados no grupo SE o desafio for aceito (respond-challenge).
+    const teamFor = (s: Side) => (s === 'HOME' ? match.home_team : match.away_team);
     const msg = [
-      '⚔️ *DESAFIO DOS MOLHADOS* ⚔️',
+      `⚔️ *DESAFIO: ${challengerName.toUpperCase()} X ${challengedName.toUpperCase()}* ⚔️`,
       '',
       `${flagEmoji(match.home_team)} ${ptName(match.home_team)} x ${ptName(match.away_team)} ${flagEmoji(match.away_team)}`,
       '',
-      `*${challengerName}* desafiou *${challengedName}*! ⏳`,
-      `Agora é com você, *${challengedName}* — aceita ou amarela? 👀`,
+      `*${challengerName}*: ${flagEmoji(teamFor(challengerPick))} ${ptName(teamFor(challengerPick))} se classifica`,
+      `*${challengedName}*: ${flagEmoji(teamFor(challengedPick))} ${ptName(teamFor(challengedPick))} se classifica`,
+      '',
+      'Quem cravar quem avança rouba *+1 ponto* do outro! 🏆',
     ].join('\n');
     await sendText(msg);
   } catch (err) {

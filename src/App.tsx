@@ -324,9 +324,20 @@ function App() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [thiefSteals, setThiefSteals] = useState<ThiefSteal[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [pendingConfirmChallenge, setPendingConfirmChallenge] = useState<{
+    challengedId: string;
+    match: Match;
+  } | null>(null);
   const [dismissedSteals, setDismissedSteals] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('dismissed_steals') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [dismissedChallenges, setDismissedChallenges] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dismissed_challenges') || '[]');
     } catch {
       return [];
     }
@@ -586,18 +597,18 @@ function App() {
         setChallenges([]);
       } else {
         const uidToUser = (uid: string) => loadedParticipants.find((p) => p.uid === uid)?.id || uid;
-        setChallenges(
-          (challengesRes.data ?? []).map((c): Challenge => ({
-            id: c.id,
-            matchId: String(c.match_id),
-            challengerId: uidToUser(c.challenger_id),
-            challengedId: uidToUser(c.challenged_id),
-            challengerPick: c.challenger_pick as 'HOME' | 'AWAY',
-            challengedPick: c.challenged_pick as 'HOME' | 'AWAY',
-            status: (c.status as 'pending' | 'accepted' | 'declined') ?? 'pending',
-            createdAt: c.created_at,
-          }))
-        );
+        const loadedChallenges = (challengesRes.data ?? []).map((c): Challenge => ({
+          id: c.id,
+          matchId: String(c.match_id),
+          challengerId: uidToUser(c.challenger_id),
+          challengedId: uidToUser(c.challenged_id),
+          challengerPick: c.challenger_pick as 'HOME' | 'AWAY',
+          challengedPick: c.challenged_pick as 'HOME' | 'AWAY',
+          status: (c.status as 'pending' | 'accepted' | 'declined') ?? 'pending',
+          createdAt: c.created_at,
+        }));
+
+        setChallenges(loadedChallenges);
       }
 
       setError(null);
@@ -1234,8 +1245,13 @@ function App() {
     }
   };
 
-  // Cria um Desafio dos Molhados contra outro participante (mata-mata).
-  const handleChallenge = async (challengedUserId: string, match: Match) => {
+  // Salva o desafio no estado temporário para que o usuário confirme antes de enviar.
+  const handleChallenge = (challengedUserId: string, match: Match) => {
+    setPendingConfirmChallenge({ challengedId: challengedUserId, match });
+  };
+
+  // Envia o desafio de fato contra outro participante (mata-mata).
+  const executeChallengeCreation = async (challengedUserId: string, match: Match) => {
     if (!currentUser?.uid) return;
     const challenged = participants.find((p) => p.id === challengedUserId);
     if (!challenged?.uid) {
@@ -1292,6 +1308,13 @@ function App() {
     const next = [...dismissedSteals, stealId];
     setDismissedSteals(next);
     localStorage.setItem('dismissed_steals', JSON.stringify(next));
+  };
+
+  // Handler para dispensar notificação de desafio recebido
+  const dismissChallenge = (challengeId: string) => {
+    const next = [...dismissedChallenges, challengeId];
+    setDismissedChallenges(next);
+    localStorage.setItem('dismissed_challenges', JSON.stringify(next));
   };
 
 
@@ -1433,6 +1456,341 @@ function App() {
   // ----------------------------------------------------
   return (
     <div className="app-container">
+
+      {/* ============================================
+          MODAL OVERLAY DE CONFIRMAÇÃO DE DESAFIO (bloqueia o app)
+          ============================================ */}
+      {pendingConfirmChallenge && (() => {
+        const match = pendingConfirmChallenge.match;
+        const challenger = currentUser;
+        const challenged = participants.find((p) => p.id === pendingConfirmChallenge.challengedId);
+        if (!challenged || !challenger) return null;
+
+        const challengerBet = betByMatchUser.get(`${match.id}|${challenger.id}`);
+        const challengedBet = betByMatchUser.get(`${match.id}|${challenged.id}`);
+
+        const challengerPick = predictedAdvancer(challengerBet, match);
+        const challengedPick = predictedAdvancer(challengedBet, match);
+        if (!challengerPick || !challengedPick) return null;
+
+        const challengerTeam = challengerPick === 'HOME' ? match.homeTeam : match.awayTeam;
+        const challengedTeam = challengedPick === 'HOME' ? match.homeTeam : match.awayTeam;
+
+        const challengerFlag = challengerPick === 'HOME' ? match.homeFlag : match.awayFlag;
+        const challengedFlag = challengedPick === 'HOME' ? match.awayFlag : match.awayFlag;
+
+        const challengerTeamEn = challengerPick === 'HOME' ? match.homeTeamEn : match.awayTeamEn;
+        const challengedTeamEn = challengedPick === 'HOME' ? match.homeTeamEn : match.awayTeamEn;
+
+        const challengerColors = getTeamColors(challengerTeamEn);
+        const challengedColors = getTeamColors(challengedTeamEn);
+
+        const challengerAvatar = `/imagens/ranking ${challenger.id}.webp`;
+        const challengedAvatar = `/imagens/ranking ${challenged.id}.webp`;
+
+        return (
+          <div className="challenge-overlay">
+            <div className="challenge-modal">
+              {/* Glow de fundo */}
+              <div className="challenge-modal-glow"></div>
+
+              {/* Conteúdo */}
+              <div className="challenge-modal-content">
+                {/* Título */}
+                <div className="challenge-modal-title">CONFIRMAR DESAFIO?</div>
+
+                {/* VS Section: Fotos dos dois participantes */}
+                <div className="challenge-vs-section">
+                  <div className="challenge-vs-player">
+                    {/* Aurora glow do desafiante */}
+                    <div
+                      className="challenge-vs-aurora"
+                      style={{
+                        '--aurora-c1': challengerColors[0],
+                        '--aurora-c2': challengerColors[1] || challengerColors[0],
+                        '--aurora-c3': challengerColors[2] || 'transparent'
+                      } as React.CSSProperties}
+                    ></div>
+                    {/* Faíscas */}
+                    <div className="challenge-sparks">
+                      <span className="spark s1"></span>
+                      <span className="spark s2"></span>
+                      <span className="spark s3"></span>
+                      <span className="spark s4"></span>
+                      <span className="spark s5"></span>
+                      <span className="spark s6"></span>
+                    </div>
+                    <div className="challenge-vs-avatar-ring challenger-ring">
+                      <img
+                        src={challengerAvatar}
+                        alt={challenger.name}
+                        className="challenge-vs-avatar"
+                        onError={(e) => { e.currentTarget.src = challenger.avatarUrl || '/imagens/default-avatar.png'; }}
+                      />
+                    </div>
+                    <span className="challenge-vs-name">{challenger.name} (Você)</span>
+                  </div>
+
+                  <div className="challenge-vs-badge">VS</div>
+
+                  <div className="challenge-vs-player">
+                    {/* Aurora glow do desafiado */}
+                    <div
+                      className="challenge-vs-aurora"
+                      style={{
+                        '--aurora-c1': challengedColors[0],
+                        '--aurora-c2': challengedColors[1] || challengedColors[0],
+                        '--aurora-c3': challengedColors[2] || 'transparent'
+                      } as React.CSSProperties}
+                    ></div>
+                    {/* Faíscas */}
+                    <div className="challenge-sparks">
+                      <span className="spark s1"></span>
+                      <span className="spark s2"></span>
+                      <span className="spark s3"></span>
+                      <span className="spark s4"></span>
+                      <span className="spark s5"></span>
+                      <span className="spark s6"></span>
+                    </div>
+                    <div className="challenge-vs-avatar-ring challenged-ring">
+                      <img
+                        src={challengedAvatar}
+                        alt={challenged.name}
+                        className="challenge-vs-avatar"
+                        onError={(e) => { e.currentTarget.src = challenged.avatarUrl || '/imagens/default-avatar.png'; }}
+                      />
+                    </div>
+                    <span className="challenge-vs-name">{challenged.name}</span>
+                  </div>
+                </div>
+
+                {/* Jogo */}
+                <div className="challenge-modal-match">
+                  <img src={flagSrc(match.homeFlag, 40)} alt="" className="challenge-modal-flag" />
+                  <span className="challenge-modal-team-name">{match.homeTeam}</span>
+                  <span className="challenge-modal-x">x</span>
+                  <span className="challenge-modal-team-name">{match.awayTeam}</span>
+                  <img src={flagSrc(match.awayFlag, 40)} alt="" className="challenge-modal-flag" />
+                </div>
+
+                {/* Palpites */}
+                <div className="challenge-modal-picks">
+                  <div className="challenge-modal-pick">
+                    <span className="challenge-modal-pick-name">{challenger.name} (Você)</span>
+                    <span className="challenge-modal-pick-value">
+                      <img src={flagSrc(challengerFlag, 40)} alt="" className="challenge-modal-pick-flag" />
+                      {challengerTeam} se classifica
+                    </span>
+                  </div>
+                  <div className="challenge-modal-pick">
+                    <span className="challenge-modal-pick-name">{challenged.name}</span>
+                    <span className="challenge-modal-pick-value">
+                      <img src={flagSrc(challengedFlag, 40)} alt="" className="challenge-modal-pick-flag" />
+                      {challengedTeam} se classifica
+                    </span>
+                  </div>
+                </div>
+
+                {/* Regra */}
+                <div className="challenge-modal-rule">
+                  Quem cravar quem avança rouba <strong>+1 ponto</strong> do outro! 🏆
+                </div>
+
+                {/* Botões */}
+                <div className="challenge-modal-actions">
+                  <button
+                    type="button"
+                    className="challenge-modal-btn accept"
+                    onClick={() => {
+                      executeChallengeCreation(challenged.id, match);
+                      setPendingConfirmChallenge(null);
+                    }}
+                  >
+                    <span className="challenge-modal-btn-inner"></span>
+                    <span className="challenge-btn-text">ENVIAR DESAFIO</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="challenge-modal-btn decline"
+                    onClick={() => setPendingConfirmChallenge(null)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ============================================
+          MODAL OVERLAY DE DESAFIO (bloqueia o app)
+          ============================================ */}
+      {currentUser && (() => {
+        let pendingChallenges = challenges.filter((c) => {
+          if (c.status !== 'pending') return false;
+          if (c.challengedId !== currentUser.id) return false;
+          if (dismissedChallenges.includes(c.id)) return false;
+          const match = matches.find((m) => m.id === c.matchId);
+          return match && match.status !== 'finished';
+        });
+
+
+
+        const firstPending = pendingChallenges[0];
+        if (!firstPending) return null;
+
+        const challenger = participants.find(p => p.id === firstPending.challengerId);
+        const challenged = currentUser;
+        const match = matches.find(m => m.id === firstPending.matchId);
+        if (!match) return null;
+
+        const challengerTeam = firstPending.challengerPick === 'HOME' ? match.homeTeam : match.awayTeam;
+        const challengedTeam = firstPending.challengedPick === 'HOME' ? match.homeTeam : match.awayTeam;
+        const challengerFlag = firstPending.challengerPick === 'HOME' ? match.homeFlag : match.awayFlag;
+        const challengedFlag = firstPending.challengedPick === 'HOME' ? match.homeFlag : match.awayFlag;
+
+        const challengerTeamEn = firstPending.challengerPick === 'HOME' ? match.homeTeamEn : match.awayTeamEn;
+        const challengedTeamEn = firstPending.challengedPick === 'HOME' ? match.homeTeamEn : match.awayTeamEn;
+
+        const challengerColors = getTeamColors(challengerTeamEn);
+        const challengedColors = getTeamColors(challengedTeamEn);
+
+        const challengerAvatar = `/imagens/ranking ${firstPending.challengerId}.webp`;
+        const challengedAvatar = `/imagens/ranking ${challenged.id}.webp`;
+
+        return (
+          <div className="challenge-overlay">
+            <div className="challenge-modal">
+              {/* Glow de fundo */}
+              <div className="challenge-modal-glow"></div>
+
+              {/* Conteúdo */}
+              <div className="challenge-modal-content">
+                {/* Título */}
+                <div className="challenge-modal-title">VOCÊ FOI DESAFIADO!</div>
+
+                {/* VS Section: Fotos dos dois participantes */}
+                <div className="challenge-vs-section">
+                  <div className="challenge-vs-player">
+                    {/* Aurora glow do time escolhido pelo desafiante */}
+                    <div
+                      className="challenge-vs-aurora"
+                      style={{
+                        '--aurora-c1': challengerColors[0],
+                        '--aurora-c2': challengerColors[1] || challengerColors[0],
+                        '--aurora-c3': challengerColors[2] || 'transparent'
+                      } as React.CSSProperties}
+                    ></div>
+                    {/* Faíscas */}
+                    <div className="challenge-sparks">
+                      <span className="spark s1"></span>
+                      <span className="spark s2"></span>
+                      <span className="spark s3"></span>
+                      <span className="spark s4"></span>
+                      <span className="spark s5"></span>
+                      <span className="spark s6"></span>
+                    </div>
+                    <div className="challenge-vs-avatar-ring challenger-ring">
+                      <img
+                        src={challengerAvatar}
+                        alt={challenger?.name || firstPending.challengerId}
+                        className="challenge-vs-avatar"
+                        onError={(e) => { e.currentTarget.src = challenger?.avatarUrl || '/imagens/default-avatar.png'; }}
+                      />
+                    </div>
+                    <span className="challenge-vs-name">{challenger?.name || firstPending.challengerId}</span>
+                  </div>
+
+                  <div className="challenge-vs-badge">VS</div>
+
+                  <div className="challenge-vs-player">
+                    {/* Aurora glow do time escolhido pelo desafiado */}
+                    <div
+                      className="challenge-vs-aurora"
+                      style={{
+                        '--aurora-c1': challengedColors[0],
+                        '--aurora-c2': challengedColors[1] || challengedColors[0],
+                        '--aurora-c3': challengedColors[2] || 'transparent'
+                      } as React.CSSProperties}
+                    ></div>
+                    {/* Faíscas */}
+                    <div className="challenge-sparks">
+                      <span className="spark s1"></span>
+                      <span className="spark s2"></span>
+                      <span className="spark s3"></span>
+                      <span className="spark s4"></span>
+                      <span className="spark s5"></span>
+                      <span className="spark s6"></span>
+                    </div>
+                    <div className="challenge-vs-avatar-ring challenged-ring">
+                      <img
+                        src={challengedAvatar}
+                        alt={challenged.name}
+                        className="challenge-vs-avatar"
+                        onError={(e) => { e.currentTarget.src = challenged.avatarUrl || '/imagens/default-avatar.png'; }}
+                      />
+                    </div>
+                    <span className="challenge-vs-name">{challenged.name}</span>
+                  </div>
+                </div>
+
+                {/* Jogo */}
+                <div className="challenge-modal-match">
+                  <img src={flagSrc(match.homeFlag, 40)} alt="" className="challenge-modal-flag" />
+                  <span className="challenge-modal-team-name">{match.homeTeam}</span>
+                  <span className="challenge-modal-x">x</span>
+                  <span className="challenge-modal-team-name">{match.awayTeam}</span>
+                  <img src={flagSrc(match.awayFlag, 40)} alt="" className="challenge-modal-flag" />
+                </div>
+
+                {/* Palpites */}
+                <div className="challenge-modal-picks">
+                  <div className="challenge-modal-pick">
+                    <span className="challenge-modal-pick-name">{challenger?.name || firstPending.challengerId}</span>
+                    <span className="challenge-modal-pick-value">
+                      <img src={flagSrc(challengerFlag, 40)} alt="" className="challenge-modal-pick-flag" />
+                      {challengerTeam} se classifica
+                    </span>
+                  </div>
+                  <div className="challenge-modal-pick">
+                    <span className="challenge-modal-pick-name">{challenged.name}</span>
+                    <span className="challenge-modal-pick-value">
+                      <img src={flagSrc(challengedFlag, 40)} alt="" className="challenge-modal-pick-flag" />
+                      {challengedTeam} se classifica
+                    </span>
+                  </div>
+                </div>
+
+                {/* Regra */}
+                <div className="challenge-modal-rule">
+                  Quem cravar quem avança rouba <strong>+1 ponto</strong> do outro! 🏆
+                </div>
+
+                {/* Botões */}
+                <div className="challenge-modal-actions">
+                  <button
+                    type="button"
+                    className="challenge-modal-btn accept"
+                    onClick={() => handleRespondChallenge(firstPending.id, true)}
+                  >
+                    <span className="challenge-modal-btn-inner"></span>
+                    <span className="challenge-btn-text">ACEITAR DESAFIO</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="challenge-modal-btn decline"
+                    onClick={() => handleRespondChallenge(firstPending.id, false)}
+                  >
+                    Recusar 🐔
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* HEADER BANNER CARD (Apenas na aba de partidas) */}
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
@@ -1540,6 +1898,9 @@ function App() {
                 </>
               );
             })()}
+
+            {/* NOTIFICAÇÕES DE DESAFIO — MODAL OVERLAY */}
+            {/* (bloco vazio — o modal é renderizado fora do fluxo, no topo do app-container) */}
 
             {/* DATE CAROUSEL (3 datas visíveis, swipeable) */}
             {dates.length > 0 && (() => {
@@ -2126,18 +2487,17 @@ function App() {
                                 // o card mostrava só o placar e ignorava o ±1 de
                                 // quem avança / +1 de acertar a forma de decisão.
                                 let pointsBadgeClass = 'wrong';
-                                let pointsText = '0 pts';
+                                let pointsText = '0';
                                 if (analysis.type === 'pending') {
                                   pointsBadgeClass = 'pending';
-                                  pointsText = 'Pendente';
+                                  pointsText = '—';
                                 } else {
                                   const totalPoints = analysis.points + pensBonus(bet, match);
                                   if (totalPoints >= 3) pointsBadgeClass = 'exact';
                                   else if (totalPoints === 2) pointsBadgeClass = 'draw';
                                   else if (totalPoints >= 1) pointsBadgeClass = 'winner';
                                   else pointsBadgeClass = 'wrong';
-                                  const unit = Math.abs(totalPoints) === 1 ? 'pt' : 'pts';
-                                  pointsText = `${totalPoints > 0 ? '+' : ''}${totalPoints} ${unit}`;
+                                  pointsText = `${totalPoints}`;
                                 }
 
                                 // Lógica da bandeira de quem o participante achou que ia vencer
@@ -2183,10 +2543,10 @@ function App() {
                                 const isEngaged = (uid: string | undefined) => !!uid && challenges.some((c) =>
                                   c.matchId === match.id && (c.status === 'pending' || c.status === 'accepted')
                                   && (c.challengerId === uid || c.challengedId === uid));
-                                const canChallenge = !!currentUser && p.id !== currentUser.id && isKnockout
-                                  && hasGameStarted && match.status !== 'finished'
-                                  && !!myAdv && !!theirAdv && myAdv !== theirAdv
-                                  && !isEngaged(currentUser.id) && !isEngaged(p.id);
+                                 const canChallenge = !!currentUser && p.id !== currentUser.id && isKnockout
+                                   && hasGameStarted && match.status !== 'finished'
+                                   && !!myAdv && !!theirAdv && myAdv !== theirAdv
+                                   && !isEngaged(currentUser.id) && !isEngaged(p.id);
                                 // Não aceito até o fim do jogo = expirado (não vale nada).
                                 const chExpired = !!existingCh && existingCh.status === 'pending' && match.status === 'finished';
                                 // Resultado do desafio (só conta se foi ACEITO e o jogo terminou).
@@ -2244,10 +2604,56 @@ function App() {
                                     </div>
 
                                     <div className="inline-guess-result-info-p16">
+                                      {/* 1. Elementos de Desafio (Espada/Galinha/Pendente) */}
+                                      {!pickHidden && (
+                                        <>
+                                          {canChallenge && (
+                                            <button
+                                              type="button"
+                                              className="challenge-btn-p16 compact-icon-btn"
+                                              onClick={() => handleChallenge(p.id, match)}
+                                              title="Lançar desafio ⚔️"
+                                            >
+                                              ⚔️
+                                            </button>
+                                          )}
+
+                                          {chExpired && (
+                                            <span className="challenge-badge-p16 compact-icon expired" title="Desafio expirou (sem aceite)">⌛</span>
+                                          )}
+
+                                          {existingCh && existingCh.status === 'pending' && !chExpired && !iAmChallenger && (
+                                            <div className="challenge-respond-p16">
+                                              <button type="button" className="challenge-accept-p16" onClick={() => handleRespondChallenge(existingCh.id, true)} title="Aceitar Desafio">⚔️</button>
+                                              <button type="button" className="challenge-decline-p16" onClick={() => handleRespondChallenge(existingCh.id, false)} title="Recusar Desafio">🐔</button>
+                                            </div>
+                                          )}
+                                          {existingCh && existingCh.status === 'pending' && !chExpired && iAmChallenger && (
+                                            <span className="challenge-badge-p16 compact-icon pending" title="Aguardando resposta do desafio">⏳</span>
+                                          )}
+
+                                          {existingCh && existingCh.status === 'accepted' && !chResolved && (
+                                            <span className="challenge-badge-p16 compact-icon active" title="Em desafio!">⚔️</span>
+                                          )}
+
+                                          {existingCh && existingCh.status === 'declined' && (
+                                            <span className="challenge-badge-p16 compact-icon declined" title={iAmChallenger ? `${p.name} recusou seu desafio` : 'Você recusou o desafio'}>🐔</span>
+                                          )}
+
+                                          {chResolved === 'won' && (
+                                            <span className="challenge-badge-p16 compact-icon won" title="Você ganhou o desafio! (+1 pt)">🏆</span>
+                                          )}
+                                          {chResolved === 'lost' && (
+                                            <span className="challenge-badge-p16 compact-icon lost" title="Você perdeu o desafio! (-1 pt)">💀</span>
+                                          )}
+                                        </>
+                                      )}
+
+                                      {/* 2. Palpite do placar */}
                                       {pickHidden ? (
                                         <span className="inline-guess-hidden-text-p16">🔒 Oculto</span>
                                       ) : bet ? (
-                                        <div className="inline-guess-scores-container-p16" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                        <div className="inline-guess-scores-container-p16" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                             <span className="inline-guess-score-text-p16">
                                               {bet.homeScore} x {bet.awayScore}
@@ -2262,15 +2668,26 @@ function App() {
                                           </div>
                                           {bet.homeScore === bet.awayScore && isKnockout && (
                                             <div style={{ fontSize: '0.72rem', color: '#15110E', fontWeight: 600, marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                              <span>{bet.pensPick ? '🥅 Pênaltis' : '⏱️ Sem Pên.'}</span>
-                                              {bet.pensWinner && (
-                                                <>
-                                                  <span style={{ color: '#8b8075' }}>•</span>
-                                                  <span style={{ fontWeight: 700 }}>
-                                                    {bet.pensWinner === 'HOME' ? match.homeTeam : match.awayTeam}
-                                                  </span>
-                                                </>
-                                              )}
+                                              <span>{bet.pensPick ? 'Pênaltis' : 'Prorrogação'}</span>
+                                              {bet.pensWinner && (() => {
+                                                const flag = bet.pensWinner === 'HOME' ? match.homeFlag : match.awayFlag;
+                                                return (
+                                                  <>
+                                                    <span style={{ color: '#8b8075' }}>•</span>
+                                                    <img
+                                                      src={flagSrc(flag, 40)}
+                                                      alt=""
+                                                      style={{
+                                                        width: '20px',
+                                                        height: '14px',
+                                                        borderRadius: '2px',
+                                                        objectFit: 'cover',
+                                                        border: '1px solid rgba(21, 17, 14, 0.15)'
+                                                      }}
+                                                    />
+                                                  </>
+                                                );
+                                              })()}
                                             </div>
                                           )}
                                         </div>
@@ -2278,56 +2695,11 @@ function App() {
                                         <span className="inline-guess-none-text-p16">Sem Palpite</span>
                                       )}
 
+                                      {/* 3. Pontuação */}
                                       {!pickHidden && (
                                         <div className={`inline-guess-badge-p16 ${pointsBadgeClass}`}>
                                           {pointsText}
                                         </div>
-                                      )}
-
-                                      {/* Desafio dos Molhados */}
-                                      {canChallenge && (
-                                        <button
-                                          type="button"
-                                          className="challenge-btn-p16"
-                                          onClick={() => handleChallenge(p.id, match)}
-                                        >
-                                          ⚔️ Desafiar
-                                        </button>
-                                      )}
-
-                                      {/* Expirado: pendente que não foi aceito até o fim do jogo */}
-                                      {chExpired && (
-                                        <span className="challenge-badge-p16 declined">⌛ Desafio expirou (sem aceite)</span>
-                                      )}
-
-                                      {/* Pendente (jogo rolando): desafiado responde; desafiante aguarda */}
-                                      {existingCh && existingCh.status === 'pending' && !chExpired && !iAmChallenger && (
-                                        <div className="challenge-respond-p16">
-                                          <button type="button" className="challenge-accept-p16" onClick={() => handleRespondChallenge(existingCh.id, true)}>Aceitar ⚔️</button>
-                                          <button type="button" className="challenge-decline-p16" onClick={() => handleRespondChallenge(existingCh.id, false)}>Recusar</button>
-                                        </div>
-                                      )}
-                                      {existingCh && existingCh.status === 'pending' && !chExpired && iAmChallenger && (
-                                        <span className="challenge-badge-p16 active">⏳ Aguardando resposta</span>
-                                      )}
-
-                                      {/* Aceito, jogo rolando */}
-                                      {existingCh && existingCh.status === 'accepted' && !chResolved && (
-                                        <span className="challenge-badge-p16 active">⚔️ Desafio aceito</span>
-                                      )}
-
-                                      {/* Recusado */}
-                                      {existingCh && existingCh.status === 'declined' && (
-                                        <span className="challenge-badge-p16 declined">
-                                          🐔 {iAmChallenger ? `${p.name.split(' ')[0]} amarelou` : 'Você recusou'}
-                                        </span>
-                                      )}
-
-                                      {chResolved === 'won' && (
-                                        <span className="challenge-badge-p16 won">⚔️ Você ganhou +1</span>
-                                      )}
-                                      {chResolved === 'lost' && (
-                                        <span className="challenge-badge-p16 lost">⚔️ Você perdeu −1</span>
                                       )}
                                     </div>
                                   </div>
@@ -2467,6 +2839,7 @@ function App() {
               bets={bets}
               specials={specials}
               standings={standings}
+              challenges={challenges}
             />
           </Suspense>
         )}
