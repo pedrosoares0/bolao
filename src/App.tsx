@@ -13,7 +13,7 @@
 // pela RPC submit_bets — o cliente só faz a checagem otimista.
 // ============================================================
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, Fragment } from 'react';
-import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network } from 'lucide-react';
+import { Trophy, Calendar, Wallet, ListChecks, ChevronDown, ChevronUp, User, Clover, Clock, ArrowUp, ArrowDown, Network, LogIn } from 'lucide-react';
 import type { Match, Bet, Participant, ParticipantStanding, SpecialPrediction, BrazilStage, Debt, MatchGoal, ThiefSteal, Challenge } from './types';
 import { BRAZIL_PLAYERS, goalsByPlayer } from './utils/players';
 import { calculateStandings, analyzeBet, pensBonus, isProfeta, predictedAdvancer, calculateThiefRounds } from './utils/rules';
@@ -1383,7 +1383,6 @@ function App() {
       <div className="login-screen-container">
         <div className="login-banner-container">
           <img loading="lazy" decoding="async" src="/imagens/login.webp" alt="Bandidos Apostados" className="login-banner-img" />
-          <div className="login-ribbon-divider"></div>
         </div>
 
         <form onSubmit={handleLoginSubmit} className="login-form-container">
@@ -1413,8 +1412,11 @@ function App() {
             />
           </div>
 
-          <button type="submit" className="login-action-btn">
-            ENTRAR
+          <button type="submit" className="launch-bet-btn-p16 active" style={{ marginTop: '1.25rem' }}>
+            <span className="launch-bet-btn-inner">
+              <span>ENTRAR</span>
+              <LogIn size={18} className="launch-btn-icon" />
+            </span>
           </button>
         </form>
 
