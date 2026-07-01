@@ -335,13 +335,14 @@ function App() {
       return [];
     }
   });
-  const [dismissedChallenges, setDismissedChallenges] = useState<string[]>(() => {
+  // dismissedChallenges: lido diretamente do localStorage (sem setter — a função de dismiss foi removida)
+  const dismissedChallenges: string[] = (() => {
     try {
       return JSON.parse(localStorage.getItem('dismissed_challenges') || '[]');
     } catch {
       return [];
     }
-  });
+  })();
   const [selectedVictims, setSelectedVictims] = useState<Record<string, string>>({});
 
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
@@ -1310,12 +1311,6 @@ function App() {
     localStorage.setItem('dismissed_steals', JSON.stringify(next));
   };
 
-  // Handler para dispensar notificação de desafio recebido
-  const dismissChallenge = (challengeId: string) => {
-    const next = [...dismissedChallenges, challengeId];
-    setDismissedChallenges(next);
-    localStorage.setItem('dismissed_challenges', JSON.stringify(next));
-  };
 
 
   // Handler para quitar TODOS os fiados de uma vez — sempre os do PRÓPRIO usuário.
