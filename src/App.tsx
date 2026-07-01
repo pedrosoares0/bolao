@@ -1830,69 +1830,56 @@ function App() {
           modal de Desafio pendente, pra não empilhar dois overlays.)
           ============================================ */}
       {currentUser && !hasBlockingChallengeModal && pendingSteals.length > 0 && (() => {
-        const { date, status } = pendingSteals[0];
+        const { date } = pendingSteals[0];
         const selectedVictim = selectedVictims[date] || '';
         const stealOptions = participants.filter((p) => p.id !== currentUser.id);
-        const myAvatar = `/imagens/ranking ${currentUser.id}.webp`;
 
         return (
           <div className="challenge-overlay">
-            <div className="thief-modal">
+            <div className="thief-modal-compact">
               <div className="thief-modal-glow"></div>
 
-              <div className="challenge-modal-content">
-                <div className="thief-modal-title">VOCÊ É O LADRÃO! 🥷</div>
-
-                {/* Herói: avatar do Ladrão em destaque */}
-                <div className="thief-hero-section">
-                  <div className="thief-hero-aurora"></div>
-                  <div className="thief-hero-sparks">
-                    <span className="spark s1"></span>
-                    <span className="spark s2"></span>
-                    <span className="spark s3"></span>
-                    <span className="spark s4"></span>
-                    <span className="spark s5"></span>
-                    <span className="spark s6"></span>
+              <div className="thief-modal-content-compact">
+                {/* Cabeçalho: ícone do ladrão + título + subtítulo */}
+                <div className="thief-header-compact">
+                  <img
+                    src="/imagens/ladrao.webp"
+                    alt="Ladrão"
+                    className="thief-ladrao-icon"
+                  />
+                  <div className="thief-header-text">
+                    <div className="thief-modal-title-sm">VOCÊ É O LADRÃO!</div>
+                    <div className="thief-modal-subtitle">
+                      Você foi barril! Foi o único a fazer mais de 5 pontos na rodada, escolha um adversário para roubar <strong>1 ponto</strong>.
+                    </div>
                   </div>
-                  <div className="thief-hero-avatar-ring">
-                    <img
-                      src={myAvatar}
-                      alt={currentUser.name}
-                      className="thief-hero-avatar"
-                      onError={(e) => { e.currentTarget.src = currentUser.avatarUrl || '/imagens/default-avatar.png'; }}
-                    />
-                  </div>
-                  <span className="thief-hero-name">{currentUser.name}</span>
                 </div>
 
-                {/* Estatística da rodada */}
-                <div className="thief-modal-stat">
-                  <span className="thief-modal-stat-label">Rodada de {formatBrlDate(date)}</span>
-                  <span className="thief-modal-stat-value">{status.pointsScored} pontos</span>
+                {/* Grade de vítimas com foto clicável — P&B por padrão, colorida ao selecionar */}
+                <div className="thief-victim-grid">
+                  {stealOptions.map((p) => {
+                    const isSel = selectedVictim === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`thief-victim-card ${isSel ? 'selected' : ''}`}
+                        onClick={() => setSelectedVictims((prev) => ({ ...prev, [date]: isSel ? '' : p.id }))}
+                      >
+                        {isSel && <div className="thief-victim-selected-ring" />}
+                        <img
+                          src={`/imagens/${p.id}-1ou2.webp`}
+                          alt={p.name}
+                          className={`thief-victim-img ${isSel ? 'colored' : ''}`}
+                          onError={(e) => { e.currentTarget.src = `/imagens/ranking ${p.id}.webp`; }}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Regra */}
-                <div className="thief-modal-rule">
-                  Você foi o maior pontuador da rodada! Escolha um adversário para roubar <strong>1 ponto</strong>, ou opte por não roubar ninguém.
-                </div>
-
-                {/* Seleção do alvo */}
-                <div className="thief-modal-select-row">
-                  <select
-                    className="thief-attacker-select"
-                    value={selectedVictim}
-                    onChange={(e) => setSelectedVictims((prev) => ({ ...prev, [date]: e.target.value }))}
-                  >
-                    <option value="">Escolher adversário...</option>
-                    {stealOptions.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                    <option value="none">Ninguém (não roubar)</option>
-                  </select>
-                </div>
-
-                {/* Confirmação */}
-                <div className="challenge-modal-actions">
+                {/* Botão de confirmação */}
+                <div className="thief-actions-compact">
                   <button
                     type="button"
                     className="thief-modal-btn accept"
@@ -1900,9 +1887,7 @@ function App() {
                     onClick={() => handleExecuteSteal(date, selectedVictim)}
                   >
                     <span className="thief-modal-btn-inner"></span>
-                    <span className="thief-btn-text">
-                      {selectedVictim === 'none' ? 'CONFIRMAR' : 'ROUBAR PONTO 🎯'}
-                    </span>
+                    <span className="thief-btn-text">ROUBAR PONTO</span>
                   </button>
                 </div>
               </div>

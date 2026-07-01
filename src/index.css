@@ -7567,7 +7567,7 @@ body {
   left: -40%;
   width: 180%;
   height: 180%;
-  background: radial-gradient(circle at 50% 30%, rgba(168, 85, 247, 0.10) 0%, transparent 55%);
+  background: radial-gradient(circle at 50% 30%, rgba(239, 68, 68, 0.12) 0%, transparent 55%);
   pointer-events: none;
   z-index: 1;
 }
@@ -7735,7 +7735,7 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow:
-    0 4px 15px rgba(168, 85, 247, 0.25),
+    0 4px 15px rgba(239, 68, 68, 0.25),
     0 12px 24px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
 }
@@ -7750,9 +7750,9 @@ body {
   background: conic-gradient(
     from 0deg,
     transparent 15%,
-    #a855f7 40%,
+    #ef4444 40%,
     #ffffff 50%,
-    #a855f7 60%,
+    #ef4444 60%,
     transparent 85%
   );
   animation: borderGlowRotate 2.5s linear infinite;
@@ -7763,9 +7763,9 @@ body {
   position: absolute;
   inset: 1.5px;
   border-radius: 11px;
-  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
   z-index: 2;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: background 0.2s ease;
 }
 
@@ -7779,12 +7779,12 @@ body {
 .thief-modal-btn.accept:hover:not(:disabled) {
   transform: translateY(-1.5px);
   box-shadow:
-    0 6px 20px rgba(168, 85, 247, 0.35),
+    0 6px 20px rgba(239, 68, 68, 0.4),
     0 16px 28px rgba(0, 0, 0, 0.4);
 }
 
 .thief-modal-btn.accept:hover:not(:disabled) .thief-modal-btn-inner {
-  background: linear-gradient(135deg, #c084fc 0%, #8b3ce0 100%);
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
 }
 
 .thief-modal-btn.accept:active:not(:disabled) {
@@ -7804,6 +7804,159 @@ body {
 
 
 
+
+/* ==========================================================================
+   MODAL LADRÃO — versão COMPACTA (foto-grid em vez de combobox)
+   ========================================================================== */
+.thief-modal-compact {
+  position: relative;
+  width: 92%;
+  max-width: 340px;
+  border-radius: 18px;
+  background: linear-gradient(165deg, #1f0a0a 0%, #110505 60%, #1a0808 100%);
+  border: 1.5px solid rgba(239, 68, 68, 0.28);
+  box-shadow:
+    0 0 50px rgba(239, 68, 68, 0.12),
+    0 20px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: challengeModalIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.thief-modal-content-compact {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem 1.1rem 1rem;
+}
+
+/* Linha de cabeçalho: avatar pequeno + textos */
+.thief-header-compact {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.thief-ladrao-icon {
+  flex-shrink: 0;
+  width: 68px;
+  height: 68px;
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.thief-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.thief-modal-title-sm {
+  font-family: var(--font-family-condensed);
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f87171;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  line-height: 1.1;
+}
+
+.thief-modal-subtitle {
+  font-size: 0.72rem;
+  color: rgba(242, 236, 221, 0.6);
+  line-height: 1.4;
+}
+
+.thief-modal-subtitle strong {
+  color: #f87171;
+}
+
+/* Grade de fotos das vítimas */
+.thief-victim-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.thief-victim-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1.5px solid rgba(168, 85, 247, 0.15);
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  overflow: hidden;
+}
+
+.thief-victim-card:hover {
+  background: rgba(168, 85, 247, 0.13);
+  border-color: rgba(168, 85, 247, 0.4);
+  transform: translateY(-2px);
+}
+
+.thief-victim-card.selected {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #f87171;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.4);
+}
+
+.thief-victim-selected-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  border: 2.5px solid #f87171;
+  pointer-events: none;
+  box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.3);
+  z-index: 2;
+}
+
+.thief-victim-img {
+  width: 100%;
+  height: 120px;
+  border-radius: 10px;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  filter: grayscale(100%) brightness(0.72);
+  transition: filter 0.3s ease;
+}
+
+.thief-victim-img.colored {
+  filter: grayscale(0%) brightness(1);
+}
+
+/* Área de ação compacta */
+.thief-actions-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.thief-skip-btn {
+  background: transparent;
+  border: none;
+  color: rgba(192, 132, 252, 0.55);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  padding: 0.25rem;
+  transition: color 0.15s ease;
+  letter-spacing: 0.02em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.thief-skip-btn:hover {
+  color: #c084fc;
+}
 
 /* ==========================================================================
    DESAFIO DOS MOLHADOS — botão/badge no palpite revelado (mata-mata)
