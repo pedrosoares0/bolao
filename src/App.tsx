@@ -1805,16 +1805,11 @@ function App() {
 
             {/* NOTIFICAÇÕES DO LADRÃO (THIEF) */}
             {currentUser && (() => {
-              // Calculate thief rounds
-              const thiefRounds = calculateThiefRounds(matches, betRows.map(b => ({
-                matchId: String(b.match_id),
-                participantId: b.user_id,
-                homeScore: b.home_score,
-                awayScore: b.away_score,
-                scorerId: b.scorer_id,
-                pensPick: !!b.pens_pick,
-                pensWinner: b.pens_winner as 'HOME' | 'AWAY' | null
-              })), participants);
+              // Rodadas do Ladrão. USA `bets` (já mapeado com participantId = username),
+              // igual aos `participants`. Antes usava betRows cru (user_id = UUID), que
+              // não casava com os participants → todo mundo pontuava 0 → nunca havia
+              // Ladrão e o card não aparecia pra ninguém.
+              const thiefRounds = calculateThiefRounds(matches, bets, participants);
 
               const pendingSteals = Object.entries(thiefRounds)
                 .filter(([date, status]) => status.thiefId === currentUser.id && !thiefSteals.some(s => s.roundDate === date))
