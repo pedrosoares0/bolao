@@ -1223,8 +1223,9 @@ function App() {
   // Handler para realizar o roubo de ponto (Ladrão)
   const handleExecuteSteal = async (roundDate: string, victimId: string) => {
     if (!currentUser?.uid) return;
-    const victim = participants.find((p) => p.id === victimId);
-    if (!victim?.uid) {
+    const isNobody = !victimId || victimId === 'none';
+    const victim = isNobody ? null : participants.find((p) => p.id === victimId);
+    if (!isNobody && !victim?.uid) {
       showToast('Participante inválido.', 'error');
       return;
     }
@@ -1232,13 +1233,13 @@ function App() {
     try {
       const { error: dbError } = await supabase.from('thief_steals').insert({
         thief_id: currentUser.uid,
-        victim_id: victim.uid,
+        victim_id: isNobody ? null : victim!.uid, // null = não roubou de ninguém
         round_date: roundDate,
       });
 
       if (dbError) throw dbError;
 
-      showToast(`Você roubou 1 ponto de ${victim.name}! 🥷`, 'success');
+      showToast(isNobody ? 'Você optou por não roubar ninguém. 🥷' : `Você roubou 1 ponto de ${victim!.name}! 🥷`, 'success');
       await loadAll(currentUser.uid, false);
     } catch (err: any) {
       console.error('Erro ao roubar ponto:', err);
@@ -1873,6 +1874,7 @@ function App() {
                               {stealOptions.map((p) => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                               ))}
+                              <option value="none">Ninguém (não roubar)</option>
                             </select>
                             <button
                               type="button"
@@ -1880,7 +1882,7 @@ function App() {
                               disabled={!selectedVictim}
                               onClick={() => handleExecuteSteal(date, selectedVictim)}
                             >
-                              Roubar Ponto 🎯
+                              {selectedVictim === 'none' ? 'Confirmar' : 'Roubar Ponto 🎯'}
                             </button>
                           </div>
                         </div>

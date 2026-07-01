@@ -240,8 +240,10 @@ export function calculateStandings(
   const fireCounts = calculateFireCounts(matches, bets, participants);
   const peFrioCounts = calculatePeFrioCounts(matches, bets, participants);
 
-  // Aplicar roubos da habilidade Ladrão (Thief)
+  // Aplicar roubos da habilidade Ladrão (Thief). victimId null = o Ladrão usou a
+  // vez mas escolheu NÃO roubar ninguém → sem transferência de pontos.
   steals.forEach((steal) => {
+    if (!steal.victimId) return;
     const thiefStanding = standings.find((s) => s.participantId === steal.thiefId);
     const victimStanding = standings.find((s) => s.participantId === steal.victimId);
     if (thiefStanding) thiefStanding.points += 1;

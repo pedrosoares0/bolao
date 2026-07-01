@@ -881,5 +881,14 @@ describe('Ladrão (Thief) Habilidade', () => {
     expect(standingsWithSteal.find(s => s.participantId === 'user1')?.points).toBe(4);
     expect(standingsWithSteal.find(s => s.participantId === 'user2')?.points).toBe(2);
   });
+
+  it('roubo com vítima null (Ladrão escolheu ninguém) não transfere pontos', () => {
+    const matches = [finishedMatch(2, 1, { id: 'm1' })];
+    const bets = [makeBet(2, 1, 'user1', 'm1'), makeBet(2, 1, 'user2', 'm1')];
+    const steals = [{ id: 's1', thiefId: 'user1', victimId: null, roundDate: '2026-06-12', createdAt: '' }];
+    const standings = calculateStandings(parts, matches, bets, [], steals);
+    expect(standings.find(s => s.participantId === 'user1')?.points).toBe(3); // sem +1
+    expect(standings.find(s => s.participantId === 'user2')?.points).toBe(3);
+  });
 });
 

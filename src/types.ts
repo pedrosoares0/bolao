@@ -100,7 +100,7 @@ export interface Debt {
 export interface ThiefSteal {
   id: string;
   thiefId: string;
-  victimId: string;
+  victimId: string | null; // null = o Ladrão escolheu não roubar de ninguém
   roundDate: string; // YYYY-MM-DD
   createdAt: string;
 }

@@ -7442,6 +7442,13 @@ body {
   border-color: rgba(168, 85, 247, 0.5);
 }
 
+/* O valor fechado do select é branco (card escuro), mas o MENU nativo abre com
+   fundo branco — força texto escuro nas opções pra não ficar branco no branco. */
+.thief-attacker-select option {
+  color: #15110E;
+  background: #fff;
+}
+
 .thief-attacker-btn {
   background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: #fff;
