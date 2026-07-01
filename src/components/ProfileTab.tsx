@@ -1,12 +1,12 @@
 import React from 'react';
-import type { Participant, Match, Bet, ParticipantStanding, SpecialPrediction, Challenge } from '../types';
+import type { Participant, Match, Bet, ParticipantStanding, SpecialPrediction, Challenge, ThiefSteal } from '../types';
 import {
   calculateFireCounts,
   calculatePeFrioCounts,
   calculateMvpCounts,
   calculateConquestTimeline
 } from '../utils/rules';
-import { User, Calendar, Award, ChevronDown, ChevronUp, Swords } from 'lucide-react';
+import { User, Calendar, Award, ChevronDown, ChevronUp, Swords, Skull } from 'lucide-react';
 import { translateTeam, flagSrc, flagOf } from '../lib/teamMaps';
 import { BRAZIL_STAGE_LABELS } from '../utils/specials';
 import Aurora from './Aurora';
@@ -21,6 +21,7 @@ interface ProfileTabProps {
   specials: SpecialPrediction[];
   standings: ParticipantStanding[];
   challenges: Challenge[];
+  thiefSteals?: ThiefSteal[];
 }
 
 const PE_FRIO_IMG = "https://www.thiings.co/_next/image?url=https%3A%2F%2Flftz25oez4aqbxpq.public.blob.vercel-storage.com%2Fimage-okSb6P6VxQwXTDfYgiOiheKJpixk2a.png&w=320&q=75";
@@ -33,11 +34,13 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   specials,
   standings,
   challenges,
+  thiefSteals = [],
 }) => {
   const [selectedProfileId, setSelectedProfileId] = useState<string>(currentUser.id);
   const [compareProfileId, setCompareProfileId] = useState<string | null>(null);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
   const [challengesExpanded, setChallengesExpanded] = useState(false);
+  const [stealsExpanded, setStealsExpanded] = useState(false);
 
   const selectedUserId = selectedProfileId;
   const selectedUser = participants.find((p) => p.id === selectedProfileId) || currentUser;
@@ -361,6 +364,102 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                       </span>
                     </div>
                   </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
+
+      {/* SECTION TITLE: HISTÓRICO DE ROUBOS */}
+      <div 
+        className="profile-section-header"
+        onClick={() => setStealsExpanded(!stealsExpanded)}
+        style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', userSelect: 'none', marginTop: '1.25rem' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Skull size={18} className="profile-section-icon" style={{ color: '#f87171' }} />
+          <h3 className="profile-section-title">HISTÓRICO DE ROUBOS</h3>
+        </div>
+        {stealsExpanded ? <ChevronUp size={16} style={{ color: '#8b8075' }} /> : <ChevronDown size={16} style={{ color: '#8b8075' }} />}
+      </div>
+
+      {stealsExpanded && (
+        <div className="thief-history-list">
+          {(() => {
+            const userSteals = (thiefSteals || []).filter(
+              (s) => s.thiefId === selectedUserId || s.victimId === selectedUserId
+            );
+
+            if (userSteals.length === 0) {
+              return (
+                <div className="thief-history-empty">
+                  Nenhum roubo registrado para este participante ainda. 🥷
+                </div>
+              );
+            }
+
+            // Sort by creation date or round date, latest first
+            const sortedSteals = [...userSteals].sort(
+              (a, b) => new Date(b.createdAt || b.roundDate).getTime() - new Date(a.createdAt || a.roundDate).getTime()
+            );
+
+            const formatBrlDateLocal = (isoDate: string): string => {
+              const parts = isoDate.split('-');
+              return parts.length === 3 ? `${parts[2]}/${parts[1]}` : isoDate;
+            };
+
+            return sortedSteals.map((s) => {
+              const isThief = s.thiefId === selectedUserId;
+              const opponentId = isThief ? s.victimId : s.thiefId;
+              const opponent = opponentId ? participants.find((p) => p.id === opponentId) : null;
+
+              let actionText = '';
+              let badgeType = '';
+              let badgeText = '';
+
+              if (isThief) {
+                if (opponent) {
+                  actionText = `Roubou 1 ponto de ${opponent.name}`;
+                  badgeType = 'steal';
+                  badgeText = '+1 Ponto';
+                } else {
+                  actionText = `Escolheu não roubar ninguém`;
+                  badgeType = 'none';
+                  badgeText = '0 Pontos';
+                }
+              } else {
+                actionText = `Teve 1 ponto roubado por ${opponent?.name || 'Ladrão'}`;
+                badgeType = 'victim';
+                badgeText = '-1 Ponto';
+              }
+
+              // Definir avatar para a linha do histórico
+              const displayAvatar = opponent 
+                ? `/imagens/ranking ${opponent.id}.webp` 
+                : '/imagens/ladrao.webp';
+
+              return (
+                <div key={s.id} className={`thief-history-item ${isThief ? 'robbed-someone' : 'was-robbed'}`}>
+                  <div className="thief-history-avatar-wrap">
+                    <img 
+                      src={displayAvatar} 
+                      alt="" 
+                      className="thief-history-avatar" 
+                      onError={(e) => { 
+                        if (opponent) {
+                          e.currentTarget.src = opponent.avatarUrl || '/imagens/default-avatar.png';
+                        } else {
+                          e.currentTarget.src = '/imagens/default-avatar.png';
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="thief-history-info">
+                    <span className="thief-history-action">{actionText}</span>
+                    <span className="thief-history-date">Rodada de {formatBrlDateLocal(s.roundDate)}</span>
+                  </div>
+                  <span className={`thief-history-badge ${badgeType}`}>{badgeText}</span>
                 </div>
               );
             });

@@ -8792,3 +8792,112 @@ body {
   border-color: rgba(245, 179, 0, 0.5);
   transform: scale(1.08);
 }
+
+/* ---- HISTÓRICO DE ROUBOS NO PERFIL ---- */
+.thief-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 1.8rem;
+}
+
+.thief-history-empty {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  color: rgba(242, 236, 221, 0.4);
+  font-size: 0.85rem;
+}
+
+.thief-history-item {
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.thief-history-item:hover {
+  transform: translateY(-1px);
+}
+
+.thief-history-item.robbed-someone {
+  background: rgba(239, 68, 68, 0.015);
+  border-color: rgba(239, 68, 68, 0.08);
+}
+
+.thief-history-item.was-robbed {
+  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.03);
+}
+
+.thief-history-avatar-wrap {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 1.5px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.thief-history-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.thief-history-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0; /* Evita quebra de layout com textos longos */
+}
+
+.thief-history-action {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thief-history-date {
+  font-size: 0.68rem;
+  color: rgba(242, 236, 221, 0.45);
+}
+
+.thief-history-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.18rem 0.5rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.thief-history-badge.steal {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.thief-history-badge.victim {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.thief-history-badge.none {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(242, 236, 221, 0.45);
+}
+

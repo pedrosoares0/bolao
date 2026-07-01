@@ -2868,6 +2868,7 @@ function App() {
               specials={specials}
               standings={standings}
               challenges={challenges}
+              thiefSteals={thiefSteals}
             />
           </Suspense>
         )}
