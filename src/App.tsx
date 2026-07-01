@@ -78,6 +78,17 @@ const isBettable = (kickoff: string, now: number): boolean => {
 // Data de hoje no horário de Brasília (YYYY-MM-DD)
 const getTodayIso = (): string => isoDateFmt.format(new Date());
 
+// "2026-06-30" -> "30/06" (rótulo de rodada do Ladrão)
+const formatBrlDate = (isoDate: string): string => {
+  const parts = isoDate.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}` : isoDate;
+};
+
+// 🧪 TESTE TEMPORÁRIO — usuário e marcador de rodada fictícia do Ladrão (ver
+// DEBUG_THIEF_ROUND). Trocar DEBUG_FORCE_THIEF_FOR para null desliga o teste.
+const DEBUG_FORCE_THIEF_FOR: string | null = 'rodrigo';
+const DEBUG_THIEF_ROUND = '__debug__';
+
 // Traduz o relógio/etapa ao vivo vindo da ESPN para PT-BR.
 // Ex.: "HT"/"Halftime" -> "Intervalo"; demais valores ("28'", etc.) ficam como vieram.
 const formatLiveClock = (clock?: string | null): string | null => {
@@ -344,6 +355,12 @@ function App() {
     }
   })();
   const [selectedVictims, setSelectedVictims] = useState<Record<string, string>>({});
+
+  // 🧪 TESTE TEMPORÁRIO — ninguém é Ladrão de verdade ainda; força o modal
+  // aparecer só pro Rodrigo pra validarmos o visual. O clique NÃO grava nada no
+  // banco (ver DEBUG_THIEF_ROUND abaixo) — só fecha o modal localmente.
+  // REMOVER esse bloco (e a constante) quando alguém virar Ladrão de verdade.
+  const [debugThiefDismissed, setDebugThiefDismissed] = useState(false);
 
   // Modal pós-lançamento com o PIX copia-e-cola (validação da aposta)
   const [showPixModal, setShowPixModal] = useState(false);
@@ -1371,6 +1388,46 @@ function App() {
   // Prêmio acumulado: R$ 10 por dia desde 12/06 até o fim da Copa (19/07)
   const accumulatedPot = useMemo(() => calcAccumulatedPot(getTodayIso()), [nowTs]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Rodadas do Ladrão (calculado uma única vez; alimenta o modal "Você é o
+  // Ladrão" e o banner de "Ponto roubado", em qualquer aba do app).
+  const thiefRounds = useMemo(
+    () => calculateThiefRounds(matches, bets, participants),
+    [matches, bets, participants]
+  );
+
+  // Rodadas em que EU sou o Ladrão e ainda não usei a vez (escolher vítima ou "Ninguém").
+  const pendingSteals = useMemo(() => {
+    if (!currentUser) return [];
+    const real = Object.entries(thiefRounds)
+      .filter(([date, status]) => status.thiefId === currentUser.id && !thiefSteals.some((s) => s.roundDate === date))
+      .map(([date, status]) => ({ date, status }));
+    if (real.length > 0) return real;
+
+    // 🧪 TESTE TEMPORÁRIO: ninguém é Ladrão de verdade ainda — injeta uma rodada
+    // fictícia só pro usuário de debug ver o modal. O botão de confirmar, nesse
+    // caso, NÃO chama handleExecuteSteal (não grava nada no banco).
+    if (DEBUG_FORCE_THIEF_FOR && currentUser.id === DEBUG_FORCE_THIEF_FOR && !debugThiefDismissed) {
+      return [{
+        date: DEBUG_THIEF_ROUND,
+        status: { roundDate: DEBUG_THIEF_ROUND, thiefId: currentUser.id, status: 'active' as const, pointsScored: 6 },
+      }];
+    }
+    return real;
+  }, [thiefRounds, thiefSteals, currentUser, debugThiefDismissed]);
+
+  // Roubos que EU sofri e ainda não dispensei (banner dismissível na aba Jogos).
+  const receivedSteals = useMemo(() => {
+    if (!currentUser) return [];
+    return thiefSteals.filter((s) => s.victimId === currentUser.id && !dismissedSteals.includes(s.id));
+  }, [thiefSteals, currentUser, dismissedSteals]);
+
+  // Há um modal de Desafio (criação/recebimento) prestes a bloquear a tela?
+  // O modal do Ladrão só aparece se NÃO houver — evita dois overlays disputando.
+  const hasBlockingChallengeModal = !!pendingConfirmChallenge || (!!currentUser && challenges.some((c) =>
+    c.status === 'pending' && c.challengedId === currentUser.id && !dismissedChallenges.includes(c.id)
+    && matches.find((m) => m.id === c.matchId)?.status !== 'finished'
+  ));
+
   // ----------------------------------------------------
   // RENDERIZAÇÃO DA TELA DE LOGIN
   // ----------------------------------------------------
@@ -1789,6 +1846,106 @@ function App() {
         );
       })()}
 
+      {/* ============================================
+          MODAL OVERLAY — VOCÊ É O LADRÃO! (mesmo design do modal de Desafio,
+          em roxo — aparece ao entrar no app, em qualquer aba, até você usar a
+          vez roubando de alguém ou escolhendo "Ninguém". Some se houver um
+          modal de Desafio pendente, pra não empilhar dois overlays.)
+          ============================================ */}
+      {currentUser && !hasBlockingChallengeModal && pendingSteals.length > 0 && (() => {
+        const { date, status } = pendingSteals[0];
+        const isDebugRound = date === DEBUG_THIEF_ROUND; // 🧪 teste — remover com DEBUG_FORCE_THIEF_FOR
+        const roundLabel = isDebugRound ? 'TESTE 🧪' : formatBrlDate(date);
+        const selectedVictim = selectedVictims[date] || '';
+        const stealOptions = participants.filter((p) => p.id !== currentUser.id);
+        const myAvatar = `/imagens/ranking ${currentUser.id}.webp`;
+
+        return (
+          <div className="challenge-overlay">
+            <div className="thief-modal">
+              <div className="thief-modal-glow"></div>
+
+              <div className="challenge-modal-content">
+                <div className="thief-modal-title">VOCÊ É O LADRÃO! 🥷</div>
+
+                {/* Herói: avatar do Ladrão em destaque */}
+                <div className="thief-hero-section">
+                  <div className="thief-hero-aurora"></div>
+                  <div className="thief-hero-sparks">
+                    <span className="spark s1"></span>
+                    <span className="spark s2"></span>
+                    <span className="spark s3"></span>
+                    <span className="spark s4"></span>
+                    <span className="spark s5"></span>
+                    <span className="spark s6"></span>
+                  </div>
+                  <div className="thief-hero-avatar-ring">
+                    <img
+                      src={myAvatar}
+                      alt={currentUser.name}
+                      className="thief-hero-avatar"
+                      onError={(e) => { e.currentTarget.src = currentUser.avatarUrl || '/imagens/default-avatar.png'; }}
+                    />
+                  </div>
+                  <span className="thief-hero-name">{currentUser.name}</span>
+                </div>
+
+                {/* Estatística da rodada */}
+                <div className="thief-modal-stat">
+                  <span className="thief-modal-stat-label">Rodada de {roundLabel}</span>
+                  <span className="thief-modal-stat-value">{status.pointsScored} pontos</span>
+                </div>
+
+                {/* Regra */}
+                <div className="thief-modal-rule">
+                  {isDebugRound
+                    ? <>🧪 Modo teste — este clique <strong>não grava nada</strong> no banco, só fecha o modal.</>
+                    : <>Você foi o maior pontuador da rodada! Escolha um adversário para roubar <strong>1 ponto</strong>, ou opte por não roubar ninguém.</>}
+                </div>
+
+                {/* Seleção do alvo */}
+                <div className="thief-modal-select-row">
+                  <select
+                    className="thief-attacker-select"
+                    value={selectedVictim}
+                    onChange={(e) => setSelectedVictims((prev) => ({ ...prev, [date]: e.target.value }))}
+                  >
+                    <option value="">Escolher adversário...</option>
+                    {stealOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                    <option value="none">Ninguém (não roubar)</option>
+                  </select>
+                </div>
+
+                {/* Confirmação */}
+                <div className="challenge-modal-actions">
+                  <button
+                    type="button"
+                    className="thief-modal-btn accept"
+                    disabled={!selectedVictim}
+                    onClick={() => {
+                      // 🧪 Rodada de teste: só fecha o modal, sem gravar no banco.
+                      if (isDebugRound) {
+                        setDebugThiefDismissed(true);
+                        showToast('Modo teste: nada foi salvo no banco. 🧪', 'success');
+                        return;
+                      }
+                      handleExecuteSteal(date, selectedVictim);
+                    }}
+                  >
+                    <span className="thief-modal-btn-inner"></span>
+                    <span className="thief-btn-text">
+                      {selectedVictim === 'none' ? 'CONFIRMAR' : 'ROUBAR PONTO 🎯'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* HEADER BANNER CARD (Apenas na aba de partidas) */}
       {activeTab === 'jogos' && (
         <div className="app-header-card-wrapper">
@@ -1804,97 +1961,24 @@ function App() {
         {activeTab === 'jogos' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-            {/* NOTIFICAÇÕES DO LADRÃO (THIEF) */}
-            {currentUser && (() => {
-              // Rodadas do Ladrão. USA `bets` (já mapeado com participantId = username),
-              // igual aos `participants`. Antes usava betRows cru (user_id = UUID), que
-              // não casava com os participants → todo mundo pontuava 0 → nunca havia
-              // Ladrão e o card não aparecia pra ninguém.
-              const thiefRounds = calculateThiefRounds(matches, bets, participants);
-
-              const pendingSteals = Object.entries(thiefRounds)
-                .filter(([date, status]) => status.thiefId === currentUser.id && !thiefSteals.some(s => s.roundDate === date))
-                .map(([date, status]) => ({ date, status }));
-
-              const receivedSteals = thiefSteals.filter(s => s.victimId === currentUser.id && !dismissedSteals.includes(s.id));
-
-              const formatBrlDate = (isoDate: string) => {
-                const parts = isoDate.split('-');
-                if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
-                return isoDate;
-              };
-
+            {/* PONTO ROUBADO (banner dismissível — "Você é o Ladrão" agora é modal, no topo do app) */}
+            {currentUser && receivedSteals.map((steal) => {
+              const thief = participants.find(p => p.id === steal.thiefId);
               return (
-                <>
-                  {/* Roubos Sofridos */}
-                  {receivedSteals.map((steal) => {
-                    const thief = participants.find(p => p.id === steal.thiefId);
-                    return (
-                      <div key={steal.id} className="thief-victim-card">
-                        <div className="thief-victim-content">
-                          <span className="thief-victim-icon">⚠️</span>
-                          <div className="thief-victim-text">
-                            <span className="thief-victim-title">PONTO ROUBADO!</span>
-                            <span className="thief-victim-desc">
-                              O participante <b>{thief?.name || steal.thiefId}</b> roubou 1 ponto seu referente à rodada de <b>{formatBrlDate(steal.roundDate)}</b>!
-                            </span>
-                          </div>
-                        </div>
-                        <button type="button" className="thief-victim-close" onClick={() => dismissSteal(steal.id)}>✕</button>
-                      </div>
-                    );
-                  })}
-
-                  {/* Roubos Pendentes (Você é o Ladrão) */}
-                  {pendingSteals.map(({ date, status }) => {
-                    const selectedVictim = selectedVictims[date] || '';
-                    const stealOptions = participants.filter(p => p.id !== currentUser.id);
-
-                    return (
-                      <div key={date} className="thief-attacker-card">
-                        <div className="thief-attacker-glow"></div>
-                        <div className="thief-attacker-body">
-                          <div className="thief-attacker-header">
-                            <span className="thief-attacker-emoji">🥷</span>
-                            <div className="thief-attacker-title-wrap">
-                              <span className="thief-attacker-title">VOCÊ É O LADRÃO!</span>
-                              <span className="thief-attacker-desc">
-                                Você foi o maior pontuador da rodada de <b>{formatBrlDate(date)}</b> com <b>{status.pointsScored} pontos</b>! Escolha um adversário para roubar 1 ponto dele.
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="thief-attacker-action-row">
-                            <select
-                              className="thief-attacker-select"
-                              value={selectedVictim}
-                              onChange={(e) => setSelectedVictims(prev => ({ ...prev, [date]: e.target.value }))}
-                            >
-                              <option value="">Escolher adversário...</option>
-                              {stealOptions.map((p) => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
-                              <option value="none">Ninguém (não roubar)</option>
-                            </select>
-                            <button
-                              type="button"
-                              className="thief-attacker-btn"
-                              disabled={!selectedVictim}
-                              onClick={() => handleExecuteSteal(date, selectedVictim)}
-                            >
-                              {selectedVictim === 'none' ? 'Confirmar' : 'Roubar Ponto 🎯'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
+                <div key={steal.id} className="thief-victim-card">
+                  <div className="thief-victim-content">
+                    <span className="thief-victim-icon">⚠️</span>
+                    <div className="thief-victim-text">
+                      <span className="thief-victim-title">PONTO ROUBADO!</span>
+                      <span className="thief-victim-desc">
+                        O participante <b>{thief?.name || steal.thiefId}</b> roubou 1 ponto seu referente à rodada de <b>{formatBrlDate(steal.roundDate)}</b>!
+                      </span>
+                    </div>
+                  </div>
+                  <button type="button" className="thief-victim-close" onClick={() => dismissSteal(steal.id)}>✕</button>
+                </div>
               );
-            })()}
-
-            {/* NOTIFICAÇÕES DE DESAFIO — MODAL OVERLAY */}
-            {/* (bloco vazio — o modal é renderizado fora do fluxo, no topo do app-container) */}
+            })}
 
             {/* DATE CAROUSEL (3 datas visíveis, swipeable) */}
             {dates.length > 0 && (() => {
