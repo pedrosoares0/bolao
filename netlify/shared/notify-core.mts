@@ -19,6 +19,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EspnGoalDetail } from './espn-core.mts';
 import { countScorerGoals, scorerName } from './scorer-core.mts';
+// Só o TIPO no topo (não carrega o @resvg/resvg-js). O gerador é importado
+// dinamicamente dentro de sendBracketImage, pra um erro de bundle da lib nativa
+// não derrubar as outras notificações.
+import type { BracketRound } from './bracket-image.mts';
 
 // ---- Linha crua da tabela `matches` (o que sync-core monta) ----
 interface MatchRow {
@@ -274,6 +278,40 @@ export const sendText = async (text: string): Promise<boolean> => {
   }
 };
 
+// Envia uma IMAGEM (base64) pro grupo, com legenda. Espelha o sendText (v2 e
+// fallback v1). `media` = base64 puro (sem o prefixo data:).
+export const sendMedia = async (base64: string, caption: string, fileName = 'imagem.png'): Promise<boolean> => {
+  const base = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const key = process.env.EVOLUTION_API_KEY || '';
+  const instance = process.env.EVOLUTION_INSTANCE_NAME || '';
+  const group = process.env.id_grupo || process.env.ID_GRUPO || '';
+  const number = group.includes('@') ? group : `${group}@g.us`;
+  const endpoint = `${base}/message/sendMedia/${instance}`;
+  const headers = { 'Content-Type': 'application/json', apikey: key };
+
+  try {
+    // Evolution v2
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ number, mediatype: 'image', mimetype: 'image/png', media: base64, fileName, caption }),
+    });
+    if (res.ok) return true;
+    // Evolution v1 (fallback)
+    const res1 = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ number, mediaMessage: { mediatype: 'image', fileName, caption, media: base64 } }),
+    });
+    if (res1.ok) return true;
+    console.error('Evolution sendMedia falhou:', res.status, await res.text().catch(() => ''));
+    return false;
+  } catch (err) {
+    console.error('Evolution sendMedia erro de rede:', err);
+    return false;
+  }
+};
+
 // Reserva atômica da chave (insere; true se foi NOVA, false se já existia
 // ou se a tabela não existe — nesse caso não enviamos para evitar repetição).
 const reserve = async (supabase: SupabaseClient, key: string): Promise<boolean> => {
@@ -431,6 +469,101 @@ const msgNextRound = (iso: string, matches: MatchRow[]): string => {
 
 const isPre = (s: string) => s === 'SCHEDULED' || s === 'TIMED';
 const isLive = (s: string) => s === 'IN_PLAY' || s === 'PAUSED';
+
+// ============================================================
+// Imagem do CHAVEAMENTO pro grupo (fim de dia no mata-mata)
+// ============================================================
+
+// Ordem oficial da chave por id (football-data) — igual ao BracketTab. Garante
+// que os pares 2k/2k+1 alimentem o índice k da fase seguinte (conectores certos).
+const BRACKET_ORDER: Record<string, string[]> = {
+  LAST_32: ['537415','537416','537417','537418','537419','537420','537421','537422','537423','537424','537425','537426','537427','537428','537429','537430'],
+  LAST_16: ['537375','537376','537379','537380','537377','537378','537381','537382'],
+  QUARTER_FINALS: ['537383','537384','537385','537386'],
+  SEMI_FINALS: ['537387','537388'],
+  FINAL: ['537390'],
+};
+const KO_TREE = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
+const KO_LABEL: Record<string, string> = {
+  LAST_32: '16avos', LAST_16: 'Oitavas', QUARTER_FINALS: 'Quartas', SEMI_FINALS: 'Semis', FINAL: 'Final',
+};
+
+interface KoRow {
+  id: number; stage: string | null; utc_date: string;
+  home_team: string; away_team: string; home_tla: string | null; away_tla: string | null;
+  home_score: number | null; away_score: number | null;
+  winner: string | null; home_pens: number | null; away_pens: number | null;
+}
+
+// Fonte Rama Gothic (display do app) — buscada do site publicado e cacheada.
+let ramaFontCache: Buffer | null = null;
+async function getRamaFont(): Promise<Buffer | null> {
+  if (ramaFontCache) return ramaFontCache;
+  const url = process.env.URL || process.env.DEPLOY_PRIME_URL;
+  if (!url) return null;
+  try {
+    const res = await fetch(`${url}/fonnts.com-Rama_Gothic_E_Bold.otf`);
+    if (!res.ok) return null;
+    ramaFontCache = Buffer.from(await res.arrayBuffer());
+    return ramaFontCache;
+  } catch {
+    return null;
+  }
+}
+
+const isTbdTeam = (t: string) => !t || t === 'A definir';
+const abbr3 = (t: string) => (t || '').replace(/[^A-Za-zÀ-ÿ]/g, '').slice(0, 3).toUpperCase();
+
+// Gera e envia a imagem do chaveamento. Devolve false se não deu (sem mata-mata,
+// sem fonte, envio falhou) — aí o chamador libera a chave pra tentar de novo.
+async function sendBracketImage(supabase: SupabaseClient, caption: string): Promise<boolean> {
+  const font = await getRamaFont();
+  if (!font) {
+    console.warn('bracket: fonte indisponível');
+    return false;
+  }
+  const { data } = await supabase
+    .from('matches')
+    .select('id, stage, utc_date, home_team, away_team, home_tla, away_tla, home_score, away_score, winner, home_pens, away_pens')
+    .in('stage', KO_TREE);
+  const all = (data ?? []) as KoRow[];
+  if (all.length === 0) return false; // mata-mata ainda não começou
+
+  const rounds: BracketRound[] = [];
+  for (const stage of KO_TREE) {
+    const ms = all.filter((m) => m.stage === stage);
+    if (ms.length === 0) continue;
+    const order = BRACKET_ORDER[stage] || [];
+    ms.sort((a, b) => {
+      const ia = order.indexOf(String(a.id));
+      const ib = order.indexOf(String(b.id));
+      if (ia >= 0 && ib >= 0) return ia - ib;
+      return Date.parse(a.utc_date) - Date.parse(b.utc_date);
+    });
+    rounds.push({
+      label: KO_LABEL[stage] ?? stage,
+      matches: ms.map((m) => {
+        const w = koWinnerSide(m as unknown as MatchRow);
+        const slot = (team: string, tla: string | null, score: number | null, side: 'HOME' | 'AWAY') => ({
+          code: isTbdTeam(team) ? '' : (tla || abbr3(team)),
+          iso: isTbdTeam(team) ? '' : (iso2Map[team] || ''),
+          score,
+          win: w === side,
+        });
+        return {
+          home: slot(m.home_team, m.home_tla, m.home_score, 'HOME'),
+          away: slot(m.away_team, m.away_tla, m.away_score, 'AWAY'),
+        };
+      }),
+    });
+  }
+  if (rounds.length === 0) return false;
+
+  // Import dinâmico: carrega o @resvg/resvg-js só aqui (ver comentário no topo).
+  const { renderBracketPng } = await import('./bracket-image.mts');
+  const png = await renderBracketPng(rounds, font);
+  return sendMedia(png.toString('base64'), caption, 'chaveamento.png');
+}
 
 export async function runNotifications(
   supabase: SupabaseClient,
@@ -644,5 +777,19 @@ export async function runNotifications(
       .sort((a, b) => Date.parse(a.utc_date) - Date.parse(b.utc_date));
     const ok = await sendText(msgNextRound(nextIso, nextMatches));
     if (!ok) await release(supabase, key);
+
+    // ÚLTIMA mensagem do dia: a imagem do CHAVEAMENTO atualizado (só no
+    // mata-mata), logo após a prévia da próxima rodada. Chave própria; se o
+    // mata-mata ainda não começou, libera pra tentar de novo no dia seguinte.
+    const brKey = `bracket:${dayIso}`;
+    if (await reserve(supabase, brKey)) {
+      try {
+        const sent = await sendBracketImage(supabase, `🏆 *Chaveamento* atualizado — ${dmFromIso(dayIso)}`);
+        if (!sent) await release(supabase, brKey);
+      } catch (err) {
+        console.error('Falha ao enviar o chaveamento:', err);
+        await release(supabase, brKey);
+      }
+    }
   }
 }
