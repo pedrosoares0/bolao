@@ -502,6 +502,13 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
   return { skipped: false, count: mergedRows.length };
 }
 
+// Reorienta o `winner` da ESPN (HOME/AWAY relativo ao mandante da ESPN) para a
+// orientação do football-data, caso listem mandante/visitante invertidos.
+function orientWinner(w: string | null, sameOrientation: boolean): string | null {
+  if (!w || w === 'DRAW' || sameOrientation) return w;
+  return w === 'HOME_TEAM' ? 'AWAY_TEAM' : 'HOME_TEAM';
+}
+
 // Sobrepõe o placar/tempo AO VIVO da ESPN nas linhas do football-data.
 // É best-effort: se a ESPN cair (rede/403/formato), devolve as linhas
 // originais — o football-data continua sendo a fonte (fallback).
@@ -533,6 +540,10 @@ async function mergeEspnLive(rows: MatchUpsertRow[]): Promise<MatchUpsertRow[]> 
       away_score: fdHomeIsEspnHome ? ov.awayScore : ov.homeScore,
       home_pens: fdHomeIsEspnHome ? ov.homePens : ov.awayPens,
       away_pens: fdHomeIsEspnHome ? ov.awayPens : ov.homePens,
+      // Quando a ESPN diz que o jogo ACABOU, ela já sabe se foi prorrogação/
+      // pênaltis e quem avançou — usamos na hora (senão mantém o football-data).
+      winner: ov.duration ? orientWinner(ov.winner, fdHomeIsEspnHome) : r.winner,
+      duration: ov.duration ?? r.duration,
       live_clock: ov.liveClock,
       homeTeamId: fdHomeIsEspnHome ? ov.homeTeamId : ov.awayTeamId,
       awayTeamId: fdHomeIsEspnHome ? ov.awayTeamId : ov.homeTeamId,
@@ -610,6 +621,10 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
     const fdHomeIsEspnHome = norm(r.home_team) === ov.homeNorm;
     const homeScore = fdHomeIsEspnHome ? ov.homeScore : ov.awayScore;
     const awayScore = fdHomeIsEspnHome ? ov.awayScore : ov.homeScore;
+    // Decisão/vencedor da ESPN (só quando encerrado) — o ao vivo passa a gravar
+    // prorrogação/pênaltis + quem avançou na hora, sem esperar o football-data.
+    const espnDuration = ov.duration ?? null;
+    const espnWinner = espnDuration ? orientWinner(ov.winner, fdHomeIsEspnHome) : null;
 
     // Só grava (e notifica) quando algo realmente mudou — evita recarregar o
     // front à toa a cada 10s e reprocessar notificações.
@@ -617,7 +632,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       ov.status !== r.status ||
       homeScore !== r.home_score ||
       awayScore !== r.away_score ||
-      ov.liveClock !== r.live_clock;
+      ov.liveClock !== r.live_clock ||
+      (espnDuration !== null && (espnDuration !== r.duration || espnWinner !== r.winner));
     if (!changed) continue;
 
     prevById.set(r.id, { id: r.id, status: r.status, home_score: r.home_score, away_score: r.away_score });
@@ -641,8 +657,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       away_score: awayScore,
       home_pens: fdHomeIsEspnHome ? ov.homePens : ov.awayPens,
       away_pens: fdHomeIsEspnHome ? ov.awayPens : ov.homePens,
-      winner: r.winner,
-      duration: r.duration,
+      winner: espnDuration ? espnWinner : r.winner,
+      duration: espnDuration ?? r.duration,
       live_clock: ov.liveClock,
       updated_at: new Date().toISOString(),
       // transitórios (notificações) — removidos antes do upsert por toDbRow
@@ -663,6 +679,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
     away_score: u.away_score,
     home_pens: u.home_pens,
     away_pens: u.away_pens,
+    winner: u.winner,
+    duration: u.duration,
     live_clock: u.live_clock,
     updated_at: u.updated_at,
   }));

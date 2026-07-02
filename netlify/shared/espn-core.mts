@@ -25,6 +25,11 @@ export interface EspnOverride {
   awayScore: number;
   homePens: number | null; // gols na disputa de pênaltis (null se não houve)
   awayPens: number | null;
+  // Como o jogo foi decidido (só quando ENCERRADO; null enquanto ao vivo). A ESPN
+  // marca "FT" (normal) / "AET" (prorrogação) / "FT-Pens" (pênaltis) e o `period`
+  // (2 = normal, 3/4 = prorrogação, 5 = pênaltis) — deduzimos daqui, sem football-data.
+  duration: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT' | null;
+  winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // quem venceu/avança (só encerrado)
   liveClock: string | null; // minuto/etapa enquanto ao vivo; null quando encerrado
   homeNorm: string;         // nome normalizado do mandante (p/ alinhar o placar)
   dateIso: string;          // dia do jogo em UTC (YYYY-MM-DD), p/ conferência
@@ -35,8 +40,8 @@ export interface EspnOverride {
 
 // ---- Formato (parcial) do scoreboard da ESPN ----
 interface EspnTeam { id?: string; displayName?: string; name?: string; }
-interface EspnCompetitor { homeAway?: string; score?: string; shootoutScore?: string | number; team?: EspnTeam; }
-interface EspnStatusType { state?: string; completed?: boolean; shortDetail?: string; }
+interface EspnCompetitor { homeAway?: string; score?: string; shootoutScore?: string | number; winner?: boolean; team?: EspnTeam; }
+interface EspnStatusType { state?: string; completed?: boolean; shortDetail?: string; detail?: string; }
 interface EspnAthlete { displayName?: string; fullName?: string; }
 interface EspnDetail {
   type?: { text?: string };
@@ -46,7 +51,7 @@ interface EspnDetail {
   clock?: { displayValue?: string };
   ownGoal?: boolean;
 }
-interface EspnCompetition { competitors?: EspnCompetitor[]; status?: { type?: EspnStatusType }; details?: EspnDetail[]; }
+interface EspnCompetition { competitors?: EspnCompetitor[]; status?: { type?: EspnStatusType; period?: number }; details?: EspnDetail[]; }
 interface EspnEvent { date?: string; competitions?: EspnCompetition[]; }
 interface EspnScoreboard { events?: EspnEvent[]; }
 
@@ -138,13 +143,41 @@ export async function fetchEspnOverrides(dateKey?: string): Promise<Map<string, 
     };
     const homePens = pens(home?.shootoutScore);
     const awayPens = pens(away?.shootoutScore);
+    const homeScore = parseInt(home?.score ?? '0', 10) || 0;
+    const awayScore = parseInt(away?.score ?? '0', 10) || 0;
+
+    // Como o jogo foi decidido + quem venceu (só quando ENCERRADO). Sinais da
+    // ESPN: `detail` ("FT"/"AET"/"FT-Pens") e `period` (2 normal, 3/4 prorrog,
+    // 5 pênaltis) + shootoutScore. Assim football-data (atrasado) deixa de ser
+    // necessário pra saber prorrogação/pênaltis.
+    let duration: EspnOverride['duration'] = null;
+    let winner: EspnOverride['winner'] = null;
+    if (isDone) {
+      const detail = (type?.detail ?? type?.shortDetail ?? '').toUpperCase();
+      const period = comp?.status?.period ?? 0;
+      const wasPens = homePens != null || awayPens != null || period >= 5 || detail.includes('PEN');
+      const wasExtra = !wasPens && (detail.includes('AET') || period === 3 || period === 4);
+      duration = wasPens ? 'PENALTY_SHOOTOUT' : wasExtra ? 'EXTRA_TIME' : 'REGULAR';
+
+      if (wasPens && homePens != null && awayPens != null && homePens !== awayPens) {
+        winner = homePens > awayPens ? 'HOME_TEAM' : 'AWAY_TEAM';
+      } else if (home?.winner === true) {
+        winner = 'HOME_TEAM';
+      } else if (away?.winner === true) {
+        winner = 'AWAY_TEAM';
+      } else {
+        winner = homeScore > awayScore ? 'HOME_TEAM' : awayScore > homeScore ? 'AWAY_TEAM' : 'DRAW';
+      }
+    }
 
     map.set(pairKey(homeName, awayName), {
       status: isLive ? 'IN_PLAY' : 'FINISHED',
-      homeScore: parseInt(home?.score ?? '0', 10) || 0,
-      awayScore: parseInt(away?.score ?? '0', 10) || 0,
+      homeScore,
+      awayScore,
       homePens,
       awayPens,
+      duration,
+      winner,
       liveClock: isLive ? (type?.shortDetail ?? null) : null,
       homeNorm: norm(homeName),
       dateIso: (ev.date ?? '').slice(0, 10),
