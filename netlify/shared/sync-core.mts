@@ -47,11 +47,15 @@ export function splitScoreAndPens(score: ApiMatch['score']): {
   away_score: number | null;
   home_pens: number | null;
   away_pens: number | null;
+  home_score_90: number | null;
+  away_score_90: number | null;
 } {
   let home_score = score?.fullTime?.home ?? null;
   let away_score = score?.fullTime?.away ?? null;
   let home_pens: number | null = null;
   let away_pens: number | null = null;
+  let home_score_90: number | null = null;
+  let away_score_90: number | null = null;
 
   const pens = score?.penalties;
   if (pens?.home != null && pens?.away != null) {
@@ -67,9 +71,17 @@ export function splitScoreAndPens(score: ApiMatch['score']): {
       home_score = home_score - pens.home;
       away_score = away_score - pens.away;
     }
+  } else if (
+    // Prorrogação por gol (sem pênaltis): guarda o placar dos 90' (regularTime).
+    score?.duration === 'EXTRA_TIME' &&
+    score?.regularTime?.home != null &&
+    score?.regularTime?.away != null
+  ) {
+    home_score_90 = score.regularTime.home;
+    away_score_90 = score.regularTime.away;
   }
 
-  return { home_score, away_score, home_pens, away_pens };
+  return { home_score, away_score, home_pens, away_pens, home_score_90, away_score_90 };
 }
 
 // ---- Estado anterior de um jogo (para detectar transições e notificar) ----
@@ -132,6 +144,8 @@ interface MatchUpsertRow {
   away_score: number | null;
   home_pens: number | null;
   away_pens: number | null;
+  home_score_90: number | null; // placar do tempo normal (só na prorrogação por gol)
+  away_score_90: number | null;
   winner: string | null;
   duration: string | null; // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT (football-data)
   live_clock: string | null;
@@ -414,7 +428,7 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
 
   const data = (await res.json()) as { matches?: ApiMatch[] };
   const rows: MatchUpsertRow[] = (data.matches ?? []).map((m): MatchUpsertRow => {
-    const { home_score, away_score, home_pens, away_pens } = splitScoreAndPens(m.score);
+    const { home_score, away_score, home_pens, away_pens, home_score_90, away_score_90 } = splitScoreAndPens(m.score);
     return {
       id: m.id,
       utc_date: m.utcDate,
@@ -431,6 +445,8 @@ export async function syncMatches(force = false): Promise<{ skipped: boolean; co
       away_score,
       home_pens, // football-data v4 traz penalties; a ESPN ainda pode sobrescrever abaixo
       away_pens,
+      home_score_90, // placar dos 90' (prorrogação); a ESPN também preenche abaixo
+      away_score_90,
       winner: m.score?.winner ?? null,
       duration: m.score?.duration ?? null, // como o jogo foi decidido (90'/prorrog./pênaltis)
       live_clock: null, // preenchido abaixo com o minuto da ESPN, quando ao vivo
@@ -544,6 +560,8 @@ async function mergeEspnLive(rows: MatchUpsertRow[]): Promise<MatchUpsertRow[]> 
       // pênaltis e quem avançou — usamos na hora (senão mantém o football-data).
       winner: ov.duration ? orientWinner(ov.winner, fdHomeIsEspnHome) : r.winner,
       duration: ov.duration ?? r.duration,
+      home_score_90: ov.homeScore90 != null ? (fdHomeIsEspnHome ? ov.homeScore90 : ov.awayScore90) : r.home_score_90,
+      away_score_90: ov.awayScore90 != null ? (fdHomeIsEspnHome ? ov.awayScore90 : ov.homeScore90) : r.away_score_90,
       live_clock: ov.liveClock,
       homeTeamId: fdHomeIsEspnHome ? ov.homeTeamId : ov.awayTeamId,
       awayTeamId: fdHomeIsEspnHome ? ov.awayTeamId : ov.homeTeamId,
@@ -565,6 +583,8 @@ interface LiveDbRow {
   away_team: string;
   home_score: number | null;
   away_score: number | null;
+  home_score_90: number | null;
+  away_score_90: number | null;
   winner: string | null;
   duration: string | null;
   live_clock: string | null;
@@ -607,7 +627,7 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
 
   const { data: dbRows } = await supabase
     .from('matches')
-    .select('id, utc_date, status, stage, home_team, away_team, home_score, away_score, winner, duration, live_clock');
+    .select('id, utc_date, status, stage, home_team, away_team, home_score, away_score, home_score_90, away_score_90, winner, duration, live_clock');
   if (!dbRows || dbRows.length === 0) return { skipped: false, count: 0 };
 
   const prevById = new Map<number, PrevState>();
@@ -625,6 +645,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
     // prorrogação/pênaltis + quem avançou na hora, sem esperar o football-data.
     const espnDuration = ov.duration ?? null;
     const espnWinner = espnDuration ? orientWinner(ov.winner, fdHomeIsEspnHome) : null;
+    const homeScore90 = ov.homeScore90 != null ? (fdHomeIsEspnHome ? ov.homeScore90 : ov.awayScore90) : r.home_score_90;
+    const awayScore90 = ov.awayScore90 != null ? (fdHomeIsEspnHome ? ov.awayScore90 : ov.homeScore90) : r.away_score_90;
 
     // Só grava (e notifica) quando algo realmente mudou — evita recarregar o
     // front à toa a cada 10s e reprocessar notificações.
@@ -633,7 +655,9 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       homeScore !== r.home_score ||
       awayScore !== r.away_score ||
       ov.liveClock !== r.live_clock ||
-      (espnDuration !== null && (espnDuration !== r.duration || espnWinner !== r.winner));
+      (espnDuration !== null && (espnDuration !== r.duration || espnWinner !== r.winner)) ||
+      homeScore90 !== r.home_score_90 ||
+      awayScore90 !== r.away_score_90;
     if (!changed) continue;
 
     prevById.set(r.id, { id: r.id, status: r.status, home_score: r.home_score, away_score: r.away_score });
@@ -657,6 +681,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
       away_score: awayScore,
       home_pens: fdHomeIsEspnHome ? ov.homePens : ov.awayPens,
       away_pens: fdHomeIsEspnHome ? ov.awayPens : ov.homePens,
+      home_score_90: homeScore90,
+      away_score_90: awayScore90,
       winner: espnDuration ? espnWinner : r.winner,
       duration: espnDuration ?? r.duration,
       live_clock: ov.liveClock,
@@ -679,6 +705,8 @@ export async function syncLive(force = false): Promise<{ skipped: boolean; count
     away_score: u.away_score,
     home_pens: u.home_pens,
     away_pens: u.away_pens,
+    home_score_90: u.home_score_90,
+    away_score_90: u.away_score_90,
     winner: u.winner,
     duration: u.duration,
     live_clock: u.live_clock,

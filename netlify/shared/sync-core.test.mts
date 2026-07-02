@@ -14,6 +14,7 @@ describe('splitScoreAndPens', () => {
     };
     expect(splitScoreAndPens(score)).toEqual({
       home_score: 2, away_score: 1, home_pens: null, away_pens: null,
+      home_score_90: null, away_score_90: null,
     });
   });
 
@@ -29,6 +30,7 @@ describe('splitScoreAndPens', () => {
     };
     expect(splitScoreAndPens(score)).toEqual({
       home_score: 1, away_score: 1, home_pens: 3, away_pens: 4,
+      home_score_90: null, away_score_90: null,
     });
   });
 
@@ -44,10 +46,11 @@ describe('splitScoreAndPens', () => {
     };
     expect(splitScoreAndPens(score)).toEqual({
       home_score: 2, away_score: 2, home_pens: 5, away_pens: 4,
+      home_score_90: null, away_score_90: null,
     });
   });
 
-  it('decidido na prorrogação por gol (sem disputa): mantém o fullTime', () => {
+  it('decidido na prorrogação por gol (sem disputa): mantém o fullTime e guarda o placar dos 90 min', () => {
     const score = {
       winner: 'HOME_TEAM',
       duration: 'EXTRA_TIME',
@@ -57,6 +60,7 @@ describe('splitScoreAndPens', () => {
     };
     expect(splitScoreAndPens(score)).toEqual({
       home_score: 2, away_score: 1, home_pens: null, away_pens: null,
+      home_score_90: 1, away_score_90: 1,
     });
   });
 
@@ -69,15 +73,18 @@ describe('splitScoreAndPens', () => {
     };
     expect(splitScoreAndPens(score)).toEqual({
       home_score: 1, away_score: 1, home_pens: 3, away_pens: 4,
+      home_score_90: null, away_score_90: null,
     });
   });
 
   it('jogo sem placar (agendado): tudo nulo', () => {
     expect(splitScoreAndPens({ winner: null })).toEqual({
       home_score: null, away_score: null, home_pens: null, away_pens: null,
+      home_score_90: null, away_score_90: null,
     });
     expect(splitScoreAndPens(null)).toEqual({
       home_score: null, away_score: null, home_pens: null, away_pens: null,
+      home_score_90: null, away_score_90: null,
     });
   });
 });

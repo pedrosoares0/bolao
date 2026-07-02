@@ -123,6 +123,8 @@ interface MatchDbRow {
   away_score: number | null;
   home_pens: number | null;
   away_pens: number | null;
+  home_score_90: number | null;
+  away_score_90: number | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
   duration: string | null;
   live_clock: string | null;
@@ -150,6 +152,8 @@ const mapRowToMatch = (r: MatchDbRow): Match => {
     awayScore: r.away_score ?? null,
     homePens: r.home_pens ?? null,
     awayPens: r.away_pens ?? null,
+    homeScore90: r.home_score_90 ?? null,
+    awayScore90: r.away_score_90 ?? null,
     status: r.status === 'FINISHED' ? 'finished' : 'scheduled',
     kickoff: r.utc_date,
     isoDate: bDay,
@@ -537,7 +541,7 @@ function App() {
         supabase
           .from('matches')
           .select(
-            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, home_pens, away_pens, winner, duration, live_clock, goals'
+            'id, utc_date, status, stage, group_name, home_team, away_team, home_tla, away_tla, home_crest, away_crest, home_score, away_score, home_pens, away_pens, home_score_90, away_score_90, winner, duration, live_clock, goals'
           )
           .order('utc_date'),
         supabase.from('bets').select('user_id, match_id, home_score, away_score, scorer_id, pens_pick, pens_winner'),
@@ -2236,6 +2240,28 @@ function App() {
                               </div>
                             </div>
                           </div>
+
+                          {/* Aviso de decisão no mata-mata: pênaltis ou prorrogação
+                              (com o placar dos 90' e o final). */}
+                          {isFinished && (() => {
+                            const wasPens = match.homePens != null && match.awayPens != null;
+                            const wasExtra = match.duration === 'EXTRA_TIME';
+                            if (!wasPens && !wasExtra) return null;
+                            return (
+                              <div className="match-decision-p16">
+                                {wasPens ? (
+                                  <span>🥅 <strong>Pênaltis</strong> · {match.homePens} <span className="md-x">x</span> {match.awayPens}</span>
+                                ) : (
+                                  <span>
+                                    ⏱️ <strong>Prorrogação</strong>
+                                    {match.homeScore90 != null && match.awayScore90 != null && (
+                                      <> · 90&apos;: {match.homeScore90} <span className="md-x">x</span> {match.awayScore90} · Final: {match.homeScore} <span className="md-x">x</span> {match.awayScore}</>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Seção de palpite baseada somente nas odds retornadas pela ESPN */}
                           {match.status !== 'finished' && (() => {

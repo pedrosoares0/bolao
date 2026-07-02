@@ -3130,6 +3130,24 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Aviso de decisão do mata-mata (pênaltis / prorrogação) no card do jogo */
+.match-decision-p16 {
+  text-align: center;
+  margin: 0.1rem auto 0.35rem;
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(21, 17, 14, 0.62);
+}
+.match-decision-p16 strong {
+  font-weight: 800;
+  color: rgba(21, 17, 14, 0.82);
+}
+.match-decision-p16 .md-x {
+  opacity: 0.45;
+  margin: 0 0.1rem;
+}
+
 .live-dot-p16 {
   width: 5px;
   height: 5px;

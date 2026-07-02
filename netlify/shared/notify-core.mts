@@ -33,6 +33,8 @@ interface MatchRow {
   away_score: number | null;
   home_pens?: number | null;
   away_pens?: number | null;
+  home_score_90?: number | null; // placar do tempo normal (só prorrogação por gol)
+  away_score_90?: number | null;
   winner?: string | null;
   duration?: string | null; // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
   homeTeamId?: string;
@@ -130,11 +132,14 @@ const decisionLine = (m: MatchRow): string | null => {
   if (m.home_pens != null && m.away_pens != null) {
     return `🥅 *Pênaltis:* ${flagEmoji(m.home_team)} ${m.home_pens} x ${m.away_pens} ${flagEmoji(m.away_team)}${adv}`;
   }
-  // Prorrogação decidida por gol: o placar principal já é o resultado final.
+  // Prorrogação decidida por gol: o placar principal (scoreLine) já é o final.
+  // Aqui destacamos que foi na prorrogação e como estava aos 90'.
   if (m.duration === 'EXTRA_TIME') {
-    return advEn
-      ? `⏱️ *${ptName(advEn)}* venceu na prorrogação`
-      : '⏱️ Decidido na prorrogação';
+    const has90 = m.home_score_90 != null && m.away_score_90 != null;
+    const base = has90
+      ? `⏱️ *Prorrogação* — aos 90' estava ${flagEmoji(m.home_team)} ${m.home_score_90} x ${m.away_score_90} ${flagEmoji(m.away_team)}`
+      : '⏱️ *Decidido na prorrogação*';
+    return `${base}${adv}`;
   }
   return null;
 };

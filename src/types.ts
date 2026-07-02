@@ -35,6 +35,8 @@ export interface Match {
   awayScore: number | null; // null se não jogou
   homePens?: number | null; // gols na disputa de pênaltis (mata-mata), via ESPN
   awayPens?: number | null;
+  homeScore90?: number | null; // placar do tempo normal (90') — só na prorrogação por gol
+  awayScore90?: number | null;
   status: MatchStatus;
   kickoff: string; // Início do jogo em UTC (ISO 8601) — fonte da verdade p/ lockout
   isoDate: string; // Data do jogo no horário de Brasília (YYYY-MM-DD)

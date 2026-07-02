@@ -30,6 +30,10 @@ export interface EspnOverride {
   // (2 = normal, 3/4 = prorrogação, 5 = pênaltis) — deduzimos daqui, sem football-data.
   duration: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT' | null;
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null; // quem venceu/avança (só encerrado)
+  // Placar do TEMPO NORMAL (90') — só na prorrogação por gol, pra exibir "90':
+  // 2x2 · Final: 3x2". Derivado dos gols (minuto <= 90). null nos demais.
+  homeScore90: number | null;
+  awayScore90: number | null;
   liveClock: string | null; // minuto/etapa enquanto ao vivo; null quando encerrado
   homeNorm: string;         // nome normalizado do mandante (p/ alinhar o placar)
   dateIso: string;          // dia do jogo em UTC (YYYY-MM-DD), p/ conferência
@@ -170,6 +174,27 @@ export async function fetchEspnOverrides(dateKey?: string): Promise<Map<string, 
       }
     }
 
+    // Placar dos 90' (só na prorrogação por gol): conta os gols com minuto <= 90
+    // (a prorrogação é 91-120). Own goal credita o outro time. Ex.: BEL x SEN ->
+    // gols aos 24/51 (SEN) e 86/89 (BEL) = 2-2; o de 120'+5' (BEL) não entra.
+    let homeScore90: number | null = null;
+    let awayScore90: number | null = null;
+    if (duration === 'EXTRA_TIME') {
+      const homeId = home?.team?.id ?? '';
+      const awayId = away?.team?.id ?? '';
+      let h90 = 0;
+      let a90 = 0;
+      for (const g of goalsDetail) {
+        if (parseInt(g.minute, 10) > 90) continue; // gol da prorrogação
+        const benefitsHome = (g.teamId === homeId && !g.ownGoal) || (g.teamId === awayId && g.ownGoal);
+        const benefitsAway = (g.teamId === awayId && !g.ownGoal) || (g.teamId === homeId && g.ownGoal);
+        if (benefitsHome) h90++;
+        else if (benefitsAway) a90++;
+      }
+      homeScore90 = h90;
+      awayScore90 = a90;
+    }
+
     map.set(pairKey(homeName, awayName), {
       status: isLive ? 'IN_PLAY' : 'FINISHED',
       homeScore,
@@ -178,6 +203,8 @@ export async function fetchEspnOverrides(dateKey?: string): Promise<Map<string, 
       awayPens,
       duration,
       winner,
+      homeScore90,
+      awayScore90,
       liveClock: isLive ? (type?.shortDetail ?? null) : null,
       homeNorm: norm(homeName),
       dateIso: (ev.date ?? '').slice(0, 10),
