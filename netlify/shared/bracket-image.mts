@@ -66,7 +66,28 @@ const PAD_L = 30;
 const TITLE_H = 182; // altura reservada p/ título + linha + rótulos das colunas
 const PAD_B = 60;
 
+// Preenche uma vaga vazia com o classificado do jogo alimentador (quem venceu).
+function fillFromFeeder(slot: BracketSlot, feeder: BracketMatch | undefined): void {
+  if (!feeder || slot.code) return; // já tem time ou sem alimentador
+  const adv = feeder.home.win ? feeder.home : feeder.away.win ? feeder.away : null;
+  if (adv && adv.code) {
+    slot.code = adv.code;
+    slot.iso = adv.iso;
+  }
+}
+
 export async function renderBracketPng(rounds: BracketRound[], fontBuffer: Buffer): Promise<Buffer> {
+  // Propaga os classificados p/ as fases seguintes: se a vaga está indefinida
+  // mas o jogo alimentador já tem vencedor, mostra quem avançou — mesmo que o
+  // football-data ainda não tenha atribuído o time à vaga (lag da fonte).
+  for (let c = 1; c < rounds.length; c++) {
+    const prev = rounds[c - 1].matches;
+    rounds[c].matches.forEach((m, j) => {
+      fillFromFeeder(m.home, prev[2 * j]);
+      fillFromFeeder(m.away, prev[2 * j + 1]);
+    });
+  }
+
   const nCols = rounds.length;
   const n0 = rounds[0]?.matches.length ?? 1;
   const contentH = n0 * CARD_H + (n0 - 1) * GAP_Y;
