@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./capa.png" alt="Bolão da Copa do Mundo 2026" width="100%"/>
+</p>
+
 # 🏆 Bolão da Copa do Mundo 2026 - Bandidos Apostados
 
 Plataforma mobile-first completa para bolão da Copa do Mundo 2026, com placares ao vivo, sistema de pontuação e notificações integradas.
